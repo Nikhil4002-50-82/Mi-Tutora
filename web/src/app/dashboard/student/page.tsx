@@ -1,69 +1,68 @@
+"use client";
+
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Helmet } from 'react-helmet-async';
+import { useRouter } from 'next/navigation';
+
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, Wallet, LayoutDashboard, LogOut, ShieldCheck, User } from 'lucide-react';
-import logo from '../../imports/logo.png';
+import { BookOpen, Users, LayoutDashboard, LogOut, ShieldCheck, User } from 'lucide-react';
+const logo = '/imports/logo.png';
 
-export default function TeacherDashboard() {
+export default function StudentDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate('/login');
+      router.push('/login');
       return;
     }
 
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://localhost:3001/api/data/teacher/dashboard', {
+        const response = await axios.get('http://localhost:3001/api/data/student/dashboard', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setData(response.data.data);
       } catch (error) {
         console.error('Error fetching dashboard', error);
         localStorage.removeItem('token');
-        navigate('/login');
+        router.push('/login');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [navigate]);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/login');
+    router.push('/login');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'schedule', label: 'Schedule', icon: CalendarDays },
-    { id: 'earnings', label: 'Earnings', icon: Wallet },
+    { id: 'teachers', label: 'Find Tutors', icon: Users },
+    { id: 'classes', label: 'My Classes', icon: BookOpen },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Helmet>
-        <title>Teacher Dashboard - Mi Tutora</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+      
 
       {/* SIDEBAR (Desktop) */}
       <aside className="w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex-col hidden md:flex border-r border-white/5 shadow-xl z-10">
         <div className="p-6 border-b border-white/10 flex flex-col items-start gap-4">
           <div className="flex flex-col justify-center">
-            <img src={logo} alt="Mi Tutora Logo" className="h-24 w-auto object-contain object-left mb-1 -ml-2" />
-            <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Teacher Portal</p>
+            <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
+            <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Student Portal</p>
           </div>
         </div>
 
@@ -109,7 +108,7 @@ export default function TeacherDashboard() {
         <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10 sticky top-0 shadow-sm">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-[#00a992]" />
-            <h1 className="font-bold text-gray-900">Teacher Portal</h1>
+            <h1 className="font-bold text-gray-900">Student Portal</h1>
           </div>
           <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-600 transition-colors">
             <LogOut className="w-5 h-5" />
@@ -129,79 +128,75 @@ export default function TeacherDashboard() {
             {/* TAB: DASHBOARD */}
             {activeTab === 'dashboard' && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, Teacher!</h1>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center gap-6">
-                    <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-100">
-                      <Wallet className="w-7 h-7 text-[#00a992]" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-500 mb-1 uppercase tracking-wide">Total Earnings</h3>
-                      <p className="text-4xl font-black text-[#063831]">${data?.earnings?.total || 0}</p>
-                    </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, Student!</h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Hours Studied</h3>
+                    <p className="text-4xl font-black text-[#063831]">{data?.progress?.hoursStudied || 0}</p>
                   </div>
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center gap-6">
-                    <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center border border-orange-100">
-                      <Wallet className="w-7 h-7 text-orange-500" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-500 mb-1 uppercase tracking-wide">Pending Payments</h3>
-                      <p className="text-4xl font-black text-orange-600">${data?.earnings?.pending || 0}</p>
-                    </div>
+                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Courses Completed</h3>
+                    <p className="text-4xl font-black text-[#00a992]">{data?.progress?.coursesCompleted || 0}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: EARNINGS */}
-            {activeTab === 'earnings' && (
+            {/* TAB: FIND TUTORS */}
+            {activeTab === 'teachers' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Earnings Breakdown</h2>
-                <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 max-w-3xl">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="text-center md:text-left">
-                      <p className="text-gray-500 font-medium mb-2">Available for Withdrawal</p>
-                      <h3 className="text-5xl font-black text-[#00a992]">${data?.earnings?.total || 0}</h3>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Available Teachers</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {data?.availableTeachers?.map((teacher: any) => (
+                    <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                          {teacher.mode}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.description}</p>
+                      <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl">
+                        <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects}</p>
+                        <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>
+                        <p><strong className="text-gray-700">Fee:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange}</span></p>
+                      </div>
+                      <button className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20">
+                        Request Tutor
+                      </button>
                     </div>
-                    <button className="bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 px-8 rounded-xl transition-colors shadow-md">
-                      Withdraw Funds
-                    </button>
-                  </div>
+                  ))}
+                  {(!data?.availableTeachers || data.availableTeachers.length === 0) && (
+                    <div className="col-span-full p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
+                      No teachers currently available.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* TAB: SCHEDULE */}
-            {activeTab === 'schedule' && (
+            {/* TAB: CLASSES */}
+            {activeTab === 'classes' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Interested Students & Schedule</h2>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Requests & Upcoming Classes</h2>
                 <div className="bg-white shadow-sm overflow-hidden sm:rounded-2xl border border-gray-100">
                   <ul className="divide-y divide-gray-100">
-                    {data?.schedule?.map((session: any) => (
-                      <li key={session.id} className="p-6 hover:bg-emerald-50/30 transition-colors">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {data?.upcomingClasses?.map((cls: any) => (
+                      <li key={cls.id} className="p-6 hover:bg-emerald-50/30 transition-colors">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-lg font-bold text-[#063831] truncate mb-1">{session.student}</p>
-                            <p className="text-sm font-medium text-gray-500">{session.subject}</p>
+                            <p className="text-base font-bold text-[#063831] truncate mb-1">{cls.subject}</p>
+                            <p className="text-sm text-gray-500 font-medium">with <span className="text-[#00a992]">{cls.teacher}</span></p>
                           </div>
-                          <div className="flex items-center space-x-4">
-                            <div className="text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
-                              <span className="block font-semibold text-gray-700">{new Date(session.date).toLocaleDateString()}</span>
-                              <span>{new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            <span className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border ${
-                              session.status === 'confirmed' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                : 'bg-orange-50 text-orange-700 border-orange-200'
-                            }`}>
-                              {session.status}
-                            </span>
+                          <div className="text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                            <span className="block font-semibold text-gray-700">{new Date(cls.date).toLocaleDateString()}</span>
+                            <span>{new Date(cls.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
                       </li>
                     ))}
-                    {(!data?.schedule || data.schedule.length === 0) && (
-                      <li className="p-8 text-sm text-gray-500 text-center font-medium">No classes scheduled.</li>
+                    {(!data?.upcomingClasses || data.upcomingClasses.length === 0) && (
+                      <li className="p-8 text-sm text-gray-500 text-center font-medium">No requests or upcoming classes.</li>
                     )}
                   </ul>
                 </div>
@@ -212,15 +207,15 @@ export default function TeacherDashboard() {
             {activeTab === 'profile' && (
               <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 max-w-2xl">
                 <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Profile</h2>
-                <p className="text-gray-500 mb-4">Manage your teacher account and availability.</p>
+                <p className="text-gray-500 mb-4">Manage your account details and preferences.</p>
                 <div className="space-y-4">
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <p className="text-sm text-gray-500 font-medium mb-1">Email</p>
-                    <p className="text-gray-900 font-bold">teacher@example.com</p>
+                    <p className="text-gray-900 font-bold">student@example.com</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-sm text-gray-500 font-medium mb-1">Status</p>
-                    <p className="text-emerald-600 font-bold">Active</p>
+                    <p className="text-sm text-gray-500 font-medium mb-1">Grade Level</p>
+                    <p className="text-gray-900 font-bold">10th Grade</p>
                   </div>
                 </div>
               </div>

@@ -1,21 +1,23 @@
+"use client";
+
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Helmet } from 'react-helmet-async';
+import { useRouter } from 'next/navigation';
+
 import axios from 'axios';
 import { motion } from 'motion/react';
 import { CalendarDays, Wallet, LayoutDashboard, LogOut, ShieldCheck, User } from 'lucide-react';
-import logo from '../../imports/logo.png';
+const logo = '/imports/logo.png';
 
 export default function TeacherDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate('/login');
+      router.push('/login');
       return;
     }
 
@@ -28,18 +30,18 @@ export default function TeacherDashboard() {
       } catch (error) {
         console.error('Error fetching dashboard', error);
         localStorage.removeItem('token');
-        navigate('/login');
+        router.push('/login');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [navigate]);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/login');
+    router.push('/login');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
@@ -53,16 +55,13 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Helmet>
-        <title>Teacher Dashboard - Mi Tutora</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+      
 
       {/* SIDEBAR (Desktop) */}
       <aside className="w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex-col hidden md:flex border-r border-white/5 shadow-xl z-10">
         <div className="p-6 border-b border-white/10 flex flex-col items-start gap-4">
           <div className="flex flex-col justify-center">
-            <img src={logo} alt="Mi Tutora Logo" className="h-24 w-auto object-contain object-left mb-1 -ml-2" />
+            <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
             <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Teacher Portal</p>
           </div>
         </div>

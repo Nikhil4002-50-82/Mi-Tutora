@@ -62,7 +62,7 @@ export default function StudentDashboard() {
       <aside className="w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex-col hidden md:flex border-r border-white/5 shadow-xl z-10">
         <div className="p-6 border-b border-white/10 flex flex-col items-start gap-4">
           <div className="flex flex-col justify-center">
-            <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
+            <img src={logo} alt="Mi Tutora Logo" className="h-24 w-auto object-contain object-left mb-1 -ml-2" />
             <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Student Portal</p>
           </div>
         </div>
