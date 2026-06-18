@@ -2,16 +2,23 @@
 
 // src/app/components/DemoForm.tsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 
 interface Props {
   category?: string;
+  isDashboard?: boolean;
+  hasProfile?: boolean;
 }
 
 export default function DemoForm({
   category,
+  isDashboard = false,
+  hasProfile = false,
 }: Props) {
 
+  const [isEditing, setIsEditing] = useState(!hasProfile);
   const [formData, setFormData] =
     useState({
       fullName: '',
@@ -32,7 +39,78 @@ export default function DemoForm({
       goal: '',
       source: '',
       requirements: '',
+      budget: '',
+      category: category || '',
+      technologies: [] as string[],
+      languages: [] as string[],
     });
+
+  // Load profile from Supabase if inside dashboard and hasProfile is true
+  useEffect(() => {
+    if (isDashboard && hasProfile) {
+      const fetchProfile = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Fetch student data
+            const { data: studentData } = await supabase.from('students').select('*').eq('parentId', user.id).single();
+            // Fetch tuition request data
+            const { data: requestData } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id).order('created_at', { ascending: false }).limit(1).single();
+            
+            if (studentData && requestData) {
+              setIsEditing(false);
+              setFormData({
+                fullName: studentData.name || '',
+                gender: studentData.gender || '',
+                phone: studentData.phoneNumber || '',
+                whatsapp: studentData.whatsappNumber || '',
+                email: studentData.email || '',
+                address: studentData.address || '',
+                studentType: studentData.studentType || '',
+                classGrade: studentData.classLevel || '',
+                parentName: '', // parents table name
+                demoMode: studentData.preferredMode || '',
+                board: studentData.board || '',
+                subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
+                classMode: '',
+                hours: requestData.preferredTimeRange || '',
+                days: '',
+                goal: studentData.learningGoal || '',
+                source: '',
+                requirements: studentData.specialRequirements || '',
+                budget: studentData.budget?.toString() || '',
+                category: studentData.category || '',
+                technologies: studentData.technologies || [],
+                languages: studentData.languages || [],
+              });
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load profile', e);
+        }
+      };
+      fetchProfile();
+    }
+  }, [isDashboard, hasProfile]);
+
+  const handleCheckboxChange = (field: string, value: string) => {
+    setFormData((prev: any) => {
+      const array = prev[field] || [];
+      if (array.includes(value)) {
+        return { ...prev, [field]: array.filter((item: string) => item !== value) };
+      } else {
+        return { ...prev, [field]: [...array, value] };
+      }
+    });
+  };
+
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const router = useRouter();
+
+  // Removed sessionStorage loading because dashboard handles silent submission
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -49,96 +127,266 @@ export default function DemoForm({
 
   };
 
-  const handleSubmit = (
+  const handleSubmit = async (
     e: React.FormEvent
   ) => {
 
     e.preventDefault();
+    setLoading(true);
+    setSuccessMsg('');
 
-    const message = `
-🎓 NEW FREE DEMO REQUEST
+    if (!isDashboard) {
+      // Check if they are logged in, and sign them out so they can log in as a student
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.auth.signOut();
+      }
 
-📚 Category:
-${category}
+      // Save data to localStorage and redirect to signup
+      localStorage.setItem('demoFormData', JSON.stringify({ ...formData, category }));
+      router.push('/signup?role=student&next=/dashboard/student');
+      return;
+    }
 
-👤 Name:
-${formData.fullName}
+    // If in dashboard, submit to Supabase
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not logged in");
 
-🚻 Gender:
-${formData.gender}
+      if (hasProfile) {
+        // Update existing records
+        const { error: studentError } = await supabase.from('students').update({
+          category: formData.category || '',
+          name: formData.fullName,
+          gender: formData.gender,
+          phoneNumber: formData.phone,
+          whatsappNumber: formData.whatsapp,
+          email: formData.email,
+          address: formData.address,
+          studentType: formData.studentType,
+          classLevel: formData.classGrade,
+          board: formData.board,
+          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          technologies: formData.technologies,
+          languages: formData.languages,
+          preferredMode: formData.demoMode,
+          learningGoal: formData.goal,
+          specialRequirements: formData.requirements,
+          budget: parseInt(formData.budget) || 0,
+        }).eq('parentId', user.id);
 
-📞 Phone:
-${formData.phone}
+        if (studentError) throw studentError;
 
-💬 WhatsApp:
-${formData.whatsapp}
+        const { error: reqError } = await supabase.from('tuition_requests').update({
+          category: formData.category || '',
+          studentName: formData.fullName,
+          classLevel: formData.classGrade,
+          board: formData.board,
+          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          technologies: formData.technologies,
+          languages: formData.languages,
+          mode: formData.demoMode,
+          preferredTimeRange: formData.hours,
+          area: formData.address,
+          budget: parseInt(formData.budget) || 0,
+        }).eq('parentId', user.id);
+        
+        if (reqError) throw reqError;
+        
+        setSuccessMsg('Profile updated successfully!');
+      } else {
+        // Mark user as having profile
+        await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
 
-📧 Email:
-${formData.email}
+        // Fetch parent (create if not exists)
+        const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();
+        if (!existingParent) {
+          await supabase.from('parents').insert({ id: user.id, name: formData.parentName || formData.fullName });
+        }
 
-🏠 Address:
-${formData.address}
+        // Create student record
+        const { data: newStudent } = await supabase.from('students').insert({
+          parentId: user.id,
+          category: formData.category || '',
+          name: formData.fullName,
+          gender: formData.gender,
+          phoneNumber: formData.phone,
+          whatsappNumber: formData.whatsapp,
+          email: formData.email,
+          address: formData.address,
+          studentType: formData.studentType,
+          classLevel: formData.classGrade,
+          board: formData.board,
+          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          budget: parseInt(formData.budget) || 0,
+          preferredMode: formData.demoMode,
+          learningGoal: formData.goal,
+          specialRequirements: formData.requirements,
+          technologies: formData.technologies,
+          languages: formData.languages,
+        }).select('id').single();
 
-👨‍🎓 Student Type:
-${formData.studentType}
+        // Create the open request
+        const { error } = await supabase.from('tuition_requests').insert({
+          parentId: user.id,
+          studentId: newStudent?.id,
+          category: formData.category || '',
+          studentName: formData.fullName,
+          classLevel: formData.classGrade,
+          board: formData.board,
+          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          technologies: formData.technologies,
+          languages: formData.languages,
+          mode: formData.demoMode,
+          preferredTimeRange: formData.hours,
+          area: formData.address,
+          budget: parseInt(formData.budget) || 0,
+          status: 'open'
+        });
 
-🏫 Class:
-${formData.classGrade}
+        if (error) throw error;
+        setSuccessMsg('Demo request submitted successfully!');
+      }
 
-👪 Parent Name:
-${formData.parentName}
-
-🌐 Demo Mode:
-${formData.demoMode}
-
-📚 Board:
-${formData.board}
-
-📖 Subjects:
-${formData.subjects}
-
-💻 Class Mode:
-${formData.classMode}
-
-⏰ Hours:
-${formData.hours}
-
-📅 Days:
-${formData.days}
-
-🎯 Goal:
-${formData.goal}
-
-📢 Source:
-${formData.source}
-
-📝 Requirements:
-${formData.requirements}
-`;
-
-    window.open(
-      `https://wa.me/917483034168?text=${encodeURIComponent(message)}`,
-      '_blank'
-    );
+      sessionStorage.removeItem('demoFormData');
+      if (isDashboard) {
+        window.location.reload();
+      } else {
+        setTimeout(() => router.push('/dashboard/student'), 2000);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit demo request');
+    } finally {
+      setLoading(false);
+    }
   };
+
+
 
   return (
 
     <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto">
 
-      {/* TITLE */}
-      <h2 className="text-5xl font-bold text-black mb-4">
-        🎓 Student Details Form
-      </h2>
+      {hasProfile && !isEditing ? (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-6">
+            <div>
+              <h2 className="text-3xl font-black text-black">👤 My Profile</h2>
+              <p className="text-slate-500 mt-1 font-medium">Your learning preferences and details.</p>
+            </div>
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-700 px-5 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
+            >
+              ✏️ Edit Profile
+            </button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
+              <p className="text-lg font-bold text-slate-800">{formData.fullName || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Category</p>
+              <p className="text-lg font-bold text-purple-600 capitalize">{formData.category || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Phone / WhatsApp</p>
+              <p className="text-lg font-bold text-slate-800">{formData.phone || formData.whatsapp || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Email</p>
+              <p className="text-lg font-bold text-slate-800">{formData.email || '-'}</p>
+            </div>
+            
+            {formData.category === 'school' && (
+              <>
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Class / Grade</p>
+                  <p className="text-lg font-bold text-slate-800">{formData.classGrade || '-'}</p>
+                </div>
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Subjects</p>
+                  <p className="text-lg font-bold text-slate-800">{formData.subjects || '-'}</p>
+                </div>
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Board</p>
+                  <p className="text-lg font-bold text-slate-800">{formData.board || '-'}</p>
+                </div>
+              </>
+            )}
 
-      <p className="text-slate-500 mb-10 text-lg">
-        Fill in your details to book your free demo session.
-      </p>
+            {formData.category === 'programming' && formData.technologies.length > 0 && (
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies</p>
+                <div className="flex gap-2 flex-wrap">
+                  {formData.technologies.map(t => (
+                    <span key={t} className="bg-purple-100/50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg text-sm font-bold">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-8"
-      >
+            {formData.category === 'languages' && formData.languages.length > 0 && (
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages</p>
+                <div className="flex gap-2 flex-wrap">
+                  {formData.languages.map(l => (
+                    <span key={l} className="bg-purple-100/50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg text-sm font-bold">{l}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Budget</p>
+              <p className="text-xl font-black text-emerald-600">₹{formData.budget || 0} <span className="text-sm text-slate-500 font-medium">/ month</span></p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Preferred Mode</p>
+              <p className="text-lg font-bold text-slate-800">{formData.demoMode || '-'}</p>
+            </div>
+            
+            {(formData.goal || formData.requirements) && (
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Goals & Requirements</p>
+                <p className="text-base text-slate-700 whitespace-pre-wrap">{formData.goal} {formData.requirements}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex justify-between items-start mb-10">
+            <div>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4">
+                {hasProfile ? '👤 Edit Profile' : (isDashboard ? '🎓 Complete Demo Request' : '🎓 Book a Free Demo')}
+              </h2>
+              <p className="text-slate-500 text-lg">
+                {hasProfile 
+                  ? 'Update your details and learning preferences.'
+                  : (isDashboard 
+                    ? 'Review and confirm your details to book your demo session.' 
+                    : 'Fill in your details to book your free demo session.')}
+              </p>
+            </div>
+            {hasProfile && (
+              <button 
+                onClick={() => setIsEditing(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-8">
 
         {/* CATEGORY */}
         <div>
@@ -146,12 +394,17 @@ ${formData.requirements}
             📚 Selected Category
           </label>
 
-          <input
-            type="text"
-            value={category || ''}
-            readOnly
-            className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-slate-100"
-          />
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+          >
+            <option value="">Select Category</option>
+            <option value="school">School / Academics</option>
+            <option value="programming">Programming / IT</option>
+            <option value="languages">Languages</option>
+          </select>
         </div>
 
         {/* NAME + GENDER */}
@@ -275,8 +528,7 @@ ${formData.requirements}
 
         </div>
 
-        {/* SCHOOL CATEGORY */}
-        {category === 'school' && (
+        {formData.category === 'school' && (
 
           <>
 
@@ -452,8 +704,7 @@ ${formData.requirements}
           </>
         )}
 
-        {/* PROGRAMMING CATEGORY */}
-        {category === 'programming' && (
+        {formData.category === 'programming' && (
 
           <>
 
@@ -479,7 +730,11 @@ ${formData.requirements}
                     className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all"
                   >
 
-                    <input type="checkbox" />
+                    <input 
+                      type="checkbox" 
+                      checked={formData.technologies.includes(item)}
+                      onChange={() => handleCheckboxChange('technologies', item)}
+                    />
 
                     {item}
 
@@ -493,8 +748,7 @@ ${formData.requirements}
           </>
         )}
 
-        {/* LANGUAGE CATEGORY */}
-        {category === 'languages' && (
+        {formData.category === 'languages' && (
 
           <>
 
@@ -517,7 +771,11 @@ ${formData.requirements}
                     className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all"
                   >
 
-                    <input type="checkbox" />
+                    <input 
+                      type="checkbox" 
+                      checked={formData.languages.includes(item)}
+                      onChange={() => handleCheckboxChange('languages', item)}
+                    />
 
                     {item}
 
@@ -539,8 +797,8 @@ ${formData.requirements}
               🌐 Preferred Mode *
             </label>
 
-            {(category === 'programming' ||
-              category === 'languages') ? (
+            {(formData.category === 'programming' ||
+              formData.category === 'languages') ? (
 
               <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl px-4 py-4 flex items-center gap-3">
 
@@ -710,15 +968,37 @@ ${formData.requirements}
           />
         </div>
 
-        {/* BUTTON */}
+        <div>
+          <label className="block text-sm font-semibold mb-2">
+            💰 Expected Budget / Monthly Fee (in ₹)
+          </label>
+
+          <input
+            type="number"
+            name="budget"
+            placeholder="E.g. 5000"
+            onChange={handleChange}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4"
+          />
+        </div>
+
+        {successMsg && (
+          <div className="bg-emerald-50 text-emerald-600 p-4 rounded-xl border border-emerald-200">
+            {successMsg}
+          </div>
+        )}
+
         <button
           type="submit"
-          className="w-full bg-gradient-to-r from-purple-600 to-violet-500 hover:from-purple-700 hover:to-violet-600 text-white py-5 rounded-xl font-semibold text-lg transition-all shadow-lg"
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-purple-600 to-violet-500 hover:from-purple-700 hover:to-violet-600 disabled:opacity-50 text-white py-5 rounded-xl font-semibold text-lg transition-all shadow-lg"
         >
-          🚀 Submit
+          {loading ? 'Processing...' : (hasProfile ? '✅ Update Profile' : (isDashboard ? '✅ Confirm & Book Demo' : '🚀 Continue to Book Demo'))}
         </button>
 
       </form>
+      </div>
+      )}
     </div>
   );
 }

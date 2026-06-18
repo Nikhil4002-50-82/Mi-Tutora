@@ -5,68 +5,312 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { BookOpen, Users, LayoutDashboard, LogOut, ShieldCheck, User } from 'lucide-react';
+import { BookOpen, Users, LayoutDashboard, LogOut, ShieldCheck, User, Gift, Lock, CheckCircle2, MessageCircle, Menu, X } from 'lucide-react';
+import DemoForm from '@/components/DemoForm';
 const logo = '/imports/logo.png';
 
 export default function StudentDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [hasProfile, setHasProfile] = useState(true);
+  const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const response = await axios.get('http://localhost:3001/api/data/student/dashboard', {
-          headers: { Authorization: `Bearer ${token}` }
+        const { createClient } = await import('@/utils/supabase/client');
+        const supabase = createClient();
+        
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          router.push('/login');
+          return;
+        }
+
+        const user = session.user;
+        
+        // Fetch user data for hasProfile
+        const { data: userData } = await supabase
+          .from('users')
+          .select('hasProfile, referralCode')
+          .eq('id', user.id)
+          .single();
+
+        setHasProfile(userData?.hasProfile || false);
+
+        if (!userData?.hasProfile) {
+          setActiveTab('profile');
+        }
+
+        // Fetch parent data (just basic info)
+        const { data: parentData } = await supabase
+          .from('parents')
+          .select('*, students(*)')
+          .eq('id', user.id)
+          .single();
+
+        // Silent Submission Logic for Demo
+        const savedDemoData = localStorage.getItem('demoFormData');
+        if (savedDemoData) {
+          try {
+            const formData = JSON.parse(savedDemoData);
+            
+            // Mark user as having profile
+            await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
+
+            // Fetch parent (create if not exists)
+            const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();
+            if (!existingParent) {
+              await supabase.from('parents').insert({ id: user.id, name: formData.parentName || formData.fullName });
+            }
+
+            // Create student record
+            const { data: newStudent } = await supabase.from('students').insert({
+              parentId: user.id,
+              category: formData.category || '',
+              name: formData.fullName,
+              gender: formData.gender,
+              phoneNumber: formData.phone,
+              whatsappNumber: formData.whatsapp,
+              email: formData.email,
+              address: formData.address,
+              studentType: formData.studentType,
+              classLevel: formData.classGrade,
+              board: formData.board,
+              subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
+              budget: parseInt(formData.budget) || 0,
+              preferredMode: formData.demoMode,
+              learningGoal: formData.goal,
+              specialRequirements: formData.requirements
+            }).select('id').single();
+
+            // Create open tuition request
+            await supabase.from('tuition_requests').insert({
+              parentId: user.id,
+              studentId: newStudent?.id,
+              category: formData.category || '',
+              studentName: formData.fullName,
+              classLevel: formData.classGrade,
+              board: formData.board,
+              subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
+              budget: parseInt(formData.budget) || 0,
+              mode: formData.demoMode,
+              preferredTimeRange: formData.hours,
+              area: formData.address,
+              status: 'open'
+            });
+
+            localStorage.removeItem('demoFormData');
+            window.location.reload();
+            return;
+          } catch (e) {
+            console.error("Failed to silently submit demo request", e);
+          }
+        }
+
+        // Fetch user's active applications/negotiations
+        const { data: applications } = await supabase
+          .from('applications')
+          .select('*')
+          .eq('parentId', user.id);
+          
+        const { data: students } = await supabase.from('students').select('*').eq('parentId', user.id);
+        const myStudent = students && students.length > 0 ? students[0] : null;
+
+        const { data: requests } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id);
+        const myRequest = requests && requests.length > 0 ? requests[0] : null;
+
+        // Fetch available tutors (Find Tutors tab)
+        const { data: availableTutors } = await supabase
+          .from('tutors')
+          .select('*')
+          .eq('hasProfile', true);
+
+        // Filter tutors roughly matching student
+        const matchedTutors = availableTutors?.filter(tutor => {
+          if (!myStudent) return true;
+          
+          const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
+          if (!tutorCategories.includes(myStudent.category)) return false;
+          
+          if (myStudent.category === 'school') {
+            const boardMatch = !tutor.boards || tutor.boards.length === 0 || tutor.boards.includes(myStudent.board);
+            const classMatch = !tutor.classes || tutor.classes.length === 0 || tutor.classes.includes(myStudent.classLevel);
+            
+            // Subject match
+            const studentSubjects = myStudent.subjects || [];
+            const tutorSubjects = tutor.subjects || [];
+            const subjectMatch = studentSubjects.length === 0 || tutorSubjects.length === 0 || 
+                                 studentSubjects.some((s: string) => tutorSubjects.some((ts: string) => ts.toLowerCase() === s.toLowerCase()));
+
+            return (boardMatch || classMatch) && subjectMatch;
+          }
+          
+          if (myStudent.category === 'programming') {
+             const studentTechs = myStudent.technologies || [];
+             const tutorTechs = tutor.technologies || [];
+             return studentTechs.length === 0 || tutorTechs.length === 0 || studentTechs.some((t: string) => tutorTechs.includes(t));
+          }
+          
+          if (myStudent.category === 'languages') {
+             const studentLangs = myStudent.languages || [];
+             const tutorLangs = tutor.languagesTaught || [];
+             return studentLangs.length === 0 || tutorLangs.length === 0 || studentLangs.some((l: string) => tutorLangs.includes(l));
+          }
+
+          return true;
+        }) || [];
+
+        // Referrals
+        const { data: referrals } = await supabase
+          .from('referrals')
+          .select('*')
+          .eq('referrerId', user.id);
+
+        setData({
+          userData,
+          profile: parentData,
+          myStudent,
+          applications: applications || [],
+          availableTeachers: matchedTutors,
+          referrals: referrals || [],
+          negotiations: applications?.filter(app => ['negotiating', 'scheduling'].includes(app.status)) || [],
+          upcomingClasses: applications?.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
+            id: app.id,
+            subject: app.category || 'General',
+            teacher: app.tutorName || 'Assigned Tutor',
+            date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
+            status: app.status
+          })) || []
         });
-        setData(response.data.data);
+
       } catch (error) {
         console.error('Error fetching dashboard', error);
-        localStorage.removeItem('token');
-        router.push('/login');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchDashboardData();
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    const { createClient } = await import('@/utils/supabase/client');
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    localStorage.removeItem('user');
     router.push('/login');
+  };
+
+  const handleRequestTutor = async (tutor: any) => {
+    const offerPrice = parseInt(negotiationOffer[tutor.id]);
+    if (!offerPrice || offerPrice <= 0) return alert("Please enter a valid budget offer.");
+
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase.from('applications').insert({
+        tutorId: tutor.id,
+        tutorName: tutor.name,
+        parentId: user?.id,
+        studentId: data?.myStudent?.id,
+        studentName: data?.myStudent?.name || 'Student',
+        currentOffer: offerPrice,
+        initialBudget: data?.myStudent?.budget || offerPrice,
+        lastUpdatedBy: 'student',
+        status: 'negotiating',
+        source: 'direct',
+        category: tutor.category,
+        mode: tutor.mode,
+        demoHours: data?.myRequest?.preferredTimeRange || 'Flexible'
+      });
+
+      if (error) throw error;
+      alert("Tutor request & offer sent successfully!");
+      window.location.reload();
+    } catch (e: any) {
+      alert("Error sending request: " + e.message);
+    }
+  };
+
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, newSchedule?: string) => {
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      
+      const updateData: any = {};
+      if (action === 'accept_price') {
+        updateData.status = 'scheduling';
+        updateData.scheduleStatus = 'pending_tutor';
+        updateData.finalPrice = newOffer;
+      } else if (action === 'counter_price') {
+        updateData.currentOffer = newOffer;
+        updateData.lastUpdatedBy = 'student';
+      } else if (action === 'propose_schedule') {
+        updateData.scheduleStatus = 'pending_tutor';
+        updateData.proposedSchedule = newSchedule;
+      } else if (action === 'accept_schedule') {
+        updateData.status = 'demo_pending_payment';
+        updateData.proposedSchedule = newSchedule;
+      }
+
+      const { error } = await supabase.from('applications').update(updateData).eq('id', appId);
+      if (error) throw error;
+      alert(`Successfully ${action === 'accept' ? 'accepted deal' : 'sent counter offer'}!`);
+      window.location.reload();
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'teachers', label: 'Find Tutors', icon: Users },
-    { id: 'classes', label: 'My Classes', icon: BookOpen },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'find_tutors', label: 'Find Tutors', icon: Users },
+    { id: 'negotiations', label: 'Negotiations', icon: MessageCircle },
+    { id: 'my_teachers', label: 'My Teachers', icon: BookOpen },
+    { id: 'referrals', label: 'Referrals', icon: Gift },
+    { id: 'profile', label: 'Profile Settings', icon: User },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       
+      {/* MOBILE HEADER */}
+      <div className="md:hidden bg-gradient-to-r from-[#063831] to-[#04241f] text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
+        <img src={logo} alt="Mi Tutora Logo" className="h-8 w-auto object-contain" />
+        <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -mr-2 text-white hover:bg-white/10 rounded-lg">
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
 
-      {/* SIDEBAR (Desktop) */}
-      <aside className="w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex-col hidden md:flex border-r border-white/5 shadow-xl z-10">
+      {/* MOBILE MENU OVERLAY */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+
+      {/* SIDEBAR (Desktop & Mobile Drawer) */}
+      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
         <div className="p-6 border-b border-white/10 flex flex-col items-start gap-4">
-          <div className="flex flex-col justify-center">
-            <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
-            <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Student Portal</p>
+          <div className="flex w-full justify-between items-center">
+            <div className="flex flex-col justify-center">
+              <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
+              <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Student Portal</p>
+            </div>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-2 text-white/70 hover:text-white bg-white/5 rounded-lg">
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 mt-4">
+        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
           <div className="px-3 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
             Menu
           </div>
@@ -76,14 +320,17 @@ export default function StudentDashboard() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-300 font-medium text-sm
-                  ${isActive 
-                    ? "bg-[#00a992]/10 text-[#00a992] border border-[#00a992]/20 shadow-[0_0_10px_rgba(0,169,146,0.05)]" 
-                    : "text-gray-300 hover:bg-white/5 hover:text-white border border-transparent"}
-                `}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
+                  isActive 
+                    ? "bg-[#00a992] text-white shadow-lg shadow-[#00a992]/20" 
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
+                }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-[#00a992]" : "text-gray-400"}`} />
+                <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-emerald-400"}`} />
                 {item.label}
               </button>
             );
@@ -91,32 +338,19 @@ export default function StudentDashboard() {
         </nav>
 
         <div className="p-4 border-t border-white/10">
-          <button
+          <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-colors font-medium text-sm"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors font-medium"
           >
-            <LogOut className="w-4 h-4" />
-            Sign Out
+            <LogOut className="w-5 h-5" />
+            Logout
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50/50">
-        
-        {/* MOBILE HEADER */}
-        <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10 sticky top-0 shadow-sm">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-[#00a992]" />
-            <h1 className="font-bold text-gray-900">Student Portal</h1>
-          </div>
-          <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-600 transition-colors">
-            <LogOut className="w-5 h-5" />
-          </button>
-        </header>
-
-        {/* DYNAMIC CONTENT */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto pb-24 md:pb-8">
+      {/* MAIN CONTENT */}
+      <main className="flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -128,121 +362,305 @@ export default function StudentDashboard() {
             {/* TAB: DASHBOARD */}
             {activeTab === 'dashboard' && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, Student!</h1>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, {data?.myStudent?.name || 'Student'}!</h1>
+                
+                {/* Active Negotiations Summary */}
+                {data?.negotiations?.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4">Active Tutor Negotiations</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {data.negotiations.map((neg: any) => (
+                        <div key={neg.id} className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 relative overflow-hidden">
+                          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                          <h3 className="font-bold text-gray-900 text-lg mb-1">{neg.tutorName || 'Tutor'}</h3>
+                          <p className="text-sm text-gray-500 mb-4">{neg.category}</p>
+                          <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <div>
+                              <p className="text-xs text-gray-500 font-medium">Current Offer</p>
+                              <p className="font-black text-emerald-600 text-lg">₹{neg.currentOffer}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500 font-medium">Waiting On</p>
+                              <p className={`font-bold text-sm ${neg.lastUpdatedBy === 'student' ? 'text-orange-500' : 'text-blue-600'}`}>
+                                {neg.lastUpdatedBy === 'student' ? 'Tutor' : 'You'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Hours Studied</h3>
-                    <p className="text-4xl font-black text-[#063831]">{data?.progress?.hoursStudied || 0}</p>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Scheduled Classes</h3>
+                    <p className="text-4xl font-black text-[#063831]">{data?.upcomingClasses?.length || 0}</p>
                   </div>
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Courses Completed</h3>
-                    <p className="text-4xl font-black text-[#00a992]">{data?.progress?.coursesCompleted || 0}</p>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Tutors Requested</h3>
+                    <p className="text-4xl font-black text-[#00a992]">{data?.applications?.length || 0}</p>
                   </div>
                 </div>
               </div>
             )}
 
             {/* TAB: FIND TUTORS */}
-            {activeTab === 'teachers' && (
+            {activeTab === 'find_tutors' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Available Teachers</h2>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Find Your Perfect Tutor</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.availableTeachers?.map((teacher: any) => (
-                    <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
-                          {teacher.mode}
-                        </span>
+                  {data?.availableTeachers?.map((teacher: any) => {
+                    const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating', 'scheduling'].includes(app.status));
+                    const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'tuition_started'].includes(app.status));
+                    
+                    if (hasNegotiation) return null; // Already negotiating
+                    
+                    return (
+                      <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
+                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                            {teacher.mode || 'Online'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.teachingApproach || 'Experienced Tutor'}</p>
+                        <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                          {teacher.subjects?.length > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
+                          {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
+                          <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
+                        </div>
+                        
+                        <div className="flex flex-col gap-3">
+                          <div className="mb-4">
+                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
+                            <input 
+                              type="number"
+                              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                              placeholder="e.g. 500"
+                              value={negotiationOffer[teacher.id] || ''}
+                              onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
+                            />
+                          </div>
+                          {isHired ? (
+                            <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                              <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleRequestTutor(teacher)}
+                              className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                            >
+                              <MessageCircle className="w-4 h-4" /> Request & Offer
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.description}</p>
-                      <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl">
-                        <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects}</p>
-                        <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>
-                        <p><strong className="text-gray-700">Fee:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange}</span></p>
-                      </div>
-                      <button className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20">
-                        Request Tutor
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {(!data?.availableTeachers || data.availableTeachers.length === 0) && (
-                    <div className="col-span-full p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
-                      No teachers currently available.
+                    <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+                      <Users className="w-12 h-12 text-gray-300 mb-3" />
+                      <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>
+                      <p className="text-gray-500 max-w-sm mt-2">We couldn't find tutors matching your exact requirements right now.</p>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* TAB: CLASSES */}
-            {activeTab === 'classes' && (
+            {/* TAB: NEGOTIATIONS */}
+            {activeTab === 'negotiations' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Requests & Upcoming Classes</h2>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Negotiations & Scheduling</h2>
+                
+                {data?.negotiations?.length > 0 ? (
+                  <div className="space-y-4">
+                    {data.negotiations.map((neg: any) => (
+                      <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900">Tutor: {neg.tutorName}</h4>
+                          <p className="text-sm text-gray-500">{neg.category}</p>
+                          {neg.status === 'scheduling' && (
+                            <div className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
+                              <p><span className="font-bold">You requested:</span> {neg.demoHours}</p>
+                              {neg.proposedSchedule && <p><span className="font-bold text-emerald-700">Tutor Proposed:</span> {neg.proposedSchedule}</p>}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
+                          <div className="text-center w-full sm:w-auto">
+                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'scheduling' ? 'Agreed Price' : 'Current Offer'}</p>
+                            <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
+                          </div>
+                          
+                          {/* Price Negotiation Logic */}
+                          {neg.status === 'negotiating' && (
+                            neg.lastUpdatedBy === 'tutor' ? (
+                              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                <button 
+                                  onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
+                                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                >
+                                  Accept Price
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const newPrice = prompt("Enter your counter offer (₹):", neg.currentOffer);
+                                    if (newPrice && !isNaN(parseInt(newPrice))) {
+                                      handleNegotiationAction(neg.id, 'counter_price', parseInt(newPrice));
+                                    }
+                                  }}
+                                  className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                >
+                                  Counter Offer
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor response...</p>
+                              </div>
+                            )
+                          )}
+
+                          {/* Scheduling Logic */}
+                          {neg.status === 'scheduling' && (
+                            neg.scheduleStatus === 'pending_student' ? (
+                              <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                <button 
+                                  onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedSchedule)}
+                                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"
+                                >
+                                  Accept Timings
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const newSched = prompt("Counter with new timings:", neg.proposedSchedule || "");
+                                    if (newSched) {
+                                      handleNegotiationAction(neg.id, 'propose_schedule', 0, newSched);
+                                    }
+                                  }}
+                                  className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm"
+                                >
+                                  Change Timings
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor to propose timings...</p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">No active negotiations.</p>
+                )}
+              </div>
+            )}
+
+            {/* TAB: MY TEACHERS */}
+            {activeTab === 'my_teachers' && (
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Teachers & Classes</h2>
                 <div className="bg-white shadow-sm overflow-hidden sm:rounded-2xl border border-gray-100">
                   <ul className="divide-y divide-gray-100">
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li key={cls.id} className="p-6 hover:bg-emerald-50/30 transition-colors">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div>
-                            <p className="text-base font-bold text-[#063831] truncate mb-1">{cls.subject}</p>
-                            <p className="text-sm text-gray-500 font-medium">with <span className="text-[#00a992]">{cls.teacher}</span></p>
+                            <p className="text-lg font-bold text-[#063831] truncate mb-1">{cls.subject}</p>
+                            <p className="text-sm font-medium text-gray-500">Tutor: <span className="text-gray-900 font-bold">{cls.teacher}</span></p>
                           </div>
-                          <div className="text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
-                            <span className="block font-semibold text-gray-700">{new Date(cls.date).toLocaleDateString()}</span>
-                            <span>{new Date(cls.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <div className="flex items-center space-x-4">
+                            <span className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border ${
+                              cls.status === 'confirmed' || cls.status === 'tuition_started'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-orange-50 text-orange-700 border-orange-200'
+                            }`}>
+                              {cls.status === 'demo_pending_payment' ? 'Pay Demo Fee' : cls.status}
+                            </span>
                           </div>
                         </div>
                       </li>
                     ))}
                     {(!data?.upcomingClasses || data.upcomingClasses.length === 0) && (
-                      <li className="p-8 text-sm text-gray-500 text-center font-medium">No requests or upcoming classes.</li>
+                      <li className="p-8 text-sm text-gray-500 text-center font-medium">No active classes yet.</li>
                     )}
                   </ul>
                 </div>
               </div>
             )}
 
-            {/* TAB: PROFILE */}
-            {activeTab === 'profile' && (
-              <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 max-w-2xl">
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Profile</h2>
-                <p className="text-gray-500 mb-4">Manage your account details and preferences.</p>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-sm text-gray-500 font-medium mb-1">Email</p>
-                    <p className="text-gray-900 font-bold">student@example.com</p>
+            {/* TAB: REFERRALS */}
+            {activeTab === 'referrals' && (
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Refer & Earn</h2>
+                <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden mb-8">
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Gift className="w-48 h-48" />
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-sm text-gray-500 font-medium mb-1">Grade Level</p>
-                    <p className="text-gray-900 font-bold">10th Grade</p>
+                  <div className="relative z-10 max-w-lg">
+                    <h3 className="text-2xl font-black mb-4">Invite Friends</h3>
+                    <p className="text-gray-300 mb-8 text-lg">Share your unique referral code. Earn rewards when they book their first class!</p>
+                    
+                    <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Your Referral Code</p>
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl font-black tracking-widest">{data?.userData?.referralCode || 'GENERATING...'}</span>
+                        <button className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
+                          Copy
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Your Referrals</h3>
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  {data?.referrals?.length > 0 ? (
+                    <ul className="divide-y divide-gray-100">
+                      {data.referrals.map((ref: any) => (
+                        <li key={ref.id} className="p-5 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-gray-900">{ref.referredUserName || 'Unknown User'}</p>
+                            <p className="text-sm text-gray-500 capitalize">{ref.referralType}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              ref.status === 'rewarded' ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'
+                            }`}>
+                              {ref.status}
+                            </span>
+                            {ref.estimatedReward > 0 && <p className="text-sm font-bold text-gray-900 mt-1">₹{ref.estimatedReward}</p>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-8 text-center text-gray-500 font-medium">You haven't referred anyone yet.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: PROFILE */}
+            {activeTab === 'profile' && (
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
+                {!hasProfile && (
+                  <div className="bg-orange-50 border-b border-orange-100 p-4 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
+                    <Lock className="w-4 h-4" /> Please submit a demo request profile to unlock the rest of your dashboard!
+                  </div>
+                )}
+                <DemoForm isDashboard={true} hasProfile={hasProfile} />
               </div>
             )}
 
           </motion.div>
         </div>
 
-        {/* MOBILE BOTTOM NAVIGATION */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 flex justify-around p-2 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col items-center gap-1 p-2 flex-1 rounded-xl transition-colors ${
-                  isActive ? "text-[#00a992] bg-emerald-50" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? "text-[#00a992]" : "text-gray-500"}`} />
-                <span className="text-[10px] font-bold">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
       </main>
     </div>
   );

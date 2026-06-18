@@ -2,16 +2,16 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft } from 'lucide-react';
 const logo = '/imports/logo.png';
 
-function LoginContent() {
+function SignupContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
@@ -19,50 +19,97 @@ function LoginContent() {
   const role = searchParams.get('role') || 'student';
   const isTeacher = role === 'teacher';
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
     try {
       const { createClient } = await import('@/utils/supabase/client');
       const supabase = createClient();
       
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: name,
+            role: role
+          }
+        }
       });
 
       if (authError) throw authError;
 
       if (data?.user) {
-        // Fetch user role
-        const { data: userData, error: userError } = await supabase
+        if (!data.session) {
+          // Email confirmation required, so we can't insert into DB due to RLS
+          setSuccessMsg("Success! Please check your email to confirm your account before logging in.");
+          return;
+        }
+
+        // Insert into public users table
+        const { error: userError } = await supabase
           .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: name,
+            role: role
+          });
           
-        const userRole = userData?.role || role; // fallback
-        
-        // Save minimal info if needed (Supabase handles session securely in cookies/localstorage)
-        localStorage.setItem('user', JSON.stringify({ id: data.user.id, email: data.user.email, role: userRole }));
-        
-        if (userRole === 'student') {
+        if (userError && userError.code !== '23505') {
+          throw new Error(`Users table error: ${userError.message}`);
+        }
+
+        // Insert into parents or tutors
+        if (role === 'student') {
+          const { error: parentError } = await supabase.from('parents').insert({ id: data.user.id });
+          if (parentError && parentError.code !== '23505') {
+            throw new Error(`Parents table error: ${parentError.message}`);
+          }
+          const searchParams = new URLSearchParams(window.location.search);
           router.push(searchParams.get('next') || '/dashboard/student');
         } else {
+          const { error: tutorError } = await supabase.from('tutors').insert({ id: data.user.id, name: name, email: email });
+          if (tutorError && tutorError.code !== '23505') {
+            throw new Error(`Tutors table error: ${tutorError.message}`);
+          }
+          const searchParams = new URLSearchParams(window.location.search);
           router.push(searchParams.get('next') || '/dashboard/teacher');
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Signup failed');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    const { createClient } = await import('@/utils/supabase/client');
+    const supabase = createClient();
+    
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const next = searchParams.get('next');
+      const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) setError(error.message);
+    } catch (err: any) {
+      setError(err.message || 'Google signup failed');
     }
   };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
       
-
       {/* LEFT COLUMN - BRANDING (Hidden on Mobile) */}
       <div className={`hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-12 transition-colors duration-700
         ${isTeacher ? 'bg-gradient-to-br from-[#04241f] to-[#021411]' : 'bg-gradient-to-br from-[#063831] to-[#04241f]'}
@@ -89,13 +136,13 @@ function LoginContent() {
 
           <div className="flex bg-white/10 p-1 rounded-xl backdrop-blur-md border border-white/10">
             <button
-              onClick={() => router.push('/login?role=student')}
+              onClick={() => router.push('/signup?role=student')}
               className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${!isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
             >
               Student
             </button>
             <button
-              onClick={() => router.push('/login?role=teacher')}
+              onClick={() => router.push('/signup?role=teacher')}
               className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
             >
               Teacher
@@ -116,46 +163,21 @@ function LoginContent() {
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mb-6 backdrop-blur-sm">
                 <Sparkles className={`w-4 h-4 ${isTeacher ? 'text-emerald-400' : 'text-[#00a992]'}`} />
                 <span className="text-sm text-emerald-100 font-semibold uppercase tracking-wider">
-                  {isTeacher ? 'Educator Portal' : 'Student Portal'}
+                  {isTeacher ? 'Join as an Educator' : 'Join as a Student'}
                 </span>
               </div>
               
               <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-6 tracking-tight">
                 {isTeacher ? (
-                  <>Empower the next <br /> <span className="bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">generation.</span></>
+                  <>Start inspiring <br /> <span className="bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">minds today.</span></>
                 ) : (
-                  <>Transform your <br /> <span className="bg-gradient-to-r from-[#00a992] to-emerald-300 bg-clip-text text-transparent">learning journey.</span></>
+                  <>Unlock your <br /> <span className="bg-gradient-to-r from-[#00a992] to-emerald-300 bg-clip-text text-transparent">true potential.</span></>
                 )}
               </h1>
               
               <p className="text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
-                {isTeacher 
-                  ? "Join India's top platform for educators. Manage your schedule, teach passionate students, and grow your teaching career with complete flexibility."
-                  : "Join India's fastest-growing platform connecting students with highly qualified, background-verified tutors for offline and online classes."
-                }
+                Create your account in seconds and get full access to the Mi Tutora platform.
               </p>
-
-              {/* Feature Highlights */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-                    {isTeacher ? <Briefcase className="w-6 h-6 text-emerald-400" /> : <Users className="w-6 h-6 text-[#00a992]" />}
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold">{isTeacher ? 'Flexible Schedule' : '10,000+ Active Students'}</h3>
-                    <p className="text-emerald-100/60 text-sm">{isTeacher ? 'Teach on your own terms' : 'Learning across India'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-                    {isTeacher ? <GraduationCap className="w-6 h-6 text-emerald-400" /> : <Award className="w-6 h-6 text-[#00a992]" />}
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold">{isTeacher ? 'Great Earnings' : 'Verified Educators'}</h3>
-                    <p className="text-emerald-100/60 text-sm">{isTeacher ? 'Consistent and reliable payouts' : 'Top 1% of teaching talent'}</p>
-                  </div>
-                </div>
-              </div>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -167,7 +189,7 @@ function LoginContent() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN - LOGIN FORM */}
+      {/* RIGHT COLUMN - SIGNUP FORM */}
       <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0">
         
         {/* Subtle mobile background glow */}
@@ -198,13 +220,13 @@ function LoginContent() {
             <img src={logo} alt="Mi Tutora Logo" className="h-10 w-auto object-contain mb-6" />
             <div className="flex bg-gray-100 p-1.5 rounded-xl w-full max-w-[260px] shadow-inner">
               <button
-                onClick={() => router.push('/login?role=student')}
+                onClick={() => router.push('/signup?role=student')}
                 className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${!isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
               >
                 Student
               </button>
               <button
-                onClick={() => router.push('/login?role=teacher')}
+                onClick={() => router.push('/signup?role=teacher')}
                 className={`flex-1 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
               >
                 Teacher
@@ -214,11 +236,9 @@ function LoginContent() {
 
           <div className="mb-10 text-center lg:text-left">
             <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-2">
-              {isTeacher ? 'Teacher Login' : 'Student Login'}
+              Create an Account
             </h2>
-            <p className="text-gray-500 font-medium">
-              Don't have an account? <a href={`/signup${searchParams.toString() ? '?' + searchParams.toString() : ''}`} className="text-[#00a992] hover:underline font-bold">Sign up</a>
-            </p>
+            <p className="text-gray-500 font-medium">Already have an account? <a href={`/login${searchParams.toString() ? '?' + searchParams.toString() : ''}`} className="text-[#00a992] hover:underline font-bold">Log in</a></p>
           </div>
           
           {error && (
@@ -231,16 +251,19 @@ function LoginContent() {
             </motion.div>
           )}
 
+          {successMsg && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-emerald-50 text-emerald-700 p-4 rounded-2xl mb-8 text-sm font-medium border border-emerald-100 flex items-center justify-center lg:justify-start"
+            >
+              {successMsg}
+            </motion.div>
+          )}
+
           <div className="space-y-4 mb-6">
             <button
-              onClick={async () => {
-                const { createClient } = await import('@/utils/supabase/client');
-                const supabase = createClient();
-                const next = searchParams.get('next');
-                const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
-                const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
-                if (error) setError(error.message);
-              }}
+              onClick={handleGoogleSignup}
               className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700"
             >
               <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -250,7 +273,7 @@ function LoginContent() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 <path d="M1 1h22v22H1z" fill="none" />
               </svg>
-              Sign in with Google
+              Sign up with Google
             </button>
           </div>
 
@@ -261,7 +284,28 @@ function LoginContent() {
             <span className="relative bg-white px-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Or</span>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleSignup} className="space-y-5">
+            <div>
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
+                Full Name<span className="text-[#00a992] ml-0.5">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <UserPlus className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
+                    ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
+                  `}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
                 Email<span className="text-[#00a992] ml-0.5">*</span>
@@ -284,14 +328,9 @@ function LoginContent() {
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs sm:text-sm font-bold text-gray-700">
-                  Password<span className="text-[#00a992] ml-0.5">*</span>
-                </label>
-                <a href="#" className={`text-xs font-bold hover:text-emerald-700 transition-colors ${isTeacher ? 'text-emerald-500' : 'text-[#00a992]'}`}>
-                  Forgot Password?
-                </a>
-              </div>
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
+                Password<span className="text-[#00a992] ml-0.5">*</span>
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
@@ -323,34 +362,22 @@ function LoginContent() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <LogIn className="w-5 h-5" />
-                  Sign in to {isTeacher ? 'Educator' : 'Student'} Dashboard
+                  <UserPlus className="w-5 h-5" />
+                  Sign up
                 </>
               )}
             </button>
-            
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => router.push(`/signup${searchParams.toString() ? '?' + searchParams.toString() : ''}`)}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-base font-bold text-gray-700"
-              >
-                Create a new account
-              </button>
-            </div>
           </form>
-
-
         </motion.div>
       </div>
     </div>
   );
 }
 
-export default function Login() {
+export default function Signup() {
   return (
     <Suspense fallback={<div className="min-h-screen flex bg-gray-50 items-center justify-center">Loading...</div>}>
-      <LoginContent />
+      <SignupContent />
     </Suspense>
   );
 }
