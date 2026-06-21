@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { DollarSign, Clock, Users, TrendingUp, CheckCircle } from 'lucide-react';
+import Image from 'next/image';
 
 export function TutorJoin() {
   const benefits = [
@@ -24,10 +25,11 @@ export function TutorJoin() {
     <section id="tutor-join" className="relative py-24 bg-white overflow-hidden">
       {/* Background image with overlay */}
       <div className="absolute inset-0">
-        <img
+        <Image
           src="https://images.unsplash.com/photo-1776178320111-a03c1ce2212e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjB0ZWFjaGVyJTIwbWVudG9yaW5nJTIwc3R1ZGVudCUyMGNsYXNzcm9vbXxlbnwxfHx8fDE3NzczMTEyOTJ8MA&ixlib=rb-4.1.0&q=80&w=1080"
           alt="Teacher"
-          className="w-full h-full object-cover"
+          fill
+          className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/90 to-emerald-900/85" />
       </div>

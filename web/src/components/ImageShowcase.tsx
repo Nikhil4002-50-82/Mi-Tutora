@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from 'motion/react';
+import Image from 'next/image';
 const homeImage = '/imports/home.jpg';
 const onlineImage = '/imports/online.jpg.jpeg';
 const bannerImage = '/imports/3rd_photo.jpg.png';
@@ -52,9 +53,11 @@ export function ImageShowcase() {
             >
               {/* Image */}
               <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-                <img
+                <Image
                   src={image.url}
                   alt={image.alt}
+                  width={800}
+                  height={600}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
 
@@ -77,9 +80,11 @@ export function ImageShowcase() {
           className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300"
         >
           <div className="relative aspect-[21/9] overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50">
-            <img
+            <Image
               src={bannerImage}
               alt="Coding, AI & Future Skills"
+              width={1200}
+              height={400}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, Phone, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const logo = '/imports/logo.png';
 
@@ -79,9 +80,11 @@ export function Navbar() {
           className="flex items-center cursor-pointer transition duration-300"
           onClick={() => scrollToSection('hero')}
         >
-          <img
+          <Image
             src={logo}
             alt="Mi Tutora"
+            width={180}
+            height={96}
             className="h-16 md:h-24 w-auto object-contain"
           />
         </motion.div>

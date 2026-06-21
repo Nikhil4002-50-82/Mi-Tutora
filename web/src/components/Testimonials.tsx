@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { Star, Quote } from 'lucide-react';
+import Image from 'next/image';
 
 export function Testimonials() {
   const testimonials = [
@@ -102,9 +103,11 @@ export function Testimonials() {
                 {/* Author info */}
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-emerald-500/20">
-                    <img
+                    <Image
                       src={testimonial.image}
                       alt={testimonial.name}
+                      width={48}
+                      height={48}
                       className="w-full h-full object-cover"
                     />
                   </div>

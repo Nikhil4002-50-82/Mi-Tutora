@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { Phone, Mail, MapPin } from 'lucide-react';
+import Image from 'next/image';
 const logo = '/imports/logo.png';
 
 const FooterLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -32,9 +33,11 @@ export function Footer() {
         {/* LEFT SECTION (Logo & About) */}
         <div className="col-span-2 lg:col-span-2">
           <a href="#hero" className="inline-block mb-4 transition-transform hover:scale-105 duration-300">
-            <img
+            <Image
               src={logo}
               alt="Mi Tutora"
+              width={200}
+              height={112}
               className="h-28 w-auto object-contain -ml-2"
             />
           </a>

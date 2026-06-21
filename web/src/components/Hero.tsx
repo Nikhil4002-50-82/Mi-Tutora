@@ -7,6 +7,7 @@ import TeacherForm from './TeacherForm';
 import DemoForm from './DemoForm';
 import { motion } from 'motion/react';
 import { ArrowRight, Download, Users, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 const heroImage = '/imports/hero.jpg';
 
 export function Hero() {
@@ -163,9 +164,11 @@ export function Hero() {
               {/* Ambient Glow */}
               <div className="absolute inset-0 bg-[#00a992]/20 blur-3xl rounded-full scale-90" />
               
-              <img
+              <Image
                 src={heroImage}
                 alt="Professional tutoring"
+                width={500}
+                height={500}
                 className="rounded-3xl w-full h-[320px] sm:h-[400px] md:h-[500px] object-cover shadow-2xl border border-white/10 relative z-10"
               />
 
