@@ -1,0 +1,9 @@
+[build]
+  # Tell Netlify that the app is in the 'web' folder
+  base = "web"
+  
+  # Standard Next.js build command
+  command = "npm run build"
+  
+  # Next.js output directory
+  publish = ".next"
