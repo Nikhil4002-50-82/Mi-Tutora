@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { Shield, Clock, Users, Award, Target, Sparkles, DollarSign } from 'lucide-react';
-import { Link } from 'react-router-dom';
+
 
 export function WhyChooseUs() {
   const highlights = [
