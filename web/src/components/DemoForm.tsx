@@ -210,7 +210,9 @@ export default function DemoForm({
         setSuccessMsg('Profile updated successfully!');
       } else {
         // Mark user as having profile
-        await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
+        const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
+        const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+        await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
 
         // Fetch parent (create if not exists)
         const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();

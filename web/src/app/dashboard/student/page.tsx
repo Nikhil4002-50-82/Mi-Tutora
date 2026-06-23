@@ -17,6 +17,13 @@ export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [payingClass, setPayingClass] = useState<any>(null);
+  const [useWallet, setUseWallet] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string) => {} });
   const router = useRouter();
 
@@ -33,7 +40,19 @@ export default function StudentDashboard() {
 
     const user = session.user;
     
-    const { data: userData } = await supabase.from('users').select('hasProfile, referralCode').eq('id', user.id).single();
+    let { data: userData } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
+    
+    if (!userData) {
+      await supabase.from('users').insert({
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || 'Student',
+        role: 'student'
+      });
+      const { data: newUserData } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
+      userData = newUserData;
+    }
+    
     const { data: parentData } = await supabase.from('parents').select('*, students(*)').eq('id', user.id).single();
     const { data: applications } = await supabase.from('applications').select('*').eq('parentId', user.id);
     const { data: students } = await supabase.from('students').select('*').eq('parentId', user.id);
@@ -104,19 +123,57 @@ export default function StudentDashboard() {
         subject: app.category || 'General',
         teacher: app.tutorName || 'Assigned Tutor',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
-        status: app.status
+        status: app.status,
+        finalPrice: app.finalPrice || app.currentOffer || 4000
       }))
     };
   };
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('studentDashboardData', fetcher);
-  const hasProfile = data?.userData?.hasProfile || false;
+  const hasProfile = data?.userData?.hasProfile || !!data?.myStudent || false;
 
   useEffect(() => {
     if (data && !hasProfile) {
       setActiveTab('profile');
     }
   }, [data, hasProfile]);
+
+  const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+
+  useEffect(() => {
+    const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
+    if (data && !existingCode && !isGeneratingRef) {
+      const generateCode = async () => {
+        setIsGeneratingRef(true);
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const baseName = data?.myStudent?.name || data?.user?.user_metadata?.name || 'USER';
+          const newCode = baseName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+          
+          // Optimistic update
+          mutate({ ...data, userData: { ...data.userData, referralCode: newCode, referralcode: newCode } }, false);
+
+          const { error } = await supabase.from('users').upsert({ 
+            id: data.user.id,
+            email: data.user.email,
+            name: baseName,
+            referralCode: newCode 
+          }, { onConflict: 'id' });
+          if (error) {
+            toast.error("Generation error: " + error.message);
+          } else {
+            toast.success("Generated referral code: " + newCode);
+          }
+          // Revalidate with server
+          mutate();
+        } catch (e: any) {
+          toast.error("Failed to generate referral code: " + e.message);
+        }
+      };
+      generateCode();
+    }
+  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user?.id, data?.myStudent?.name, mutate, data, isGeneratingRef]);
 
   useEffect(() => {
     const processSilentSubmission = async () => {
@@ -129,7 +186,9 @@ export default function StudentDashboard() {
           const user = data?.user;
           if (!user) return;
           
-          await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
+          const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
+          const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+          await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
 
           const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();
           if (!existingParent) {
@@ -276,7 +335,89 @@ export default function StudentDashboard() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+  const handlePaymentSubmit = async () => {
+    setPaymentLoading(true);
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      
+      const coursePrice = payingClass.finalPrice || 4000;
+      const walletBalance = data?.userData?.walletBalance || 0;
+      
+      // Update application
+      await supabase.from('applications').update({ status: 'tuition_started' }).eq('id', payingClass.id);
+      
+      // Handle referral reward logic
+      const { data: pendingReferral } = await supabase.from('referrals')
+        .select('*')
+        .eq('referredUserId', data?.user?.id)
+        .eq('status', 'pending')
+        .single();
+        
+      if (pendingReferral) {
+         const rewardAmount = Math.floor(coursePrice * 0.10);
+         await supabase.from('referrals').update({
+           status: 'rewarded',
+           estimatedReward: rewardAmount,
+           applicationId: payingClass.id
+         }).eq('id', pendingReferral.id);
+         
+         const { data: referrerUser } = await supabase.from('users').select('walletBalance').eq('id', pendingReferral.referrerId).single();
+         const newBal = (referrerUser?.walletBalance || 0) + rewardAmount;
+         await supabase.from('users').update({ walletBalance: newBal }).eq('id', pendingReferral.referrerId);
+      }
+      
+      // Deduct wallet if used
+      if (useWallet && walletBalance > 0) {
+        const usedAmount = Math.min(coursePrice, walletBalance);
+        await supabase.from('users').update({ walletBalance: walletBalance - usedAmount }).eq('id', data?.user?.id);
+      }
+
+      toast.success("Payment completed successfully!");
+      setPayingClass(null);
+      setUseWallet(false);
+      mutate();
+    } catch (e: any) {
+      toast.error(e.message || "Payment failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleWithdrawSubmit = async () => {
+    if (!upiId.includes('@')) {
+      toast.error('Please enter a valid UPI ID');
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const currentBalance = data?.userData?.walletBalance || 0;
+      
+      if (currentBalance < 1000) {
+        throw new Error('Minimum withdrawal amount is ₹1000');
+      }
+      
+      await supabase.from('withdrawals').insert({
+        userId: data?.user?.id,
+        amount: currentBalance,
+        upiId: upiId,
+        status: 'pending'
+      });
+      
+      await supabase.from('users').update({ walletBalance: 0 }).eq('id', data?.user?.id);
+      
+      toast.success('Withdrawal request submitted successfully!');
+      setWithdrawModal(false);
+      setUpiId('');
+      mutate();
+    } catch (e: any) {
+      toast.error(e.message || 'Withdrawal failed');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -587,7 +728,13 @@ export default function StudentDashboard() {
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                 : 'bg-orange-50 text-orange-700 border-orange-200'
                             }`}>
-                              {cls.status === 'demo_pending_payment' ? 'Pay Demo Fee' : cls.status}
+                            {cls.status === 'demo_pending_payment' ? (
+                              <button onClick={() => setPayingClass(cls)} className="text-orange-700 font-bold hover:text-orange-800 uppercase tracking-wider">
+                                Pay Demo Fee
+                              </button>
+                            ) : (
+                              <span>{cls.status}</span>
+                            )}
                             </span>
                           </div>
                         </div>
@@ -609,18 +756,38 @@ export default function StudentDashboard() {
                   <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Gift className="w-48 h-48" />
                   </div>
-                  <div className="relative z-10 max-w-lg">
-                    <h3 className="text-2xl font-black mb-4">Invite Friends</h3>
-                    <p className="text-gray-300 mb-8 text-lg">Share your unique referral code. Earn rewards when they book their first class!</p>
-                    
-                    <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Your Referral Code</p>
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl font-black tracking-widest">{data?.userData?.referralCode || 'GENERATING...'}</span>
-                        <button className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
-                          Copy
-                        </button>
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                    <div className="max-w-md">
+                      <h3 className="text-2xl font-black mb-4">Invite Friends & Earn</h3>
+                      <p className="text-emerald-100 mb-8 text-lg font-medium">Share your unique referral code. Earn 25% of the initial company margin (approx. 10% of total course value) when your friend books their first class!</p>
+                      
+                      <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block mb-4">
+                        <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Referral Code</p>
+                        <div className="flex items-center gap-4">
+                          <span className="text-3xl font-black tracking-widest text-white">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
+                          <button onClick={() => {
+                            navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
+                            toast.success("Code copied!");
+                          }} className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
+                            Copy
+                          </button>
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-6 shadow-2xl text-gray-900 w-full md:w-72 flex-shrink-0">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Wallet Balance</p>
+                      <h4 className="text-4xl font-black text-[#002B20] mb-6">₹{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}</h4>
+                      <p className="text-xs text-gray-500 mb-4 font-medium leading-relaxed">
+                        Use balance to get discounts on your courses, or withdraw to bank (Min ₹1000).
+                      </p>
+                      <button 
+                        onClick={() => setWithdrawModal(true)}
+                        disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
+                        className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Withdraw Funds
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -665,6 +832,114 @@ export default function StudentDashboard() {
               </div>
             )}
 
+            {/* PAYMENT MODAL */}
+            {payingClass && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
+                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
+                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to start tuition with <span className="font-bold text-gray-900">{payingClass.teacher}</span>.</p>
+                  
+                  <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
+                    <div className="flex justify-between items-center mb-4 text-sm font-bold text-gray-500">
+                      <span>Course Fee</span>
+                      <span className="text-gray-900">₹{payingClass.finalPrice || 4000}</span>
+                    </div>
+                    
+                    {(data?.userData?.walletBalance || 0) > 0 && (
+                      <div className="flex items-start gap-3 mb-4 pt-4 border-t border-gray-200">
+                        <input
+                          type="checkbox"
+                          id="useWallet"
+                          checked={useWallet}
+                          onChange={(e) => setUseWallet(e.target.checked)}
+                          className="mt-1 w-4 h-4 text-[#00a992] rounded border-gray-300 focus:ring-[#00a992]"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="useWallet" className="text-sm font-bold text-gray-900 cursor-pointer block">
+                            Apply Wallet Balance
+                          </label>
+                          <p className="text-xs text-gray-500 font-medium">Available: ₹{data?.userData?.walletBalance}</p>
+                        </div>
+                        <span className="text-emerald-600 font-bold text-sm">
+                          -₹{useWallet ? Math.min(payingClass.finalPrice || 4000, data?.userData?.walletBalance) : 0}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
+                      <span>Total to Pay</span>
+                      <span className="text-[#00a992]">
+                        ₹{useWallet ? Math.max(0, (payingClass.finalPrice || 4000) - (data?.userData?.walletBalance || 0)) : (payingClass.finalPrice || 4000)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4 relative z-10">
+                    <button
+                      onClick={() => { setPayingClass(null); setUseWallet(false); }}
+                      className="flex-1 py-3.5 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      disabled={paymentLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePaymentSubmit}
+                      disabled={paymentLoading}
+                      className="flex-1 py-3.5 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                      {paymentLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        'Pay Securely'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* WITHDRAW MODAL */}
+            {withdrawModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Withdraw Funds</h3>
+                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are withdrawing ₹{data?.userData?.walletBalance || 0} to your bank account.</p>
+                  
+                  <div className="mb-6 relative z-10">
+                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID</label>
+                    <input
+                      type="text"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="e.g. 9876543210@ybl"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#00a992]/10 focus:border-[#00a992] transition-colors"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-4 relative z-10">
+                    <button
+                      onClick={() => { setWithdrawModal(false); setUpiId(''); }}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      disabled={withdrawLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleWithdrawSubmit}
+                      disabled={withdrawLoading}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                      {withdrawLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        'Submit Request'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
 

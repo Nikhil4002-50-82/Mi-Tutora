@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
   referralCode TEXT DEFAULT '',
   referredBy TEXT DEFAULT '',
   fcmToken TEXT DEFAULT '',
-  freeDemoEligible BOOLEAN DEFAULT false
+  freeDemoEligible BOOLEAN DEFAULT false,
+  walletBalance INT DEFAULT 0
 );
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -219,10 +220,21 @@ CREATE TABLE IF NOT EXISTS referrals (
   referralType TEXT DEFAULT '',
   status TEXT DEFAULT 'pending',
   estimatedReward INT DEFAULT 0,
+  applicationId TEXT DEFAULT '',
   createdAt BIGINT DEFAULT (extract(epoch from now()) * 1000)
 );
 
--- 10. global_config
+-- 10. withdrawals
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  userId TEXT DEFAULT '',
+  amount INT DEFAULT 0,
+  status TEXT DEFAULT 'pending',
+  upiId TEXT DEFAULT '',
+  createdAt BIGINT DEFAULT (extract(epoch from now()) * 1000)
+);
+
+-- 11. global_config
 CREATE TABLE IF NOT EXISTS global_config (
   id TEXT PRIMARY KEY DEFAULT 'app',
   appEnabled BOOLEAN DEFAULT true,

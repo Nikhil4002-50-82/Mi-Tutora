@@ -149,8 +149,10 @@ export default function TeacherForm({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not logged in");
 
-      // Update user hasProfile flag
-      await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
+      // Update user hasProfile flag and referral code
+      const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
+      const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+      await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
 
       // Update the existing tutor record
       const { error } = await supabase.from('tutors').update({

@@ -10,12 +10,15 @@ function SignupContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  
+  const searchParams = useSearchParams();
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
+  
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
-  const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'student';
   const isTeacher = role === 'teacher';
 
@@ -54,11 +57,33 @@ function SignupContent() {
             id: data.user.id,
             email: data.user.email,
             name: name,
-            role: role
+            role: role,
+            referredBy: referralCode.trim()
           });
           
         if (userError && userError.code !== '23505') {
           throw new Error(`Users table error: ${userError.message}`);
+        }
+
+        // Process referral if exists
+        if (referralCode.trim()) {
+          const { data: referrerUser } = await supabase
+            .from('users')
+            .select('id, name')
+            .eq('referralCode', referralCode.trim().toUpperCase())
+            .single();
+            
+          if (referrerUser) {
+            await supabase.from('referrals').insert({
+              referrerId: referrerUser.id,
+              referrerName: referrerUser.name,
+              referredUserId: data.user.id,
+              referredUserName: name,
+              referralCode: referralCode.trim().toUpperCase(),
+              referralType: role,
+              status: 'pending'
+            });
+          }
         }
 
         // Insert into parents or tutors
@@ -92,7 +117,8 @@ function SignupContent() {
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const next = searchParams.get('next');
-      const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
+      const ref = referralCode.trim();
+      const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -324,6 +350,26 @@ function SignupContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
+                    ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
+                  `}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
+                Referral Code <span className="text-gray-400 font-normal">(Optional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Award className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. JOHN-X8B2"
                   className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}

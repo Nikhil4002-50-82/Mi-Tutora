@@ -19,6 +19,9 @@ export default function TeacherDashboard() {
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string) => {} });
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -34,7 +37,21 @@ export default function TeacherDashboard() {
 
     const user = session.user;
     
-    const { data: userData } = await supabase.from('users').select('hasProfile, referralCode').eq('id', user.id).single();
+    let { data: userData, error: fetchUserError } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
+    
+    if (!userData) {
+      console.log("userData not found! Attempting insert. Error was:", fetchUserError);
+      const { error: insertError } = await supabase.from('users').insert({
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || 'Teacher',
+        role: 'teacher'
+      });
+      console.log("Insert result error:", insertError);
+      const { data: newUserData } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
+      userData = newUserData;
+    }
+
     const { data: tutorData } = await supabase.from('tutors').select('*').eq('id', user.id).single();
     const { data: applications } = await supabase.from('applications').select('*').eq('tutorId', user.id);
 
@@ -105,13 +122,51 @@ export default function TeacherDashboard() {
   };
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('teacherDashboardData', fetcher);
-  const hasProfile = data?.userData?.hasProfile || false;
+  const hasProfile = data?.userData?.hasProfile || !!data?.profile?.phone || false;
 
   useEffect(() => {
     if (data && !hasProfile) {
       setActiveTab('profile');
     }
   }, [data, hasProfile]);
+
+  const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+
+  useEffect(() => {
+    const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
+    if (data && !existingCode && !isGeneratingRef) {
+      const generateCode = async () => {
+        setIsGeneratingRef(true);
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const baseName = data?.profile?.name || data?.user?.user_metadata?.name || 'USER';
+          const newCode = baseName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+          
+          // Optimistic update
+          mutate({ ...data, userData: { ...data.userData, referralCode: newCode, referralcode: newCode } }, false);
+          
+          const { data: updatedData, error } = await supabase.from('users').upsert({ 
+            id: data.user.id,
+            email: data.user.email,
+            name: baseName,
+            referralCode: newCode 
+          }, { onConflict: 'id' }).select();
+          
+          if (error) {
+            toast.error("Generation error: " + error.message);
+          } else {
+            toast.success("Generated referral code: " + newCode);
+          }
+          // Revalidate with server
+          mutate();
+        } catch (e: any) {
+          toast.error("Failed to generate referral code: " + e.message);
+        }
+      };
+      generateCode();
+    }
+  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user?.id, data?.profile?.name, mutate, data, isGeneratingRef]);
 
   useEffect(() => {
     if ((data?.teacherCategories?.length ?? 0) > 0 && !subTab) {
@@ -130,7 +185,9 @@ export default function TeacherDashboard() {
           const user = data?.user;
           if (!user) return;
           
-          await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
+          const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
+          const newCode = existingUser?.referralCode || (parsedData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+          await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
 
           await supabase.from('tutors').update({
             category: parsedData.category || '',
@@ -264,6 +321,41 @@ export default function TeacherDashboard() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+
+  const handleWithdrawSubmit = async () => {
+    if (!upiId.includes('@')) {
+      toast.error('Please enter a valid UPI ID');
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const currentBalance = data?.userData?.walletBalance || 0;
+      
+      if (currentBalance < 1000) {
+        throw new Error('Minimum withdrawal amount is ₹1000');
+      }
+      
+      await supabase.from('withdrawals').insert({
+        userId: data?.user?.id,
+        amount: currentBalance,
+        upiId: upiId,
+        status: 'pending'
+      });
+      
+      await supabase.from('users').update({ walletBalance: 0 }).eq('id', data?.user?.id);
+      
+      toast.success('Withdrawal request submitted successfully!');
+      setWithdrawModal(false);
+      setUpiId('');
+      mutate();
+    } catch (e: any) {
+      toast.error(e.message || 'Withdrawal failed');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -620,18 +712,38 @@ export default function TeacherDashboard() {
                   <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Gift className="w-48 h-48" />
                   </div>
-                  <div className="relative z-10 max-w-lg">
-                    <h3 className="text-2xl font-black mb-4">Invite Students & Teachers</h3>
-                    <p className="text-gray-300 mb-8 text-lg">Share your unique referral code. Earn rewards when they book their first class!</p>
-                    
-                    <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Your Referral Code</p>
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl font-black tracking-widest">{data?.userData?.referralCode || 'GENERATING...'}</span>
-                        <button className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
-                          Copy
-                        </button>
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                    <div className="max-w-md">
+                      <h3 className="text-2xl font-black mb-4">Invite Friends & Earn</h3>
+                      <p className="text-emerald-100 mb-8 text-lg font-medium">Share your unique referral code. Earn 25% of the initial company margin when they book their first class!</p>
+                      
+                      <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block mb-4">
+                        <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Referral Code</p>
+                        <div className="flex items-center gap-4">
+                          <span className="text-3xl font-black tracking-widest text-white">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
+                          <button onClick={() => {
+                            navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
+                            toast.success("Code copied!");
+                          }} className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
+                            Copy
+                          </button>
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-6 shadow-2xl text-gray-900 w-full md:w-72 flex-shrink-0">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Wallet Balance</p>
+                      <h2 className="text-4xl font-black text-[#002B20]">₹{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}</h2>
+                      <p className="text-xs text-gray-500 mb-4 font-medium leading-relaxed">
+                        Use balance to get discounts on your courses, or withdraw to bank (Min ₹1000).
+                      </p>
+                      <button 
+                        onClick={() => setWithdrawModal(true)}
+                        disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
+                        className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Withdraw Funds
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -676,6 +788,47 @@ export default function TeacherDashboard() {
               </div>
             )}
 
+            {/* WITHDRAW MODAL */}
+            {withdrawModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Withdraw Funds</h3>
+                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are withdrawing ₹{data?.userData?.walletBalance || 0} to your bank account.</p>
+                  
+                  <div className="mb-6 relative z-10">
+                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID</label>
+                    <input
+                      type="text"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="e.g. 9876543210@ybl"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#00a992]/10 focus:border-[#00a992] transition-colors"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-4 relative z-10">
+                    <button
+                      onClick={() => { setWithdrawModal(false); setUpiId(''); }}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      disabled={withdrawLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleWithdrawSubmit}
+                      disabled={withdrawLoading}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                      {withdrawLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        'Submit Request'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
 
