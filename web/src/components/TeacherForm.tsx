@@ -380,6 +380,7 @@ export default function TeacherForm({
               type="text"
               name="fullName"
               placeholder="John Doe"
+              value={formData.fullName}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -434,6 +435,7 @@ export default function TeacherForm({
               type="tel"
               name="phone"
               placeholder="Enter phone number"
+              value={formData.phone}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -448,6 +450,7 @@ export default function TeacherForm({
               type="tel"
               name="whatsapp"
               placeholder="Enter WhatsApp number"
+              value={formData.whatsapp}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -467,6 +470,7 @@ export default function TeacherForm({
               type="email"
               name="email"
               placeholder="Enter email"
+              value={formData.email}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
               required
@@ -484,6 +488,7 @@ export default function TeacherForm({
               rows={4}
               name="address"
               placeholder="Enter address"
+              value={formData.address}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -515,6 +520,7 @@ export default function TeacherForm({
               type="text"
               name="qualification"
               placeholder="Enter qualification"
+              value={formData.qualification}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -529,6 +535,7 @@ export default function TeacherForm({
               type="text"
               name="experience"
               placeholder="Years of experience"
+              value={formData.experience}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -587,7 +594,8 @@ export default function TeacherForm({
                 type="text"
                 name="subjects"
                 placeholder="Maths, Science, English"
-                onChange={handleChange}
+                value={formData.subjects}
+              onChange={handleChange}
                 className="w-full border border-slate-300 rounded-xl px-4 py-4"
               />
             </div>

@@ -45,46 +45,55 @@ export default function DemoForm({
       languages: [] as string[],
     });
 
-  // Load profile from Supabase if inside dashboard and hasProfile is true
+  // Load profile from Supabase if inside dashboard
   useEffect(() => {
-    if (isDashboard && hasProfile) {
+    if (isDashboard) {
       const fetchProfile = async () => {
         try {
           const { createClient } = await import('@/utils/supabase/client');
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            // Fetch student data
-            const { data: studentData } = await supabase.from('students').select('*').eq('parentId', user.id).single();
-            // Fetch tuition request data
-            const { data: requestData } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id).order('created_at', { ascending: false }).limit(1).single();
-            
-            if (studentData && requestData) {
-              setIsEditing(false);
-              setFormData({
-                fullName: studentData.name || '',
-                gender: studentData.gender || '',
-                phone: studentData.phoneNumber || '',
-                whatsapp: studentData.whatsappNumber || '',
-                email: studentData.email || '',
-                address: studentData.address || '',
-                studentType: studentData.studentType || '',
-                classGrade: studentData.classLevel || '',
-                parentName: '', // parents table name
-                demoMode: studentData.preferredMode || '',
-                board: studentData.board || '',
-                subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
-                classMode: '',
-                hours: requestData.preferredTimeRange || '',
-                days: '',
-                goal: studentData.learningGoal || '',
-                source: '',
-                requirements: studentData.specialRequirements || '',
-                budget: studentData.budget?.toString() || '',
-                category: studentData.category || '',
-                technologies: studentData.technologies || [],
-                languages: studentData.languages || [],
-              });
+            if (hasProfile) {
+              // Fetch student data
+              const { data: studentData } = await supabase.from('students').select('*').eq('parentId', user.id).single();
+              // Fetch tuition request data
+              const { data: requestData } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id).order('created_at', { ascending: false }).limit(1).single();
+              
+              if (studentData && requestData) {
+                setIsEditing(false);
+                setFormData({
+                  fullName: studentData.name || '',
+                  gender: studentData.gender || '',
+                  phone: studentData.phoneNumber || '',
+                  whatsapp: studentData.whatsappNumber || '',
+                  email: studentData.email || '',
+                  address: studentData.address || '',
+                  studentType: studentData.studentType || '',
+                  classGrade: studentData.classLevel || '',
+                  parentName: '', // parents table name
+                  demoMode: studentData.preferredMode || '',
+                  board: studentData.board || '',
+                  subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
+                  classMode: '',
+                  hours: requestData.preferredTimeRange || '',
+                  days: '',
+                  goal: studentData.learningGoal || '',
+                  source: '',
+                  requirements: studentData.specialRequirements || '',
+                  budget: studentData.budget?.toString() || '',
+                  category: studentData.category || '',
+                  technologies: studentData.technologies || [],
+                  languages: studentData.languages || [],
+                });
+              }
+            } else {
+              // Pre-fill name and email from auth user metadata if they don't have a profile yet
+              setFormData(prev => ({
+                ...prev,
+                fullName: user.user_metadata?.full_name || prev.fullName,
+                email: user.email || prev.email
+              }));
             }
           }
         } catch (e) {
@@ -420,6 +429,7 @@ export default function DemoForm({
               type="text"
               name="fullName"
               placeholder="Enter your full name"
+              value={formData.fullName}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -474,6 +484,7 @@ export default function DemoForm({
               type="tel"
               name="phone"
               placeholder="Enter phone number"
+              value={formData.phone}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -488,6 +499,7 @@ export default function DemoForm({
               type="tel"
               name="whatsapp"
               placeholder="Enter WhatsApp number"
+              value={formData.whatsapp}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -507,6 +519,7 @@ export default function DemoForm({
               type="email"
               name="email"
               placeholder="Enter email"
+              value={formData.email}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -521,6 +534,7 @@ export default function DemoForm({
               rows={4}
               name="address"
               placeholder="Enter address"
+              value={formData.address}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -542,7 +556,8 @@ export default function DemoForm({
 
                 <select
                   name="studentType"
-                  onChange={handleChange}
+                  value={formData.studentType}
+              onChange={handleChange}
                   className="w-full border border-slate-300 rounded-xl px-4 py-4"
                 >
                   <option>
@@ -567,7 +582,8 @@ export default function DemoForm({
 
                 <select
                   name="classGrade"
-                  onChange={handleChange}
+                  value={formData.classGrade}
+              onChange={handleChange}
                   className="w-full border border-slate-300 rounded-xl px-4 py-4"
                 >
 
@@ -658,7 +674,8 @@ export default function DemoForm({
 
                 <select
                   name="board"
-                  onChange={handleChange}
+                  value={formData.board}
+              onChange={handleChange}
                   className="w-full border border-slate-300 rounded-xl px-4 py-4"
                 >
 
@@ -694,7 +711,8 @@ export default function DemoForm({
                   type="text"
                   name="subjects"
                   placeholder="Maths, Science..."
-                  onChange={handleChange}
+                  value={formData.subjects}
+              onChange={handleChange}
                   className="w-full border border-slate-300 rounded-xl px-4 py-4"
                 />
               </div>
@@ -858,6 +876,7 @@ export default function DemoForm({
               type="text"
               name="parentName"
               placeholder="Parent Name"
+              value={formData.parentName}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -875,6 +894,7 @@ export default function DemoForm({
 
             <select
               name="hours"
+              value={formData.hours}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             >
@@ -909,6 +929,7 @@ export default function DemoForm({
 
             <select
               name="days"
+              value={formData.days}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             >
@@ -948,7 +969,8 @@ export default function DemoForm({
             rows={4}
             name="goal"
             placeholder="Write your goal..."
-            onChange={handleChange}
+            value={formData.goal}
+              onChange={handleChange}
             className="w-full border border-slate-300 rounded-xl px-4 py-4"
           />
         </div>
@@ -963,7 +985,8 @@ export default function DemoForm({
             rows={4}
             name="requirements"
             placeholder="Any specific requirements?"
-            onChange={handleChange}
+            value={formData.requirements}
+              onChange={handleChange}
             className="w-full border border-slate-300 rounded-xl px-4 py-4"
           />
         </div>
@@ -977,7 +1000,8 @@ export default function DemoForm({
             type="number"
             name="budget"
             placeholder="E.g. 5000"
-            onChange={handleChange}
+            value={formData.budget}
+              onChange={handleChange}
             className="w-full border border-slate-300 rounded-xl px-4 py-4"
           />
         </div>

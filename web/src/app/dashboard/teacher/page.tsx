@@ -7,180 +7,183 @@ import axios from 'axios';
 import { motion } from 'motion/react';
 import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
+import ActionModal from '@/components/ActionModal';
+import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
+import useSWR from 'swr';
+
 export default function TeacherDashboard() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [subTab, setSubTab] = useState<string>('');
-  const [hasProfile, setHasProfile] = useState(true);
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string) => {} });
   const router = useRouter();
 
+  const fetcher = async () => {
+    const { createClient } = await import('@/utils/supabase/client');
+    const supabase = createClient();
+    
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      router.push('/login');
+      throw new Error('Unauthenticated');
+    }
+
+    const user = session.user;
+    
+    const { data: userData } = await supabase.from('users').select('hasProfile, referralCode').eq('id', user.id).single();
+    const { data: tutorData } = await supabase.from('tutors').select('*').eq('id', user.id).single();
+    const { data: applications } = await supabase.from('applications').select('*').eq('tutorId', user.id);
+
+    const { data: availableStudentsRaw } = await supabase
+      .from('tuition_requests')
+      .select('*')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+
+    const uniqueParentIds = new Set();
+    const availableStudents = availableStudentsRaw?.filter(req => {
+      if (uniqueParentIds.has(req.parentId)) return false;
+      uniqueParentIds.add(req.parentId);
+      return true;
+    }) || [];
+
+    const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
+    
+    const matchedStudents = availableStudents?.filter(student => {
+      if (!tutorData) return true;
+      if (!teacherCategories.includes(student.category)) return false;
+      
+      if (student.category === 'school') {
+        const boardMatch = !student.board || (tutorData.boards && tutorData.boards.includes(student.board));
+        const classMatch = !student.classLevel || (tutorData.classes && tutorData.classes.includes(student.classLevel));
+        return boardMatch || classMatch;
+      }
+      return true;
+    }) || [];
+
+    const { data: referrals } = await supabase.from('referrals').select('*').eq('referrerId', user.id);
+
+    return {
+      user,
+      userData,
+      profile: tutorData,
+      teacherCategories,
+      availableStudents: matchedStudents,
+      applications: applications || [],
+      referrals: referrals || [],
+      negotiations: applications?.filter(app => ['negotiating', 'scheduling'].includes(app.status)) || [],
+      upcomingClasses: applications?.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
+        id: app.id,
+        student: app.studentName || 'Assigned Student',
+        subject: app.category || 'General',
+        date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
+        status: app.status === 'tuition_started' ? 'confirmed' : 'pending'
+      })) || []
+    };
+  };
+
+  const { data, error: swrError, isLoading: loading, mutate } = useSWR('teacherDashboardData', fetcher);
+  const hasProfile = data?.userData?.hasProfile || false;
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const { createClient } = await import('@/utils/supabase/client');
-        const supabase = createClient();
-        
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          router.push('/login');
-          return;
-        }
+    if (data && !hasProfile) {
+      setActiveTab('profile');
+    }
+  }, [data, hasProfile]);
 
-        const user = session.user;
-        
-        // Fetch user data
-        const { data: userData } = await supabase
-          .from('users')
-          .select('hasProfile, referralCode')
-          .eq('id', user.id)
-          .single();
+  useEffect(() => {
+    if ((data?.teacherCategories?.length ?? 0) > 0 && !subTab) {
+      setSubTab(data?.teacherCategories?.[0] || '');
+    }
+  }, [data?.teacherCategories, subTab]);
 
-        setHasProfile(userData?.hasProfile || false);
-
-        if (!userData?.hasProfile) {
-          setActiveTab('profile');
-        }
-
-        // Fetch teacher data from Supabase
-        const { data: tutorData } = await supabase
-          .from('tutors')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        // Silent Submission Logic
-        const savedTeacherData = localStorage.getItem('teacherFormData');
-        if (savedTeacherData) {
-          try {
-            const parsedData = JSON.parse(savedTeacherData);
-            
-            // Mark user as having profile
-            await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
-
-            await supabase.from('tutors').update({
-              category: parsedData.category || '',
-              name: parsedData.fullName,
-              gender: parsedData.gender,
-              phone: parsedData.phone,
-              whatsapp: parsedData.whatsapp,
-              address: parsedData.address,
-              qualification: parsedData.qualification,
-              experience: parsedData.experience,
-              occupation: parsedData.occupation,
-              subjects: parsedData.subjects || [],
-              classes: parsedData.classes || [],
-              boards: parsedData.boards || [],
-              technologies: parsedData.technologies || [],
-              languagesTaught: parsedData.languages || [],
-              mode: parsedData.mode,
-              teachingApproach: parsedData.description,
-              studentCount: parsedData.studentsCount,
-              schoolNames: parsedData.schoolNames,
-              preferredLocations: parsedData.locations,
-              travelDistance: parsedData.travelKm,
-              feeRange: parsedData.feeRange,
-              hasProfile: true
-            }).eq('id', user.id);
-            localStorage.removeItem('teacherFormData');
-            
-            // Reload page to reflect new data
-            window.location.reload();
-            return;
-          } catch (e) {
-            console.error("Failed to silently submit profile data", e);
-          }
-        }
-
-        // Fetch applications (negotiations and scheduled classes)
-        const { data: applications } = await supabase
-          .from('applications')
-          .select('*')
-          .eq('tutorId', user.id);
-
-        // Fetch open tuition requests (Find Students)
-        // Basic matching logic: match category, then maybe subjects in frontend
-        const { data: availableStudentsRaw } = await supabase
-          .from('tuition_requests')
-          .select('*')
-          .eq('status', 'open')
-          .order('created_at', { ascending: false });
-
-        // Deduplicate students by parentId to avoid showing the same request multiple times
-        const uniqueParentIds = new Set();
-        const availableStudents = availableStudentsRaw?.filter(req => {
-          if (uniqueParentIds.has(req.parentId)) return false;
-          uniqueParentIds.add(req.parentId);
-          return true;
-        }) || [];
-
-        // Filter students based on tutor's profile (boards, classes, subjects)
-        const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
-        
-        if (teacherCategories.length > 0 && !subTab) {
-          setSubTab(teacherCategories[0]);
-        }
-
-        const matchedStudents = availableStudents?.filter(student => {
-          if (!tutorData) return true; // Show all if no profile data yet
-          if (!teacherCategories.includes(student.category)) return false;
+  useEffect(() => {
+    const processSilentSubmission = async () => {
+      const savedTeacherData = localStorage.getItem('teacherFormData');
+      if (savedTeacherData && data?.user) {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const parsedData = JSON.parse(savedTeacherData);
+          const user = data?.user;
+          if (!user) return;
           
-          if (student.category === 'school') {
-            const boardMatch = !student.board || (tutorData.boards && tutorData.boards.includes(student.board));
-            const classMatch = !student.classLevel || (tutorData.classes && tutorData.classes.includes(student.classLevel));
-            return boardMatch || classMatch;
-          }
-          return true;
-        }) || [];
+          await supabase.from('users').update({ hasProfile: true }).eq('id', user.id);
 
-        // Referrals
-        const { data: referrals } = await supabase
-          .from('referrals')
-          .select('*')
-          .eq('referrerId', user.id);
-
-        setData({
-          userData,
-          profile: tutorData,
-          teacherCategories,
-          availableStudents: matchedStudents,
-          referrals: referrals || [],
-          negotiations: applications?.filter(app => ['negotiating', 'scheduling'].includes(app.status)) || [],
-          upcomingClasses: applications?.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
-            id: app.id,
-            student: app.studentName || 'Assigned Student',
-            subject: app.category || 'General',
-            date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
-            status: app.status === 'tuition_started' ? 'confirmed' : 'pending'
-          })) || []
-        });
-
-      } catch (error) {
-        console.error('Error fetching dashboard', error);
-      } finally {
-        setLoading(false);
+          await supabase.from('tutors').update({
+            category: parsedData.category || '',
+            name: parsedData.fullName,
+            gender: parsedData.gender,
+            phone: parsedData.phone,
+            whatsapp: parsedData.whatsapp,
+            address: parsedData.address,
+            qualification: parsedData.qualification,
+            experience: parsedData.experience,
+            occupation: parsedData.occupation,
+            subjects: parsedData.subjects || [],
+            classes: parsedData.classes || [],
+            boards: parsedData.boards || [],
+            technologies: parsedData.technologies || [],
+            languagesTaught: parsedData.languages || [],
+            mode: parsedData.mode,
+            teachingApproach: parsedData.description,
+            studentCount: parsedData.studentsCount,
+            schoolNames: parsedData.schoolNames,
+            preferredLocations: parsedData.locations,
+            travelDistance: parsedData.travelKm,
+            feeRange: parsedData.feeRange,
+            hasProfile: true
+          }).eq('id', user.id);
+          localStorage.removeItem('teacherFormData');
+          mutate();
+        } catch (e) {
+          console.error("Failed to silently submit profile data", e);
+        }
       }
     };
+    processSilentSubmission();
+  }, [data?.user, mutate]);
 
-    fetchDashboardData();
-  }, [router]);
+  useEffect(() => {
+    if (!data?.user) return;
+    let channel: any;
+    let supabaseInstance: any;
+    const setupRealtime = async () => {
+      const { createClient } = await import('@/utils/supabase/client');
+      supabaseInstance = createClient();
+      
+      channel = supabaseInstance
+        .channel(`teacher_applications_${data?.user?.id}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'applications', filter: `tutorId=eq.${data?.user?.id}` },
+          () => mutate()
+        )
+        .subscribe();
+    };
+    setupRealtime();
+
+    return () => {
+      if (channel && supabaseInstance) supabaseInstance.removeChannel(channel);
+    };
+  }, [data?.user, mutate]);
 
   const handleLogout = async () => {
     const { createClient } = await import('@/utils/supabase/client');
     const supabase = createClient();
     await supabase.auth.signOut();
     localStorage.removeItem('user');
+    toast.success("Logged out successfully!");
     router.push('/login');
   };
 
   const handleSendOffer = async (student: any) => {
     const offerPrice = parseInt(negotiationOffer[student.id]);
-    if (!offerPrice || offerPrice <= 0) return alert("Please enter a valid offer price.");
+    if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid offer price.");
 
     try {
       const { createClient } = await import('@/utils/supabase/client');
@@ -205,10 +208,10 @@ export default function TeacherDashboard() {
       });
 
       if (error) throw error;
-      alert("Offer sent successfully!");
-      window.location.reload();
+      toast.success("Offer sent successfully!");
+      mutate();
     } catch (e: any) {
-      alert("Error sending offer: " + e.message);
+      toast.error("Error sending offer: " + e.message);
     }
   };
 
@@ -235,10 +238,10 @@ export default function TeacherDashboard() {
 
       const { error } = await supabase.from('applications').update(updateData).eq('id', appId);
       if (error) throw error;
-      alert(`Successfully ${action === 'accept' ? 'accepted deal' : 'sent counter offer'}!`);
-      window.location.reload();
+      toast.success(`Successfully ${action === 'accept_schedule' || action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      mutate();
     } catch (e: any) {
-      alert("Error: " + e.message);
+      toast.error("Error: " + e.message);
     }
   };
 
@@ -290,14 +293,21 @@ export default function TeacherDashboard() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const isLocked = !hasProfile && item.id !== 'profile';
             return (
               <button
                 key={item.id}
                 onClick={() => {
+                  if (isLocked) {
+                    toast.error("Please complete your profile first!");
+                    return;
+                  }
                   setActiveTab(item.id);
                   setIsMobileMenuOpen(false);
                 }}
+                disabled={isLocked}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
+                  isLocked ? "opacity-50 cursor-not-allowed text-gray-400" :
                   isActive 
                     ? "bg-[#00a992] text-white shadow-lg shadow-[#00a992]/20" 
                     : "text-gray-300 hover:bg-white/10 hover:text-white"
@@ -305,6 +315,7 @@ export default function TeacherDashboard() {
               >
                 <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-emerald-400"}`} />
                 {item.label}
+                {isLocked && <Lock className="w-4 h-4 ml-auto opacity-50" />}
               </button>
             );
           })}
@@ -323,6 +334,7 @@ export default function TeacherDashboard() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 overflow-x-hidden overflow-y-auto">
+        <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12">
           <motion.div
             key={activeTab}
@@ -338,11 +350,11 @@ export default function TeacherDashboard() {
                 <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, {data?.profile?.name || 'Teacher'}!</h1>
                 
                 {/* Active Negotiations Summary */}
-                {data?.negotiations?.length > 0 && (
+                {(data?.negotiations?.length ?? 0) > 0 && (
                   <div className="mb-8">
                     <h2 className="text-lg font-bold text-gray-900 mb-4">Active Negotiations</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data.negotiations.map((neg: any) => (
+                      {data?.negotiations?.map((neg: any) => (
                         <div key={neg.id} className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
                           <h3 className="font-bold text-gray-900 text-lg mb-1">{neg.studentName || 'Student'}</h3>
@@ -368,7 +380,7 @@ export default function TeacherDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                     <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Total Classes</h3>
-                    <p className="text-4xl font-black text-[#063831]">{data?.schedule?.length || 0}</p>
+                    <p className="text-4xl font-black text-[#063831]">{(data?.upcomingClasses?.length ?? 0)}</p>
                   </div>
                   <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                     <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Active Proposals</h3>
@@ -385,7 +397,7 @@ export default function TeacherDashboard() {
                 
                 {data?.teacherCategories?.length > 1 && (
                   <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto pb-1">
-                    {data.teacherCategories.map((cat: string) => (
+                    {data?.teacherCategories?.map((cat: string) => (
                       <button
                         key={cat}
                         onClick={() => setSubTab(cat)}
@@ -422,7 +434,7 @@ export default function TeacherDashboard() {
                         
                         <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
                           {student.classLevel && <p><span className="text-gray-500 font-medium">Class:</span> <span className="font-semibold text-gray-900">{student.classLevel}</span></p>}
-                          {student.subjects?.length > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
+                          {(student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
                           {student.area && <p><span className="text-gray-500 font-medium">Location:</span> <span className="font-semibold text-gray-900">{student.area}</span></p>}
                           <p><span className="text-gray-500 font-medium">Budget:</span> <span className="font-black text-emerald-600 text-base">₹{student.budget}</span></p>
                         </div>
@@ -454,7 +466,7 @@ export default function TeacherDashboard() {
                       </div>
                     );
                   })}
-                  {(!data?.availableStudents || data.availableStudents.filter((s:any) => data?.teacherCategories?.length > 1 ? s.category === subTab : true).length === 0) && (
+                  {(!data?.availableStudents || data?.availableStudents?.filter((s:any) => data?.teacherCategories?.length > 1 ? s.category === subTab : true).length === 0) && (
                     <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
                       <Users className="w-12 h-12 text-gray-300 mb-3" />
                       <h3 className="text-lg font-bold text-gray-900">No matching students found</h3>
@@ -469,9 +481,9 @@ export default function TeacherDashboard() {
               <div>
                 <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Negotiations & Scheduling</h2>
                 
-                {data?.negotiations?.length > 0 ? (
+                {(data?.negotiations?.length ?? 0) > 0 ? (
                   <div className="space-y-4">
-                    {data.negotiations.map((neg: any) => (
+                    {data?.negotiations?.map((neg: any) => (
                       <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
                         <div>
                           <h4 className="font-bold text-lg text-gray-900">{neg.studentName}</h4>
@@ -501,10 +513,18 @@ export default function TeacherDashboard() {
                                 </button>
                                 <button 
                                   onClick={() => {
-                                    const newPrice = prompt("Enter your counter offer (₹):", neg.currentOffer);
-                                    if (newPrice && !isNaN(parseInt(newPrice))) {
-                                      handleNegotiationAction(neg.id, 'counter_price', parseInt(newPrice));
-                                    }
+                                    setModalConfig({
+                                      isOpen: true,
+                                      type: 'price',
+                                      title: 'Counter Offer',
+                                      description: 'Propose a new monthly fee for this student.',
+                                      placeholder: 'e.g. 500',
+                                      initialValue: neg.currentOffer?.toString() || '',
+                                      onSubmit: (val: string) => {
+                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                        handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
+                                      }
+                                    });
                                   }}
                                   className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
                                 >
@@ -522,16 +542,32 @@ export default function TeacherDashboard() {
                           {neg.status === 'scheduling' && (
                             neg.scheduleStatus === 'pending_tutor' ? (
                               <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                {neg.proposedSchedule && (
+                                  <button 
+                                    onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedSchedule)}
+                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                  >
+                                    Accept Timings
+                                  </button>
+                                )}
                                 <button 
                                   onClick={() => {
-                                    const newSched = prompt("Propose class timings (e.g., 'Mon & Wed 5 PM - 6 PM'):", neg.proposedSchedule || "");
-                                    if (newSched) {
-                                      handleNegotiationAction(neg.id, 'propose_schedule', 0, newSched);
-                                    }
+                                    setModalConfig({
+                                      isOpen: true,
+                                      type: 'timing',
+                                      title: 'Propose Timings',
+                                      description: 'Suggest your preferred class timings.',
+                                      placeholder: 'e.g. Mon & Wed 5 PM - 6 PM',
+                                      initialValue: neg.proposedSchedule || '',
+                                      onSubmit: (val: string) => {
+                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, val);
+                                      }
+                                    });
                                   }}
                                   className="w-full sm:w-auto bg-[#063831] hover:bg-[#04241f] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"
                                 >
-                                  Propose Timings
+                                  {neg.proposedSchedule ? 'Change Timings' : 'Propose Timings'}
                                 </button>
                               </div>
                             ) : (
@@ -575,7 +611,7 @@ export default function TeacherDashboard() {
                         </div>
                       </li>
                     ))}
-                    {(!data?.upcomingClasses || data.upcomingClasses.length === 0) && (
+                    {(!data?.upcomingClasses || data?.upcomingClasses?.length === 0) && (
                       <li className="p-8 text-sm text-gray-500 text-center font-medium">No active classes yet.</li>
                     )}
                   </ul>
@@ -609,9 +645,9 @@ export default function TeacherDashboard() {
 
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Your Referrals</h3>
                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                  {data?.referrals?.length > 0 ? (
+                  {(data?.referrals?.length ?? 0) > 0 ? (
                     <ul className="divide-y divide-gray-100">
-                      {data.referrals.map((ref: any) => (
+                      {data?.referrals?.map((ref: any) => (
                         <li key={ref.id} className="p-5 flex justify-between items-center">
                           <div>
                             <p className="font-bold text-gray-900">{ref.referredUserName || 'Unknown User'}</p>

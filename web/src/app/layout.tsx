@@ -63,6 +63,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -94,7 +96,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-white">{children}</body>
+      <body className="min-h-full flex flex-col bg-white">
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   );
 }
