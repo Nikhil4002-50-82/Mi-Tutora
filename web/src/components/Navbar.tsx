@@ -140,14 +140,17 @@ export function Navbar() {
             </div>
           </nav>
 
-          <motion.button
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
-            onClick={openTeacherForm}
-            className="bg-gradient-to-r from-[#00a992] to-emerald-600 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold px-7 py-2.5 rounded-full transition-all duration-300 shadow-lg shadow-[#00a992]/20 hover:shadow-[#00a992]/40"
           >
-            Book Free Demo
-          </motion.button>
+            <Link
+              href="/signup?role=student"
+              className="inline-block bg-gradient-to-r from-[#00a992] to-emerald-600 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold px-7 py-2.5 rounded-full transition-all duration-300 shadow-lg shadow-[#00a992]/20 hover:shadow-[#00a992]/40"
+            >
+              Book Free Demo
+            </Link>
+          </motion.div>
         </div>
 
         {/* Mobile Menu Button */}
@@ -195,12 +198,12 @@ export function Navbar() {
               </div>
             </div>
 
-            <button
-              onClick={openTeacherForm}
+            <Link
+              href="/signup?role=student"
               className="w-full bg-gradient-to-r from-[#00a992] to-emerald-600 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3.5 mt-4 flex items-center justify-center rounded-xl transition duration-300 shadow-lg shadow-[#00a992]/20"
             >
               Book Free Demo
-            </button>
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>

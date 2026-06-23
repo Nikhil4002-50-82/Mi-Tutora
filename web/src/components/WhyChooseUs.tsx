@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { Shield, Clock, Users, Award, Target, Sparkles, DollarSign } from 'lucide-react';
+import Link from 'next/link';
 
 
 export function WhyChooseUs() {
@@ -75,15 +76,12 @@ export function WhyChooseUs() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={() => {
-                  const event = new CustomEvent('openTeacherForm');
-                  window.dispatchEvent(event);
-                }}
+              <Link
+                href="/signup?role=student"
                 className="px-8 py-3.5 rounded-full bg-gradient-to-r from-[#00a992] to-emerald-600 hover:from-emerald-500 hover:to-emerald-400 transition duration-300 text-white font-bold text-center shadow-lg shadow-[#00a992]/20"
               >
                 Book Free Demo
-              </button>
+              </Link>
             </div>
           </motion.div>
 

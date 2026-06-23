@@ -3,6 +3,7 @@
 import { motion } from 'motion/react';
 import { DollarSign, Clock, Users, TrendingUp, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export function TutorJoin() {
   const benefits = [
@@ -72,14 +73,14 @@ export function TutorJoin() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <motion.a
-                href="tel:+917483034168"
+              <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-full font-semibold text-lg shadow-xl shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/40 transition-all text-center"
               >
-                Apply Now
-              </motion.a>
+                <Link href="/signup?role=teacher" className="inline-block px-8 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-full font-semibold text-lg shadow-xl shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/40 transition-all text-center">
+                  Apply Now
+                </Link>
+              </motion.div>
               <motion.a
                 href="mailto:musharrafak06@gmail.com"
                 whileHover={{ scale: 1.05 }}

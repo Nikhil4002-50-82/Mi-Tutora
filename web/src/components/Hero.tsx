@@ -8,6 +8,7 @@ import DemoForm from './DemoForm';
 import { motion } from 'motion/react';
 import { ArrowRight, Download, Users, Sparkles } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 const heroImage = '/imports/hero.jpg';
 
 export function Hero() {
@@ -127,29 +128,23 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4"
             >
-              <button
-                onClick={() => {
-                  setSelectedCategory('');
-                  setShowDemoForm(true);
-                }}
+              <Link
+                href="/signup?role=student"
                 className="group w-full sm:w-auto bg-gradient-to-r from-[#00a992] to-emerald-600 hover:from-emerald-500 hover:to-emerald-400 transition duration-300 px-6 sm:px-8 py-3.5 rounded-full text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#00a992]/20 hover:scale-[1.02]"
               >
                 Book Free Demo
                 <span className="bg-white text-[#063831] rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold group-hover:translate-x-1 transition duration-300">
                   →
                 </span>
-              </button>
+              </Link>
 
-              <button
-                onClick={() => {
-                  setSelectedCategory('');
-                  setShowForm(true);
-                }}
+              <Link
+                href="/signup?role=teacher"
                 className="group w-full sm:w-auto border border-white/30 text-white hover:bg-white hover:text-gray-900 transition duration-300 px-6 sm:px-8 py-3.5 rounded-full font-bold flex items-center justify-center gap-2"
               >
                 <Users className="w-5 h-5" />
                 Become a Tutor
-              </button>
+              </Link>
             </motion.div>
           </div>
 
