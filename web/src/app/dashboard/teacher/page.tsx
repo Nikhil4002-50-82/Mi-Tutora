@@ -67,22 +67,40 @@ export default function TeacherDashboard() {
 
     const { data: referrals } = await supabase.from('referrals').select('*').eq('referrerId', user.id);
 
+    // Fetch student subjects for active applications
+    const studentIds = applications?.map(app => app.studentId).filter(Boolean) || [];
+    let studentsInfo: any[] = [];
+    if (studentIds.length > 0) {
+      const { data } = await supabase.from('students').select('id, subjects, technologies, languages').in('id', studentIds);
+      studentsInfo = data || [];
+    }
+
+    const applicationsWithSubjects = applications?.map(app => {
+      const student = studentsInfo.find(s => s.id === app.studentId);
+      return { 
+        ...app, 
+        subjects: student?.subjects || [],
+        technologies: student?.technologies || [],
+        languages: student?.languages || []
+      };
+    }) || [];
+
     return {
       user,
       userData,
       profile: tutorData,
       teacherCategories,
       availableStudents: matchedStudents,
-      applications: applications || [],
+      applications: applicationsWithSubjects,
       referrals: referrals || [],
-      negotiations: applications?.filter(app => ['negotiating', 'scheduling'].includes(app.status)) || [],
-      upcomingClasses: applications?.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
+      negotiations: applicationsWithSubjects.filter(app => ['negotiating', 'scheduling'].includes(app.status)),
+      upcomingClasses: applicationsWithSubjects.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
         id: app.id,
         student: app.studentName || 'Assigned Student',
         subject: app.category || 'General',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
         status: app.status === 'tuition_started' ? 'confirmed' : 'pending'
-      })) || []
+      }))
     };
   };
 
@@ -257,7 +275,7 @@ export default function TeacherDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
       
       {/* MOBILE HEADER */}
       <div className="md:hidden bg-gradient-to-r from-[#063831] to-[#04241f] text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
@@ -346,47 +364,12 @@ export default function TeacherDashboard() {
             
             {/* TAB: DASHBOARD */}
             {activeTab === 'dashboard' && (
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, {data?.profile?.name || 'Teacher'}!</h1>
-                
-                {/* Active Negotiations Summary */}
-                {(data?.negotiations?.length ?? 0) > 0 && (
-                  <div className="mb-8">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">Active Negotiations</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data?.negotiations?.map((neg: any) => (
-                        <div key={neg.id} className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                          <h3 className="font-bold text-gray-900 text-lg mb-1">{neg.studentName || 'Student'}</h3>
-                          <p className="text-sm text-gray-500 mb-4">{neg.category}</p>
-                          <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Current Offer</p>
-                              <p className="font-black text-emerald-600 text-lg">₹{neg.currentOffer}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-gray-500 font-medium">Waiting On</p>
-                              <p className={`font-bold text-sm ${neg.lastUpdatedBy === 'tutor' ? 'text-orange-500' : 'text-blue-600'}`}>
-                                {neg.lastUpdatedBy === 'tutor' ? 'Student' : 'You'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Total Classes</h3>
-                    <p className="text-4xl font-black text-[#063831]">{(data?.upcomingClasses?.length ?? 0)}</p>
-                  </div>
-                  <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Active Proposals</h3>
-                    <p className="text-4xl font-black text-emerald-600">{data?.negotiations?.length || 0}</p>
-                  </div>
+              <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4">
+                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                  <LayoutDashboard className="w-10 h-10 text-emerald-500" />
                 </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-4">Welcome back, {data?.profile?.name || 'Teacher'}!</h1>
+                <p className="text-gray-500 max-w-md mx-auto text-lg">Your dashboard overview is currently being updated. In the meantime, use the sidebar to find students and manage your negotiations!</p>
               </div>
             )}
 
@@ -415,10 +398,11 @@ export default function TeacherDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {data?.availableStudents?.filter((s:any) => data?.teacherCategories?.length > 1 ? s.category === subTab : true).map((student: any) => {
-                    const hasNegotiation = data?.applications?.some((app: any) => app.requestId === student.id && ['negotiating', 'scheduling'].includes(app.status));
-                    const isHired = data?.applications?.some((app: any) => app.requestId === student.id && ['demo_pending_payment', 'demo_booked', 'tuition_started'].includes(app.status));
+                    const hasNegotiation = data?.applications?.some((app: any) => app.requestId === student.id && ['negotiating'].includes(app.status));
+                    const isPending = data?.applications?.some((app: any) => app.requestId === student.id && ['demo_pending_payment', 'demo_booked', 'scheduling'].includes(app.status));
+                    const isHired = data?.applications?.some((app: any) => app.requestId === student.id && ['tuition_started'].includes(app.status));
                     
-                    if (hasNegotiation) return null; // Don't show students we are already negotiating withth
+                    if (hasNegotiation) return null; // Don't show students we are already negotiating with
 
                     return (
                       <div key={student.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
@@ -434,7 +418,9 @@ export default function TeacherDashboard() {
                         
                         <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
                           {student.classLevel && <p><span className="text-gray-500 font-medium">Class:</span> <span className="font-semibold text-gray-900">{student.classLevel}</span></p>}
-                          {(student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
+                          {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Technologies:</span> <span className="font-semibold text-gray-900">{student.technologies.join(', ')}</span></p>}
+                          {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Languages:</span> <span className="font-semibold text-gray-900">{student.languages.join(', ')}</span></p>}
+                          {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
                           {student.area && <p><span className="text-gray-500 font-medium">Location:</span> <span className="font-semibold text-gray-900">{student.area}</span></p>}
                           <p><span className="text-gray-500 font-medium">Budget:</span> <span className="font-black text-emerald-600 text-base">₹{student.budget}</span></p>
                         </div>
@@ -453,6 +439,10 @@ export default function TeacherDashboard() {
                           {isHired ? (
                             <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
                               <CheckCircle2 className="w-4 h-4" /> Already Your Student
+                            </button>
+                          ) : isPending ? (
+                            <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                              Pending
                             </button>
                           ) : (
                             <button 
@@ -487,7 +477,10 @@ export default function TeacherDashboard() {
                       <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
                         <div>
                           <h4 className="font-bold text-lg text-gray-900">{neg.studentName}</h4>
-                          <p className="text-sm text-gray-500">{neg.category}</p>
+                          <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
+                          {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
+                          {neg.category === 'languages' && neg.languages && neg.languages.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languages.join(', ')}</p>}
+                          {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
                           {neg.status === 'scheduling' && (
                             <div className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
                               <p><span className="font-bold">Student requested:</span> {neg.demoHours}</p>

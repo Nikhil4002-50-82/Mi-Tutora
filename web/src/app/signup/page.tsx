@@ -108,10 +108,10 @@ function SignupContent() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
       
-      {/* LEFT COLUMN - BRANDING (Hidden on Mobile) */}
-      <div className={`hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-12 transition-colors duration-700
+      {/* LEFT COLUMN - BRANDING (Visible on Mobile as Banner) */}
+      <div className={`flex w-full lg:w-1/2 relative overflow-hidden flex-col justify-between p-6 pt-8 pb-16 lg:p-12 transition-colors duration-700
         ${isTeacher ? 'bg-gradient-to-br from-[#04241f] to-[#021411]' : 'bg-gradient-to-br from-[#063831] to-[#04241f]'}
       `}>
         {/* Decorative Background Elements */}
@@ -151,7 +151,7 @@ function SignupContent() {
         </div>
 
         {/* Center Content */}
-        <div className="relative z-10 max-w-lg mt-20 mb-20">
+        <div className="relative z-10 max-w-lg mt-12 lg:mt-20 mb-8 lg:mb-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={role}
@@ -167,7 +167,7 @@ function SignupContent() {
                 </span>
               </div>
               
-              <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-6 tracking-tight">
+              <h1 className="text-3xl lg:text-5xl font-black text-white leading-tight mb-4 lg:mb-6 tracking-tight">
                 {isTeacher ? (
                   <>Start inspiring <br /> <span className="bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">minds today.</span></>
                 ) : (
@@ -175,7 +175,7 @@ function SignupContent() {
                 )}
               </h1>
               
-              <p className="text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
+              <p className="hidden lg:block text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
                 Create your account in seconds and get full access to the Mi Tutora platform.
               </p>
             </motion.div>
@@ -183,14 +183,14 @@ function SignupContent() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-emerald-100/60 text-sm font-medium flex justify-between">
+        <div className="hidden lg:flex relative z-10 text-emerald-100/60 text-sm font-medium justify-between">
           <span>© {new Date().getFullYear()} Mi Tutora. All rights reserved.</span>
           <span className="opacity-50">Support: +91 7483034168</span>
         </div>
       </div>
 
       {/* RIGHT COLUMN - SIGNUP FORM */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0">
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0 -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-none">
         
         {/* Subtle mobile background glow */}
         <div className={`lg:hidden absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 transition-colors duration-700
@@ -215,24 +215,7 @@ function SignupContent() {
           transition={{ duration: 0.4 }}
           className="w-full max-w-md relative z-10"
         >
-          {/* Mobile Logo & Role Selector */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            <img src={logo} alt="Mi Tutora Logo" className="h-10 w-auto object-contain mb-6" />
-            <div className="flex bg-gray-100 p-1.5 rounded-xl w-full max-w-[260px] shadow-inner">
-              <button
-                onClick={() => router.push('/signup?role=student')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${!isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
-              >
-                Student
-              </button>
-              <button
-                onClick={() => router.push('/signup?role=teacher')}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
-              >
-                Teacher
-              </button>
-            </div>
-          </div>
+          {/* Mobile Logo & Role Selector Removed (now in banner) */}
 
           <div className="mb-10 text-center lg:text-left">
             <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-2">

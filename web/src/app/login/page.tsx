@@ -6,12 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  // We'll remove the local error state and use toast directly where needed
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
@@ -31,8 +32,11 @@ function LoginContent() {
         password,
       });
 
-      if (authError) throw authError;
-
+      if (authError) {
+        toast.error(authError.message);
+        return;
+      }
+      
       if (data?.user) {
         // Fetch user role
         const { data: userData, error: userError } = await supabase
@@ -46,6 +50,7 @@ function LoginContent() {
         // Save minimal info if needed (Supabase handles session securely in cookies/localstorage)
         localStorage.setItem('user', JSON.stringify({ id: data.user.id, email: data.user.email, role: userRole }));
         
+        toast.success("Login successful!");
         if (userRole === 'student') {
           router.push(searchParams.get('next') || '/dashboard/student');
         } else {
@@ -53,18 +58,18 @@ function LoginContent() {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      toast.error(err.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
       
 
-      {/* LEFT COLUMN - BRANDING (Hidden on Mobile) */}
-      <div className={`hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-12 transition-colors duration-700
+      {/* LEFT COLUMN - BRANDING (Visible on Mobile as Banner) */}
+      <div className={`flex w-full lg:w-1/2 relative overflow-hidden flex-col justify-between p-6 pt-8 pb-16 lg:p-12 transition-colors duration-700
         ${isTeacher ? 'bg-gradient-to-br from-[#04241f] to-[#021411]' : 'bg-gradient-to-br from-[#063831] to-[#04241f]'}
       `}>
         {/* Decorative Background Elements */}
@@ -104,7 +109,7 @@ function LoginContent() {
         </div>
 
         {/* Center Content */}
-        <div className="relative z-10 max-w-lg mt-20 mb-20">
+        <div className="relative z-10 max-w-lg mt-12 lg:mt-20 mb-8 lg:mb-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={role}
@@ -120,7 +125,7 @@ function LoginContent() {
                 </span>
               </div>
               
-              <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-6 tracking-tight">
+              <h1 className="text-3xl lg:text-5xl font-black text-white leading-tight mb-4 lg:mb-6 tracking-tight">
                 {isTeacher ? (
                   <>Empower the next <br /> <span className="bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">generation.</span></>
                 ) : (
@@ -128,7 +133,7 @@ function LoginContent() {
                 )}
               </h1>
               
-              <p className="text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
+              <p className="hidden lg:block text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
                 {isTeacher 
                   ? "Join India's top platform for educators. Manage your schedule, teach passionate students, and grow your teaching career with complete flexibility."
                   : "Join India's fastest-growing platform connecting students with highly qualified, background-verified tutors for offline and online classes."
@@ -136,7 +141,7 @@ function LoginContent() {
               </p>
 
               {/* Feature Highlights */}
-              <div className="space-y-6">
+              <div className="hidden lg:block space-y-6">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
                     {isTeacher ? <Briefcase className="w-6 h-6 text-emerald-400" /> : <Users className="w-6 h-6 text-[#00a992]" />}
@@ -161,14 +166,14 @@ function LoginContent() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-emerald-100/60 text-sm font-medium flex justify-between">
+        <div className="hidden lg:flex relative z-10 text-emerald-100/60 text-sm font-medium justify-between">
           <span>© {new Date().getFullYear()} Mi Tutora. All rights reserved.</span>
           <span className="opacity-50">Support: +91 7483034168</span>
         </div>
       </div>
 
       {/* RIGHT COLUMN - LOGIN FORM */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0">
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0 -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-none">
         
         {/* Subtle mobile background glow */}
         <div className={`lg:hidden absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 transition-colors duration-700
@@ -193,24 +198,7 @@ function LoginContent() {
           transition={{ duration: 0.4 }}
           className="w-full max-w-md relative z-10"
         >
-          {/* Mobile Logo & Role Selector */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            <img src={logo} alt="Mi Tutora Logo" className="h-10 w-auto object-contain mb-6" />
-            <div className="flex bg-gray-100 p-1.5 rounded-xl w-full max-w-[260px] shadow-inner">
-              <button
-                onClick={() => router.push('/login?role=student')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${!isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
-              >
-                Student
-              </button>
-              <button
-                onClick={() => router.push('/login?role=teacher')}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isTeacher ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500'}`}
-              >
-                Teacher
-              </button>
-            </div>
-          </div>
+          {/* Mobile Logo & Role Selector Removed (now in banner) */}
 
           <div className="mb-10 text-center lg:text-left">
             <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-2">
@@ -221,15 +209,7 @@ function LoginContent() {
             </p>
           </div>
           
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-red-50 text-red-600 p-4 rounded-2xl mb-8 text-sm font-medium border border-red-100 flex items-center justify-center lg:justify-start"
-            >
-              {error}
-            </motion.div>
-          )}
+          {/* Removed inline error rendering */}
 
           <div className="space-y-4 mb-6">
             <button
@@ -239,7 +219,7 @@ function LoginContent() {
                 const next = searchParams.get('next');
                 const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
                 const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
-                if (error) setError(error.message);
+                if (error) toast.error(error.message);
               }}
               className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700"
             >

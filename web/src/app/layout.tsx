@@ -98,7 +98,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-white">
         {children}
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" richColors expand={true} />
       </body>
     </html>
   );

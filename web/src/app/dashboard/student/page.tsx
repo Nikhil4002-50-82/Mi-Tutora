@@ -71,23 +71,41 @@ export default function StudentDashboard() {
 
     const { data: referrals } = await supabase.from('referrals').select('*').eq('referrerId', user.id);
 
+    // Fetch tutor subjects for active applications
+    const tutorIds = applications?.map(app => app.tutorId).filter(Boolean) || [];
+    let tutorsInfo: any[] = [];
+    if (tutorIds.length > 0) {
+      const { data } = await supabase.from('tutors').select('id, subjects, technologies, languagesTaught').in('id', tutorIds);
+      tutorsInfo = data || [];
+    }
+
+    const applicationsWithSubjects = applications?.map(app => {
+      const tutor = tutorsInfo.find(t => t.id === app.tutorId);
+      return { 
+        ...app, 
+        subjects: tutor?.subjects || [],
+        technologies: tutor?.technologies || [],
+        languagesTaught: tutor?.languagesTaught || []
+      };
+    }) || [];
+
     return {
       user,
       userData,
       profile: parentData,
       myStudent,
       myRequest,
-      applications: applications || [],
+      applications: applicationsWithSubjects,
       availableTeachers: matchedTutors,
       referrals: referrals || [],
-      negotiations: applications?.filter(app => ['negotiating', 'scheduling'].includes(app.status)) || [],
-      upcomingClasses: applications?.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
+      negotiations: applicationsWithSubjects.filter(app => ['negotiating', 'scheduling'].includes(app.status)),
+      upcomingClasses: applicationsWithSubjects.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
         id: app.id,
         subject: app.category || 'General',
         teacher: app.tutorName || 'Assigned Tutor',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
         status: app.status
-      })) || []
+      }))
     };
   };
 
@@ -270,7 +288,7 @@ export default function StudentDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
       
       {/* MOBILE HEADER */}
       <div className="md:hidden bg-gradient-to-r from-[#063831] to-[#04241f] text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
@@ -359,47 +377,12 @@ export default function StudentDashboard() {
             
             {/* TAB: DASHBOARD */}
             {activeTab === 'dashboard' && (
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Welcome back, {data?.myStudent?.name || 'Student'}!</h1>
-                
-                {/* Active Negotiations Summary */}
-                {(data?.negotiations?.length ?? 0) > 0 && (
-                  <div className="mb-8">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">Active Tutor Negotiations</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data?.negotiations?.map((neg: any) => (
-                        <div key={neg.id} className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-5 relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                          <h3 className="font-bold text-gray-900 text-lg mb-1">{neg.tutorName || 'Tutor'}</h3>
-                          <p className="text-sm text-gray-500 mb-4">{neg.category}</p>
-                          <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Current Offer</p>
-                              <p className="font-black text-emerald-600 text-lg">₹{neg.currentOffer}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-gray-500 font-medium">Waiting On</p>
-                              <p className={`font-bold text-sm ${neg.lastUpdatedBy === 'student' ? 'text-orange-500' : 'text-blue-600'}`}>
-                                {neg.lastUpdatedBy === 'student' ? 'Tutor' : 'You'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Scheduled Classes</h3>
-                    <p className="text-4xl font-black text-[#063831]">{data?.upcomingClasses?.length || 0}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Tutors Requested</h3>
-                    <p className="text-4xl font-black text-[#00a992]">{data?.applications?.length || 0}</p>
-                  </div>
+              <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4">
+                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                  <LayoutDashboard className="w-10 h-10 text-emerald-500" />
                 </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-4">Welcome back, {data?.myStudent?.name || 'Student'}!</h1>
+                <p className="text-gray-500 max-w-md mx-auto text-lg">Your dashboard overview is currently being updated. In the meantime, use the sidebar to find tutors and manage your negotiations!</p>
               </div>
             )}
 
@@ -409,8 +392,9 @@ export default function StudentDashboard() {
                 <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Find Your Perfect Tutor</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {data?.availableTeachers?.map((teacher: any) => {
-                    const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating', 'scheduling'].includes(app.status));
-                    const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'tuition_started'].includes(app.status));
+                    const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
+                    const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'scheduling'].includes(app.status));
+                    const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
                     
                     if (hasNegotiation) return null; // Already negotiating
                     
@@ -424,7 +408,9 @@ export default function StudentDashboard() {
                         </div>
                         <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.teachingApproach || 'Experienced Tutor'}</p>
                         <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                          {(teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
+                          {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-gray-700">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
+                          {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
+                          {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
                           {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
                           <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
                         </div>
@@ -443,6 +429,10 @@ export default function StudentDashboard() {
                           {isHired ? (
                             <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
                               <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
+                            </button>
+                          ) : isPending ? (
+                            <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                              Pending
                             </button>
                           ) : (
                             <button 
@@ -478,7 +468,10 @@ export default function StudentDashboard() {
                       <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
                         <div>
                           <h4 className="font-bold text-lg text-gray-900">Tutor: {neg.tutorName}</h4>
-                          <p className="text-sm text-gray-500">{neg.category}</p>
+                          <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
+                          {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
+                          {neg.category === 'languages' && neg.languagesTaught && neg.languagesTaught.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languagesTaught.join(', ')}</p>}
+                          {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
                           {neg.status === 'scheduling' && (
                             <div className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
                               <p><span className="font-bold">You requested:</span> {neg.demoHours}</p>
