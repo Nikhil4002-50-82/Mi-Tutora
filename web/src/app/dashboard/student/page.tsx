@@ -15,6 +15,8 @@ import useSWR from 'swr';
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
@@ -28,40 +30,51 @@ export default function StudentDashboard() {
   const router = useRouter();
 
   const fetcher = async () => {
-    const { createClient } = await import('@/utils/supabase/client');
-    const supabase = createClient();
+    const { auth, db } = await import('@/utils/firebase/client');
+    const { doc, getDoc, collection, query, where, getDocs, setDoc } = await import('firebase/firestore');
     
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    await new Promise(resolve => auth.onAuthStateChanged(resolve));
+    const user = auth.currentUser;
     
-    if (sessionError || !session) {
+    if (!user) {
       router.push('/login');
       throw new Error('Unauthenticated');
     }
 
-    const user = session.user;
-    
-    let { data: userData } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
+    let userDocRef = doc(db, 'users', user.uid);
+    let userDocSnap = await getDoc(userDocRef);
+    let userData = userDocSnap.exists() ? userDocSnap.data() : null;
     
     if (!userData) {
-      await supabase.from('users').insert({
-        id: user.id,
+      userData = {
+        id: user.uid,
         email: user.email,
-        name: user.user_metadata?.name || 'Student',
-        role: 'student'
-      });
-      const { data: newUserData } = await supabase.from('users').select('hasProfile, referralCode, walletbalance').eq('id', user.id).single();
-      userData = newUserData;
+        name: user.displayName || 'Student',
+        role: 'student',
+        hasProfile: false,
+        walletBalance: 0
+      };
+      await setDoc(userDocRef, userData);
     }
     
-    const { data: parentData } = await supabase.from('parents').select('*, students(*)').eq('id', user.id).single();
-    const { data: applications } = await supabase.from('applications').select('*').eq('parentId', user.id);
-    const { data: students } = await supabase.from('students').select('*').eq('parentId', user.id);
-    const myStudent = students && students.length > 0 ? students[0] : null;
-    const { data: requests } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id);
-    const myRequest = requests && requests.length > 0 ? requests[0] : null;
-    const { data: availableTutors } = await supabase.from('tutors').select('*').eq('hasProfile', true);
+    const parentDocSnap = await getDoc(doc(db, 'parents', user.uid));
+    const parentData = parentDocSnap.exists() ? parentDocSnap.data() : null;
+    
+    const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentId', '==', user.uid)));
+    const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-    const matchedTutors = availableTutors?.filter(tutor => {
+    const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentId', '==', user.uid)));
+    const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const myStudent = students.length > 0 ? students[0] : null;
+
+    const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid)));
+    const requests = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const myRequest = requests.length > 0 ? requests[0] : null;
+
+    const tutorsSnap = await getDocs(query(collection(db, 'tutors'), where('hasProfile', '==', true)));
+    const availableTutors = tutorsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+    const matchedTutors = availableTutors.filter((tutor: any) => {
       if (!myStudent) return true;
       const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
       if (!tutorCategories.includes(myStudent.category)) return false;
@@ -88,17 +101,20 @@ export default function StudentDashboard() {
       return true;
     }) || [];
 
-    const { data: referrals } = await supabase.from('referrals').select('*').eq('referrerId', user.id);
+    const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
+    const referrals = referralsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-    // Fetch tutor subjects for active applications
-    const tutorIds = applications?.map(app => app.tutorId).filter(Boolean) || [];
+    const tutorIds = applications.map((app: any) => app.tutorId).filter(Boolean);
     let tutorsInfo: any[] = [];
     if (tutorIds.length > 0) {
-      const { data } = await supabase.from('tutors').select('id, subjects, technologies, languagesTaught').in('id', tutorIds);
-      tutorsInfo = data || [];
+       // Note: In Firestore, 'in' queries max out at 10 items. For a robust implementation we might fetch individual docs or chunk.
+       // Assuming <10 for this demo context.
+       const tutorsQuery = query(collection(db, 'tutors'), where('id', 'in', tutorIds.slice(0, 10)));
+       const tSnap = await getDocs(tutorsQuery);
+       tutorsInfo = tSnap.docs.map(d => d.data());
     }
 
-    const applicationsWithSubjects = applications?.map(app => {
+    const applicationsWithSubjects = applications.map((app: any) => {
       const tutor = tutorsInfo.find(t => t.id === app.tutorId);
       return { 
         ...app, 
@@ -116,9 +132,9 @@ export default function StudentDashboard() {
       myRequest,
       applications: applicationsWithSubjects,
       availableTeachers: matchedTutors,
-      referrals: referrals || [],
-      negotiations: applicationsWithSubjects.filter(app => ['negotiating', 'scheduling'].includes(app.status)),
-      upcomingClasses: applicationsWithSubjects.filter(app => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map(app => ({
+      referrals,
+      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'scheduling'].includes(app.status)),
+      upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
         subject: app.category || 'General',
         teacher: app.tutorName || 'Assigned Tutor',
@@ -134,38 +150,41 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (data && !hasProfile) {
-      setActiveTab('profile');
+      setActiveTab('find_tutors');
+      const storedCat = localStorage.getItem('selectedCategory');
+      if (!storedCat) {
+        setShowCategoryPopup(true);
+      } else {
+        setSelectedCategory(storedCat);
+      }
     }
   }, [data, hasProfile]);
+
+  const handleCategorySelect = (cat: string) => {
+    localStorage.setItem('selectedCategory', cat);
+    setSelectedCategory(cat);
+    setShowCategoryPopup(false);
+  };
 
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
 
   useEffect(() => {
     const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
-    if (data && !existingCode && !isGeneratingRef) {
+    if (data && !existingCode && !isGeneratingRef && data.user) {
       const generateCode = async () => {
         setIsGeneratingRef(true);
         try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
-          const baseName = data?.myStudent?.name || data?.user?.user_metadata?.name || 'USER';
+          const { db } = await import('@/utils/firebase/client');
+          const { doc, updateDoc } = await import('firebase/firestore');
+          const baseName = data?.myStudent?.name || data?.user?.displayName || 'USER';
           const newCode = baseName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
           
-          // Optimistic update
           mutate({ ...data, userData: { ...data.userData, referralCode: newCode, referralcode: newCode } }, false);
 
-          const { error } = await supabase.from('users').upsert({ 
-            id: data.user.id,
-            email: data.user.email,
-            name: baseName,
-            referralCode: newCode 
-          }, { onConflict: 'id' });
-          if (error) {
-            toast.error("Generation error: " + error.message);
-          } else {
-            toast.success("Generated referral code: " + newCode);
-          }
-          // Revalidate with server
+          const userDocRef = doc(db, 'users', data.user.uid);
+          await updateDoc(userDocRef, { referralCode: newCode });
+          
+          toast.success("Generated referral code: " + newCode);
           mutate();
         } catch (e: any) {
           toast.error("Failed to generate referral code: " + e.message);
@@ -173,30 +192,32 @@ export default function StudentDashboard() {
       };
       generateCode();
     }
-  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user?.id, data?.myStudent?.name, mutate, data, isGeneratingRef]);
+  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.myStudent?.name, mutate, data, isGeneratingRef]);
 
   useEffect(() => {
     const processSilentSubmission = async () => {
       const savedDemoData = localStorage.getItem('demoFormData');
       if (savedDemoData && data?.user) {
         try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
+          const { db } = await import('@/utils/firebase/client');
+          const { doc, getDoc, updateDoc, setDoc, addDoc, collection } = await import('firebase/firestore');
           const formData = JSON.parse(savedDemoData);
-          const user = data?.user;
-          if (!user) return;
+          const user = data.user;
           
-          const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
-          const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
-          await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          const existingCode = userDocSnap.exists() && userDocSnap.data().referralCode;
+          const newCode = existingCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+          await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
-          const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();
-          if (!existingParent) {
-            await supabase.from('parents').insert({ id: user.id, name: formData.parentName || formData.fullName });
+          const parentDocRef = doc(db, 'parents', user.uid);
+          const parentDocSnap = await getDoc(parentDocRef);
+          if (!parentDocSnap.exists()) {
+            await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
           }
 
-          const { data: newStudent } = await supabase.from('students').insert({
-            parentId: user.id,
+          const newStudentRef = await addDoc(collection(db, 'students'), {
+            parentId: user.uid,
             category: formData.category || '',
             name: formData.fullName,
             gender: formData.gender,
@@ -211,12 +232,13 @@ export default function StudentDashboard() {
             budget: parseInt(formData.budget) || 0,
             preferredMode: formData.demoMode,
             learningGoal: formData.goal,
-            specialRequirements: formData.requirements
-          }).select('id').single();
+            specialRequirements: formData.requirements,
+            createdAt: Date.now()
+          });
 
-          await supabase.from('tuition_requests').insert({
-            parentId: user.id,
-            studentId: newStudent?.id,
+          await addDoc(collection(db, 'tuition_requests'), {
+            parentId: user.uid,
+            studentId: newStudentRef.id,
             category: formData.category || '',
             studentName: formData.fullName,
             classLevel: formData.classGrade,
@@ -226,7 +248,8 @@ export default function StudentDashboard() {
             mode: formData.demoMode,
             preferredTimeRange: formData.hours,
             area: formData.address,
-            status: 'open'
+            status: 'open',
+            createdAt: Date.now()
           });
 
           localStorage.removeItem('demoFormData');
@@ -241,32 +264,26 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!data?.user) return;
-    let channel: any;
-    let supabaseInstance: any;
+    let unsubscribe: any;
     const setupRealtime = async () => {
-      const { createClient } = await import('@/utils/supabase/client');
-      supabaseInstance = createClient();
+      const { db } = await import('@/utils/firebase/client');
+      const { collection, query, where, onSnapshot } = await import('firebase/firestore');
       
-      channel = supabaseInstance
-        .channel(`student_applications_${data?.user?.id}_${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'applications', filter: `parentId=eq.${data?.user?.id}` },
-          () => mutate()
-        )
-        .subscribe();
+      const q = query(collection(db, 'applications'), where('parentId', '==', data.user.uid));
+      unsubscribe = onSnapshot(q, () => {
+        mutate();
+      });
     };
     setupRealtime();
 
     return () => {
-      if (channel && supabaseInstance) supabaseInstance.removeChannel(channel);
+      if (unsubscribe) unsubscribe();
     };
   }, [data?.user, mutate]);
 
   const handleLogout = async () => {
-    const { createClient } = await import('@/utils/supabase/client');
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    const { auth } = await import('@/utils/firebase/client');
+    await auth.signOut();
     localStorage.removeItem('user');
     toast.success("Logged out successfully!");
     router.push('/login');
@@ -275,16 +292,23 @@ export default function StudentDashboard() {
   const handleRequestTutor = async (tutor: any) => {
     const offerPrice = parseInt(negotiationOffer[tutor.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid budget offer.");
+    
+    // Redirect logic if profile is incomplete
+    if (!hasProfile) {
+      toast.error("Please complete your profile to request a tutor.");
+      setActiveTab('profile');
+      return;
+    }
 
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { db, auth } = await import('@/utils/firebase/client');
+      const { collection, addDoc } = await import('firebase/firestore');
+      const user = auth.currentUser;
 
-      const { error } = await supabase.from('applications').insert({
+      await addDoc(collection(db, 'applications'), {
         tutorId: tutor.id,
         tutorName: tutor.name,
-        parentId: user?.id,
+        parentId: user?.uid,
         studentId: data?.myStudent?.id,
         studentName: data?.myStudent?.name || 'Student',
         currentOffer: offerPrice,
@@ -294,10 +318,10 @@ export default function StudentDashboard() {
         source: 'direct',
         category: tutor.category,
         mode: tutor.mode,
-        demoHours: data?.myRequest?.preferredTimeRange || 'Flexible'
+        demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
+        createdAt: Date.now()
       });
 
-      if (error) throw error;
       toast.success("Tutor request & offer sent successfully!");
       mutate();
     } catch (e: any) {
@@ -307,8 +331,8 @@ export default function StudentDashboard() {
 
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, newSchedule?: string) => {
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc } = await import('firebase/firestore');
       
       const updateData: any = {};
       if (action === 'accept_price') {
@@ -326,8 +350,7 @@ export default function StudentDashboard() {
         updateData.proposedSchedule = newSchedule;
       }
 
-      const { error } = await supabase.from('applications').update(updateData).eq('id', appId);
-      if (error) throw error;
+      await updateDoc(doc(db, 'applications', appId), updateData);
       toast.success(`Successfully ${action === 'accept_schedule' || action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
@@ -338,39 +361,39 @@ export default function StudentDashboard() {
   const handlePaymentSubmit = async () => {
     setPaymentLoading(true);
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, collection, query, where, getDocs, getDoc } = await import('firebase/firestore');
       
       const coursePrice = payingClass.finalPrice || 4000;
       const walletBalance = data?.userData?.walletBalance || 0;
       
       // Update application
-      await supabase.from('applications').update({ status: 'tuition_started' }).eq('id', payingClass.id);
+      await updateDoc(doc(db, 'applications', payingClass.id), { status: 'tuition_started' });
       
       // Handle referral reward logic
-      const { data: pendingReferral } = await supabase.from('referrals')
-        .select('*')
-        .eq('referredUserId', data?.user?.id)
-        .eq('status', 'pending')
-        .single();
+      const pendingReferralSnap = await getDocs(query(collection(db, 'referrals'), where('referredUserId', '==', data?.user?.uid as string), where('status', '==', 'pending')));
         
-      if (pendingReferral) {
+      if (!pendingReferralSnap.empty) {
+         const pendingReferral = pendingReferralSnap.docs[0];
          const rewardAmount = Math.floor(coursePrice * 0.10);
-         await supabase.from('referrals').update({
+         await updateDoc(pendingReferral.ref, {
            status: 'rewarded',
            estimatedReward: rewardAmount,
            applicationId: payingClass.id
-         }).eq('id', pendingReferral.id);
+         });
          
-         const { data: referrerUser } = await supabase.from('users').select('walletBalance').eq('id', pendingReferral.referrerId).single();
-         const newBal = (referrerUser?.walletBalance || 0) + rewardAmount;
-         await supabase.from('users').update({ walletBalance: newBal }).eq('id', pendingReferral.referrerId);
+         const referrerDocRef = doc(db, 'users', pendingReferral.data().referrerId);
+         const referrerDocSnap = await getDoc(referrerDocRef);
+         if (referrerDocSnap.exists()) {
+           const newBal = (referrerDocSnap.data().walletBalance || 0) + rewardAmount;
+           await updateDoc(referrerDocRef, { walletBalance: newBal });
+         }
       }
       
       // Deduct wallet if used
       if (useWallet && walletBalance > 0) {
         const usedAmount = Math.min(coursePrice, walletBalance);
-        await supabase.from('users').update({ walletBalance: walletBalance - usedAmount }).eq('id', data?.user?.id);
+        await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
       }
 
       toast.success("Payment completed successfully!");
@@ -391,22 +414,23 @@ export default function StudentDashboard() {
     }
     setWithdrawLoading(true);
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, addDoc, collection, updateDoc } = await import('firebase/firestore');
       const currentBalance = data?.userData?.walletBalance || 0;
       
       if (currentBalance < 1000) {
         throw new Error('Minimum withdrawal amount is ₹1000');
       }
       
-      await supabase.from('withdrawals').insert({
-        userId: data?.user?.id,
+      await addDoc(collection(db, 'withdrawals'), {
+        userId: data?.user?.uid,
         amount: currentBalance,
         upiId: upiId,
-        status: 'pending'
+        status: 'pending',
+        createdAt: Date.now()
       });
       
-      await supabase.from('users').update({ walletBalance: 0 }).eq('id', data?.user?.id);
+      await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: 0 });
       
       toast.success('Withdrawal request submitted successfully!');
       setWithdrawModal(false);
@@ -505,6 +529,19 @@ export default function StudentDashboard() {
       </aside>
 
       {/* MAIN CONTENT */}
+      {showCategoryPopup && !hasProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-lg w-full text-center">
+            <h2 className="text-3xl font-black text-slate-900 mb-4">What are you looking for?</h2>
+            <p className="text-slate-500 mb-8">Select a category to discover the best matches for your needs.</p>
+            <div className="space-y-4">
+              <button onClick={() => handleCategorySelect('school')} className="w-full py-4 px-6 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-lg transition-colors border border-emerald-200">School / Academics</button>
+              <button onClick={() => handleCategorySelect('programming')} className="w-full py-4 px-6 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-lg transition-colors border border-purple-200">Programming / IT</button>
+              <button onClick={() => handleCategorySelect('languages')} className="w-full py-4 px-6 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-lg transition-colors border border-blue-200">Languages</button>
+            </div>
+          </div>
+        </div>
+      )}
       <main className="flex-1 overflow-x-hidden overflow-y-auto">
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12">
@@ -532,7 +569,7 @@ export default function StudentDashboard() {
               <div>
                 <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Find Your Perfect Tutor</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.availableTeachers?.map((teacher: any) => {
+                  {data?.availableTeachers?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                     const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
                     const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'scheduling'].includes(app.status));
                     const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
@@ -557,37 +594,48 @@ export default function StudentDashboard() {
                         </div>
                         
                         <div className="flex flex-col gap-3">
-                          <div className="mb-4">
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
-                            <input 
-                              type="number"
-                              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                              placeholder="e.g. 500"
-                              value={negotiationOffer[teacher.id] || ''}
-                              onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
-                            />
-                          </div>
-                          {isHired ? (
-                            <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                              <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
-                            </button>
-                          ) : isPending ? (
-                            <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                              Pending
-                            </button>
-                          ) : (
+                          {!hasProfile ? (
                             <button 
-                              onClick={() => handleRequestTutor(teacher)}
+                              onClick={() => setActiveTab('profile')}
                               className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
                             >
-                              <MessageCircle className="w-4 h-4" /> Request & Offer
+                              <User className="w-4 h-4" /> View Teacher
                             </button>
+                          ) : (
+                            <>
+                              <div className="mb-4">
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
+                                <input 
+                                  type="number"
+                                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                                  placeholder="e.g. 500"
+                                  value={negotiationOffer[teacher.id] || ''}
+                                  onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
+                                />
+                              </div>
+                              {isHired ? (
+                                <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                  <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
+                                </button>
+                              ) : isPending ? (
+                                <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                  Pending
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleRequestTutor(teacher)}
+                                  className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                                >
+                                  <MessageCircle className="w-4 h-4" /> Request & Offer
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
                     );
                   })}
-                  {(!data?.availableTeachers || data?.availableTeachers?.length === 0) && (
+                  {(!data?.availableTeachers || data?.availableTeachers?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0) && (
                     <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
                       <Users className="w-12 h-12 text-gray-300 mb-3" />
                       <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>

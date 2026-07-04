@@ -28,7 +28,9 @@ export default function TeacherForm({
     phone: '',
     whatsapp: '',
     email: '',
-    address: '',
+    street: '',
+    city: '',
+    pincode: '',
     qualification: '',
     experience: '',
     occupation: '',
@@ -44,7 +46,7 @@ export default function TeacherForm({
     boards: [] as string[],
     technologies: [] as string[],
     languages: [] as string[],
-    categories: category ? [category] : [] as string[],
+    category: category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
   });
 
   const handleCheckboxChange = (field: string, value: string) => {
@@ -63,12 +65,14 @@ export default function TeacherForm({
     if (isDashboard) {
       const fetchProfile = async () => {
         try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
+          const { auth, db } = await import('@/utils/firebase/client');
+          const { doc, getDoc } = await import('firebase/firestore');
+          await new Promise(resolve => auth.onAuthStateChanged(resolve));
+          const user = auth.currentUser;
           if (user) {
-            const { data } = await supabase.from('tutors').select('*').eq('id', user.id).single();
-            if (data) {
+            const docSnap = await getDoc(doc(db, 'tutors', user.uid));
+            if (docSnap.exists()) {
+              const data = docSnap.data();
               setIsEditing(false);
               setFormData({
                 fullName: data.name || '',
@@ -76,7 +80,9 @@ export default function TeacherForm({
                 phone: data.phone || '',
                 whatsapp: data.whatsapp || '',
                 email: data.email || '',
-                address: data.address || '',
+                street: (data.address || '').split(',')[0]?.trim() || '',
+                city: (data.address || '').split(',')[1]?.trim() || '',
+                pincode: (data.address || '').split(',')[2]?.trim() || '',
                 qualification: data.qualification || '',
                 experience: data.experience || '',
                 occupation: data.occupation || '',
@@ -92,7 +98,7 @@ export default function TeacherForm({
                 boards: data.boards || [],
                 technologies: data.technologies || [],
                 languages: data.languagesTaught || [],
-                categories: data.category ? data.category.split(',').map((c:string) => c.trim()) : [],
+                category: data.category || '',
               });
             }
           }
@@ -129,11 +135,9 @@ export default function TeacherForm({
 
     if (!isDashboard) {
       // Check if they are logged in, and sign them out so they can log in as a tutor
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.auth.signOut();
+      const { auth } = await import('@/utils/firebase/client');
+      if (auth.currentUser) {
+        await auth.signOut();
       }
 
       // Save data to localStorage (more robust across OAuth redirects) and redirect to signup
@@ -143,25 +147,26 @@ export default function TeacherForm({
     }
 
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { auth, db } = await import('@/utils/firebase/client');
+      const { doc, setDoc, getDoc, updateDoc } = await import('firebase/firestore');
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
 
       // Update user hasProfile flag and referral code
-      const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
-      const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
-      await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+      await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
       // Update the existing tutor record
-      const { error } = await supabase.from('tutors').update({
-        category: formData.categories.join(','),
+      await setDoc(doc(db, 'tutors', user.uid), {
+        category: formData.category,
         name: formData.fullName,
         gender: formData.gender,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
-        address: formData.address,
+        address: [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
         qualification: formData.qualification,
         experience: formData.experience,
         occupation: formData.occupation,
@@ -178,9 +183,9 @@ export default function TeacherForm({
         technologies: formData.technologies,
         languagesTaught: formData.languages,
         hasProfile: true
-      }).eq('id', user.id);
+      }, { merge: true });
 
-      if (error) throw error;
+      
 
       localStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
@@ -224,7 +229,7 @@ export default function TeacherForm({
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Teaching Categories</p>
               <div className="flex gap-2 flex-wrap mt-1">
-                {formData.categories.map(c => (
+                {[formData.category].map(c => (
                   <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold capitalize">{c}</span>
                 ))}
               </div>
@@ -254,7 +259,7 @@ export default function TeacherForm({
               <p className="text-lg font-bold text-slate-800">{formData.mode || '-'}</p>
             </div>
             
-            {formData.categories.includes('school') && (
+            {formData.category ===('school') && (
               <>
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Subjects (School)</p>
@@ -279,7 +284,7 @@ export default function TeacherForm({
               </>
             )}
 
-            {formData.categories.includes('programming') && formData.technologies.length > 0 && (
+            {formData.category ===('programming') && formData.technologies.length > 0 && (
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies Taught</p>
                 <div className="flex gap-2 flex-wrap">
@@ -290,7 +295,7 @@ export default function TeacherForm({
               </div>
             )}
 
-            {formData.categories.includes('languages') && formData.languages.length > 0 && (
+            {formData.category ===('languages') && formData.languages.length > 0 && (
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages Taught</p>
                 <div className="flex gap-2 flex-wrap">
@@ -359,7 +364,7 @@ export default function TeacherForm({
               >
                 <input 
                   type="checkbox" 
-                  checked={formData.categories.includes(cat.id)}
+                  checked={formData.category ===(cat.id)}
                   onChange={() => handleCheckboxChange('categories', cat.id)}
                   className="w-5 h-5 accent-emerald-500 rounded"
                 />
@@ -444,9 +449,18 @@ export default function TeacherForm({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              💬 WhatsApp No.
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold">
+                💬 WhatsApp No.
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
+                <input type="checkbox" onChange={(e) => {
+                  if (e.target.checked && formData.phone) {
+                    setFormData({ ...formData, whatsapp: formData.phone });
+                  }
+                }} /> Same as Phone
+              </label>
+            </div>
 
             <input
               type="tel"
@@ -481,19 +495,39 @@ export default function TeacherForm({
 
 
 
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              🏠 Residential Address *
-            </label>
-
-            <textarea
-              rows={4}
-              name="address"
-              placeholder="Enter address"
-              value={formData.address}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-1 md:col-span-2">
+                <input
+                  type="text"
+                  name="street"
+                  placeholder="Street / Locality"
+                  value={formData.street}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-4"
+                  required
+                />
+              </div>
+              <input
+                type="text"
+                name="city"
+                placeholder="City"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-xl px-4 py-4"
+                required
+              />
+              <input
+                type="text"
+                name="pincode"
+                placeholder="Pincode"
+                value={formData.pincode}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-xl px-4 py-4"
+                required
+              />
+            </div>
           </div>
 
         </div>
@@ -582,7 +616,7 @@ export default function TeacherForm({
         </div>
 
         {/* SCHOOL CATEGORY */}
-        {formData.categories.includes('school') && (
+        {formData.category ===('school') && (
 
           <>
 
@@ -682,7 +716,7 @@ export default function TeacherForm({
         )}
 
         {/* PROGRAMMING CATEGORY */}
-        {formData.categories.includes('programming') && (
+        {formData.category ===('programming') && (
 
           <div>
             <label className="block text-sm font-semibold mb-3">
@@ -723,7 +757,7 @@ export default function TeacherForm({
         )}
 
         {/* LANGUAGE CATEGORY */}
-        {formData.categories.includes('languages') && (
+        {formData.category ===('languages') && (
 
           <div>
             <label className="block text-sm font-semibold mb-3">
@@ -766,8 +800,8 @@ export default function TeacherForm({
             🌐 Preferred Mode
           </label>
 
-          {(formData.categories.includes('programming') ||
-            formData.categories.includes('languages')) && !formData.categories.includes('school') ? (
+          {(formData.category ===('programming') ||
+            formData.category ===('languages'))  ? (
 
             <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl px-4 py-4 flex items-center gap-3">
 

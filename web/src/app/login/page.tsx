@@ -24,31 +24,19 @@ function LoginContent() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { auth, db } = await import('@/utils/firebase/client');
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { doc, getDoc } = await import('firebase/firestore');
       
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) {
-        toast.error(authError.message);
-        return;
-      }
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       
-      if (data?.user) {
+      if (user) {
         // Fetch user role
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-          
-        const userRole = userData?.role || role; // fallback
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userRole = userDoc.exists() ? userDoc.data().role : role;
         
-        // Save minimal info if needed (Supabase handles session securely in cookies/localstorage)
-        localStorage.setItem('user', JSON.stringify({ id: data.user.id, email: data.user.email, role: userRole }));
+        localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
         
         toast.success("Login successful!");
         if (userRole === 'student') {
@@ -214,12 +202,38 @@ function LoginContent() {
           <div className="space-y-4 mb-6">
             <button
               onClick={async () => {
-                const { createClient } = await import('@/utils/supabase/client');
-                const supabase = createClient();
-                const next = searchParams.get('next');
-                const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
-                const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
-                if (error) toast.error(error.message);
+                const { auth, db } = await import('@/utils/firebase/client');
+                const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+                const { doc, getDoc, setDoc } = await import('firebase/firestore');
+                try {
+                  const provider = new GoogleAuthProvider();
+                  const result = await signInWithPopup(auth, provider);
+                  const user = result.user;
+                  
+                  const userDoc = await getDoc(doc(db, 'users', user.uid));
+                  let userRole = role;
+                  if (userDoc.exists()) {
+                    userRole = userDoc.data().role || role;
+                  } else {
+                    await setDoc(doc(db, 'users', user.uid), {
+                      id: user.uid,
+                      email: user.email,
+                      name: user.displayName || '',
+                      role: role
+                    });
+                    if (role === 'student') {
+                      await setDoc(doc(db, 'parents', user.uid), { id: user.uid });
+                    } else {
+                      await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+                    }
+                  }
+                  
+                  localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
+                  const next = searchParams.get('next');
+                  router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
+                } catch (error: any) {
+                  toast.error(error.message);
+                }
               }}
               className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700"
             >

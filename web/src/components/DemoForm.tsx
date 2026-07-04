@@ -50,17 +50,23 @@ export default function DemoForm({
     if (isDashboard) {
       const fetchProfile = async () => {
         try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
+          const { auth, db } = await import('@/utils/firebase/client');
+          const { collection, query, where, getDocs, doc, getDoc, orderBy, limit, updateDoc, setDoc, addDoc } = await import('firebase/firestore');
+          await new Promise(resolve => auth.onAuthStateChanged(resolve));
+          const user = auth.currentUser;
           if (user) {
             if (hasProfile) {
               // Fetch student data
-              const { data: studentData } = await supabase.from('students').select('*').eq('parentId', user.id).single();
+              const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
+              const studentSnap = await getDocs(studentQuery);
+              const studentData = !studentSnap.empty ? studentSnap.docs[0].data() : null;
               // Fetch tuition request data
-              const { data: requestData } = await supabase.from('tuition_requests').select('*').eq('parentId', user.id).order('created_at', { ascending: false }).limit(1).single();
-              
-              if (studentData && requestData) {
+              const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
+              const requestSnap = await getDocs(requestQuery);
+              const requestDocs = requestSnap.docs.map(d => d.data());
+              requestDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+              const requestData = requestDocs[0] || {};
+              if (studentData && !requestSnap.empty) {
                 setIsEditing(false);
                 setFormData({
                   fullName: studentData.name || '',
@@ -91,7 +97,7 @@ export default function DemoForm({
               // Pre-fill name and email from auth user metadata if they don't have a profile yet
               setFormData(prev => ({
                 ...prev,
-                fullName: user.user_metadata?.full_name || prev.fullName,
+                fullName: user.displayName || prev.fullName,
                 email: user.email || prev.email
               }));
             }
@@ -146,11 +152,9 @@ export default function DemoForm({
 
     if (!isDashboard) {
       // Check if they are logged in, and sign them out so they can log in as a student
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.auth.signOut();
+      const { auth } = await import('@/utils/firebase/client');
+      if (auth.currentUser) {
+        await auth.signOut();
       }
 
       // Save data to localStorage and redirect to signup
@@ -161,68 +165,74 @@ export default function DemoForm({
 
     // If in dashboard, submit to Supabase
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { auth, db } = await import('@/utils/firebase/client');
+      const { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, addDoc } = await import('firebase/firestore');
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
 
       if (hasProfile) {
         // Update existing records
-        const { error: studentError } = await supabase.from('students').update({
-          category: formData.category || '',
-          name: formData.fullName,
-          gender: formData.gender,
-          phoneNumber: formData.phone,
-          whatsappNumber: formData.whatsapp,
-          email: formData.email,
-          address: formData.address,
-          studentType: formData.studentType,
-          classLevel: formData.classGrade,
-          board: formData.board,
-          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
-          technologies: formData.technologies,
-          languages: formData.languages,
-          preferredMode: formData.demoMode,
-          learningGoal: formData.goal,
-          specialRequirements: formData.requirements,
-          budget: parseInt(formData.budget) || 0,
-        }).eq('parentId', user.id);
+        const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
+        const studentSnap = await getDocs(studentQuery);
+        if (!studentSnap.empty) {
+          await updateDoc(studentSnap.docs[0].ref, {
+            category: formData.category || '',
+            name: formData.fullName,
+            gender: formData.gender,
+            phoneNumber: formData.phone,
+            whatsappNumber: formData.whatsapp,
+            email: formData.email,
+            address: formData.address,
+            studentType: formData.studentType,
+            classLevel: formData.classGrade,
+            board: formData.board,
+            subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+            technologies: formData.technologies,
+            languages: formData.languages,
+            preferredMode: formData.demoMode,
+            learningGoal: formData.goal,
+            specialRequirements: formData.requirements,
+            budget: parseInt(formData.budget) || 0,
+          });
+        }
 
-        if (studentError) throw studentError;
-
-        const { error: reqError } = await supabase.from('tuition_requests').update({
-          category: formData.category || '',
-          studentName: formData.fullName,
-          classLevel: formData.classGrade,
-          board: formData.board,
-          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
-          technologies: formData.technologies,
-          languages: formData.languages,
-          mode: formData.demoMode,
-          preferredTimeRange: formData.hours,
-          area: formData.address,
-          budget: parseInt(formData.budget) || 0,
-        }).eq('parentId', user.id);
-        
-        if (reqError) throw reqError;
+        const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
+        const requestSnap = await getDocs(requestQuery);
+        if (!requestSnap.empty) {
+          await updateDoc(requestSnap.docs[0].ref, {
+            category: formData.category || '',
+            studentName: formData.fullName,
+            classLevel: formData.classGrade,
+            board: formData.board,
+            subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+            technologies: formData.technologies,
+            languages: formData.languages,
+            mode: formData.demoMode,
+            preferredTimeRange: formData.hours,
+            area: formData.address,
+            budget: parseInt(formData.budget) || 0,
+          });
+        }
         
         setSuccessMsg('Profile updated successfully!');
       } else {
         // Mark user as having profile
-        const { data: existingUser } = await supabase.from('users').select('referralCode').eq('id', user.id).single();
-        const newCode = existingUser?.referralCode || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
-        await supabase.from('users').update({ hasProfile: true, referralCode: newCode }).eq('id', user.id);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+        await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
         // Fetch parent (create if not exists)
-        const { data: existingParent } = await supabase.from('parents').select('id').eq('id', user.id).single();
-        if (!existingParent) {
-          await supabase.from('parents').insert({ id: user.id, name: formData.parentName || formData.fullName });
+        const parentDocRef = doc(db, 'parents', user.uid);
+        const parentDocSnap = await getDoc(parentDocRef);
+        if (!parentDocSnap.exists()) {
+          await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
         }
 
         // Create student record
-        const { data: newStudent } = await supabase.from('students').insert({
-          parentId: user.id,
+        const newStudentRef = await addDoc(collection(db, 'students'), {
+          parentId: user.uid,
           category: formData.category || '',
           name: formData.fullName,
           gender: formData.gender,
@@ -240,12 +250,13 @@ export default function DemoForm({
           specialRequirements: formData.requirements,
           technologies: formData.technologies,
           languages: formData.languages,
-        }).select('id').single();
+          createdAt: Date.now()
+        });
 
         // Create the open request
-        const { error } = await supabase.from('tuition_requests').insert({
-          parentId: user.id,
-          studentId: newStudent?.id,
+        await addDoc(collection(db, 'tuition_requests'), {
+          parentId: user.uid,
+          studentId: newStudentRef.id,
           category: formData.category || '',
           studentName: formData.fullName,
           classLevel: formData.classGrade,
@@ -257,10 +268,10 @@ export default function DemoForm({
           preferredTimeRange: formData.hours,
           area: formData.address,
           budget: parseInt(formData.budget) || 0,
-          status: 'open'
+          status: 'open',
+          createdAt: Date.now()
         });
 
-        if (error) throw error;
         setSuccessMsg('Demo request submitted successfully!');
       }
 

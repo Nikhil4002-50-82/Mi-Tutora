@@ -27,79 +27,50 @@ function SignupContent() {
     setIsSubmitting(true);
     setError('');
     try {
-      const { createClient } = await import('@/utils/supabase/client');
-      const supabase = createClient();
+      const { auth, db } = await import('@/utils/firebase/client');
+      const { createUserWithEmailAndPassword } = await import('firebase/auth');
+      const { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } = await import('firebase/firestore');
       
-      const { data, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            role: role
-          }
-        }
-      });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      if (authError) throw authError;
-
-      if (data?.user) {
-        if (!data.session) {
-          // Email confirmation required, so we can't insert into DB due to RLS
-          setSuccessMsg("Success! Please check your email to confirm your account before logging in.");
-          return;
-        }
-
-        // Insert into public users table
-        const { error: userError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            name: name,
-            role: role,
-            referredBy: referralCode.trim()
-          });
-          
-        if (userError && userError.code !== '23505') {
-          throw new Error(`Users table error: ${userError.message}`);
-        }
+      if (user) {
+        // Insert into users collection
+        await setDoc(doc(db, 'users', user.uid), {
+          id: user.uid,
+          email: user.email,
+          name: name,
+          role: role,
+          referredBy: referralCode.trim()
+        });
 
         // Process referral if exists
         if (referralCode.trim()) {
-          const { data: referrerUser } = await supabase
-            .from('users')
-            .select('id, name')
-            .eq('referralCode', referralCode.trim().toUpperCase())
-            .single();
+          const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const referrerUserDoc = querySnapshot.docs[0];
+            const referrerUser = referrerUserDoc.data();
             
-          if (referrerUser) {
-            await supabase.from('referrals').insert({
+            await addDoc(collection(db, 'referrals'), {
               referrerId: referrerUser.id,
               referrerName: referrerUser.name,
-              referredUserId: data.user.id,
+              referredUserId: user.uid,
               referredUserName: name,
               referralCode: referralCode.trim().toUpperCase(),
               referralType: role,
-              status: 'pending'
+              status: 'pending',
+              createdAt: Date.now()
             });
           }
         }
 
         // Insert into parents or tutors
         if (role === 'student') {
-          const { error: parentError } = await supabase.from('parents').insert({ id: data.user.id });
-          if (parentError && parentError.code !== '23505') {
-            throw new Error(`Parents table error: ${parentError.message}`);
-          }
-          const searchParams = new URLSearchParams(window.location.search);
+          await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: name });
           router.push(searchParams.get('next') || '/dashboard/student');
         } else {
-          const { error: tutorError } = await supabase.from('tutors').insert({ id: data.user.id, name: name, email: email });
-          if (tutorError && tutorError.code !== '23505') {
-            throw new Error(`Tutors table error: ${tutorError.message}`);
-          }
-          const searchParams = new URLSearchParams(window.location.search);
+          await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: name, email: email });
           router.push(searchParams.get('next') || '/dashboard/teacher');
         }
       }
@@ -111,23 +82,61 @@ function SignupContent() {
   };
 
   const handleGoogleSignup = async () => {
-    const { createClient } = await import('@/utils/supabase/client');
-    const supabase = createClient();
+    const { auth, db } = await import('@/utils/firebase/client');
+    const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+    const { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } = await import('firebase/firestore');
     
     try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      let userRole = role;
+      
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'users', user.uid), {
+          id: user.uid,
+          email: user.email,
+          name: user.displayName || '',
+          role: role,
+          referredBy: referralCode.trim()
+        });
+
+        // Process referral if exists
+        if (referralCode.trim()) {
+          const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const referrerUserDoc = querySnapshot.docs[0];
+            const referrerUser = referrerUserDoc.data();
+            
+            await addDoc(collection(db, 'referrals'), {
+              referrerId: referrerUser.id,
+              referrerName: referrerUser.name,
+              referredUserId: user.uid,
+              referredUserName: user.displayName || '',
+              referralCode: referralCode.trim().toUpperCase(),
+              referralType: role,
+              status: 'pending',
+              createdAt: Date.now()
+            });
+          }
+        }
+
+        if (role === 'student') {
+          await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: user.displayName || '' });
+        } else {
+          await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+        }
+      } else {
+        userRole = userDoc.data().role || role;
+      }
+      
+      localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
       const searchParams = new URLSearchParams(window.location.search);
       const next = searchParams.get('next');
-      const ref = referralCode.trim();
-      const redirectUrl = `${window.location.origin}/auth/callback?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ''}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) setError(error.message);
+      router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
     } catch (err: any) {
       setError(err.message || 'Google signup failed');
     }
