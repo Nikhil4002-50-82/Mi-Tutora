@@ -16,6 +16,7 @@ import useSWR from 'swr';
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -26,7 +27,7 @@ export default function StudentDashboard() {
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string) => {} });
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
   const router = useRouter();
 
   const fetcher = async () => {
@@ -133,7 +134,7 @@ export default function StudentDashboard() {
       applications: applicationsWithSubjects,
       availableTeachers: matchedTutors,
       referrals,
-      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'scheduling'].includes(app.status)),
+      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status)),
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
         subject: app.category || 'General',
@@ -284,7 +285,7 @@ export default function StudentDashboard() {
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
     await auth.signOut();
-    localStorage.removeItem('user');
+    localStorage.clear();
     toast.success("Logged out successfully!");
     router.push('/login');
   };
@@ -329,25 +330,27 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, newSchedule?: string) => {
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, date?: string, time?: string) => {
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc } = await import('firebase/firestore');
       
       const updateData: any = {};
       if (action === 'accept_price') {
-        updateData.status = 'scheduling';
-        updateData.scheduleStatus = 'pending_tutor';
+        updateData.status = 'demo_pending_payment';
         updateData.finalPrice = newOffer;
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'student';
       } else if (action === 'propose_schedule') {
-        updateData.scheduleStatus = 'pending_tutor';
-        updateData.proposedSchedule = newSchedule;
+        updateData.demoScheduleStatus = 'proposed';
+        updateData.demoScheduleUpdatedBy = 'student';
+        updateData.proposedDemoDate = date;
+        updateData.proposedDemoTime = time;
       } else if (action === 'accept_schedule') {
-        updateData.status = 'demo_pending_payment';
-        updateData.proposedSchedule = newSchedule;
+        updateData.demoScheduleStatus = 'accepted';
+        updateData.scheduledDemoDate = date;
+        updateData.scheduledDemoTime = time;
       }
 
       await updateDoc(doc(db, 'applications', appId), updateData);
@@ -355,6 +358,18 @@ export default function StudentDashboard() {
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
+    }
+  };
+
+  const handleAppointTutor = async (appId: string) => {
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'applications', appId), { status: 'tuition_started', startDate: new Date().toLocaleDateString('en-GB') });
+      toast.success("Tutor appointed successfully! Tuition has started.");
+      mutate();
+    } catch (e: any) {
+      toast.error("Error appointing tutor");
     }
   };
 
@@ -367,34 +382,14 @@ export default function StudentDashboard() {
       const coursePrice = payingClass.finalPrice || 4000;
       const walletBalance = data?.userData?.walletBalance || 0;
       
-      // Update application
-      await updateDoc(doc(db, 'applications', payingClass.id), { status: 'tuition_started' });
-      
-      // Handle referral reward logic
-      const pendingReferralSnap = await getDocs(query(collection(db, 'referrals'), where('referredUserId', '==', data?.user?.uid as string), where('status', '==', 'pending')));
-        
-      if (!pendingReferralSnap.empty) {
-         const pendingReferral = pendingReferralSnap.docs[0];
-         const rewardAmount = Math.floor(coursePrice * 0.10);
-         await updateDoc(pendingReferral.ref, {
-           status: 'rewarded',
-           estimatedReward: rewardAmount,
-           applicationId: payingClass.id
-         });
-         
-         const referrerDocRef = doc(db, 'users', pendingReferral.data().referrerId);
-         const referrerDocSnap = await getDoc(referrerDocRef);
-         if (referrerDocSnap.exists()) {
-           const newBal = (referrerDocSnap.data().walletBalance || 0) + rewardAmount;
-           await updateDoc(referrerDocRef, { walletBalance: newBal });
-         }
-      }
-      
       // Deduct wallet if used
       if (useWallet && walletBalance > 0) {
         const usedAmount = Math.min(coursePrice, walletBalance);
         await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
       }
+
+      // Update application to demo_booked
+      await updateDoc(doc(db, 'applications', payingClass.id), { status: 'demo_booked', demoPaymentPaid: true });
 
       toast.success("Payment completed successfully!");
       setPayingClass(null);
@@ -571,7 +566,7 @@ export default function StudentDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {data?.availableTeachers?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                     const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
-                    const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'scheduling'].includes(app.status));
+                    const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
                     const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
                     
                     if (hasNegotiation) return null; // Already negotiating
@@ -622,12 +617,20 @@ export default function StudentDashboard() {
                                   Pending
                                 </button>
                               ) : (
-                                <button 
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => setSelectedViewUser(teacher)}
+                                    className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                                  >
+                                    <User className="w-4 h-4" /> View Profile
+                                  </button>
+                                  <button 
                                   onClick={() => handleRequestTutor(teacher)}
                                   className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
                                 >
                                   <MessageCircle className="w-4 h-4" /> Request & Offer
                                 </button>
+                                </div>
                               )}
                             </>
                           )}
@@ -670,7 +673,7 @@ export default function StudentDashboard() {
                         </div>
                         <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
                           <div className="text-center w-full sm:w-auto">
-                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'scheduling' ? 'Agreed Price' : 'Current Offer'}</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
                             <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
                           </div>
                           
@@ -712,11 +715,11 @@ export default function StudentDashboard() {
                           )}
 
                           {/* Scheduling Logic */}
-                          {neg.status === 'scheduling' && (
-                            neg.scheduleStatus === 'pending_student' ? (
+                          {neg.status === 'demo_pending_payment' && (
+                            neg.demoScheduleUpdatedBy === 'tutor' && neg.demoScheduleStatus === 'proposed' ? (
                               <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
                                 <button 
-                                  onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedSchedule)}
+                                  onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedDemoDate, neg.proposedDemoTime)}
                                   className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"
                                 >
                                   Accept Timings
@@ -729,10 +732,10 @@ export default function StudentDashboard() {
                                       title: 'Propose Timings',
                                       description: 'Suggest your preferred class timings.',
                                       placeholder: 'e.g. Mon, Wed, Fri 6PM-7PM',
-                                      initialValue: neg.proposedSchedule || '',
-                                      onSubmit: (val: string) => {
+                                      initialValue: '',
+                                      onSubmit: (val: string, date?: string, time?: string) => {
                                         setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, val);
+                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, date, time);
                                       }
                                     });
                                   }}
@@ -743,7 +746,7 @@ export default function StudentDashboard() {
                               </div>
                             ) : (
                               <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor to propose timings...</p>
+                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor response on timings...</p>
                               </div>
                             )
                           )}
@@ -876,7 +879,7 @@ export default function StudentDashboard() {
                     <Lock className="w-4 h-4" /> Please submit a demo request profile to unlock the rest of your dashboard!
                   </div>
                 )}
-                <DemoForm isDashboard={true} hasProfile={hasProfile} />
+                <DemoForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} />
               </div>
             )}
 
@@ -990,6 +993,55 @@ export default function StudentDashboard() {
             )}
           </motion.div>
         </div>
+
+      
+      {/* View Teacher Profile Modal */}
+      {selectedViewUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
+            <button 
+              onClick={() => setSelectedViewUser(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
+            >
+              ✕
+            </button>
+            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-black uppercase">
+                {selectedViewUser.name.charAt(0)}
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.name}</h3>
+                <p className="text-emerald-600 font-bold capitalize">{selectedViewUser.category || 'Tutor'}</p>
+              </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Experience</p>
+                <p className="text-lg font-bold text-gray-900">{selectedViewUser.experience || 'Not specified'}</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Highest Qualification</p>
+                <p className="text-lg font-bold text-gray-900">{selectedViewUser.qualification || 'Not specified'}</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-5 rounded-2xl mb-6">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Teaching Expertise</p>
+              {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Technologies:</strong> {selectedViewUser.technologies.join(', ')}</p>}
+              {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
+              {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
+              <p className="mb-2"><strong className="text-gray-700">Teaching Approach:</strong> {selectedViewUser.teachingApproach || 'Not specified'}</p>
+              <p><strong className="text-gray-700">Fee Range:</strong> {selectedViewUser.feeRange || 'Negotiable'}</p>
+            </div>
+            
+            <div className="bg-gray-50 p-5 rounded-2xl">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
+              <p className="font-medium text-gray-900">{selectedViewUser.address || 'Not specified'}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       </main>
     </div>

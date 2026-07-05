@@ -19,6 +19,7 @@ export default function DemoForm({
 }: Props) {
 
   const [isEditing, setIsEditing] = useState(!hasProfile);
+  const [sameAsPhone, setSameAsPhone] = useState(false);
   const [formData, setFormData] =
     useState({
       fullName: '',
@@ -26,7 +27,9 @@ export default function DemoForm({
       phone: '',
       whatsapp: '',
       email: '',
-      address: '',
+      addressFlat: '',
+      addressStreet: '',
+      addressPincode: '',
       studentType: '',
       classGrade: '',
       parentName: '',
@@ -57,6 +60,10 @@ export default function DemoForm({
           if (user) {
             if (hasProfile) {
               // Fetch student data
+              const parentDocRef = doc(db, 'parents', user.uid);
+              const parentSnap = await getDoc(parentDocRef);
+              const parentData = parentSnap.exists() ? parentSnap.data() : null;
+
               const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
               const studentSnap = await getDocs(studentQuery);
               const studentData = !studentSnap.empty ? studentSnap.docs[0].data() : null;
@@ -74,10 +81,12 @@ export default function DemoForm({
                   phone: studentData.phoneNumber || '',
                   whatsapp: studentData.whatsappNumber || '',
                   email: studentData.email || '',
-                  address: studentData.address || '',
+                  addressFlat: studentData.address?.split(', ')[0] || '',
+                  addressStreet: studentData.address?.split(', ')[1] || studentData.address || '',
+                  addressPincode: studentData.address?.split(', ')[2] || '',
                   studentType: studentData.studentType || '',
                   classGrade: studentData.classLevel || '',
-                  parentName: '', // parents table name
+                  parentName: parentData ? parentData.name : '',
                   demoMode: studentData.preferredMode || '',
                   board: studentData.board || '',
                   subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
@@ -134,12 +143,24 @@ export default function DemoForm({
       HTMLSelectElement
     >
   ) => {
-
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+    const val = e.target.value;
+    const name = e.target.name;
+    
+    setFormData((prev: any) => {
+      const next = { ...prev, [name]: val };
+      if (name === 'phone' && sameAsPhone) {
+        next.whatsapp = val;
+      }
+      return next;
     });
+  };
 
+  const handleSameAsPhone = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSameAsPhone(checked);
+    if (checked) {
+      setFormData((prev: any) => ({ ...prev, whatsapp: prev.phone }));
+    }
   };
 
   const handleSubmit = async (
@@ -149,6 +170,8 @@ export default function DemoForm({
     e.preventDefault();
     setLoading(true);
     setSuccessMsg('');
+
+    const combinedAddress = [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
     if (!isDashboard) {
       // Check if they are logged in, and sign them out so they can log in as a student
@@ -173,7 +196,11 @@ export default function DemoForm({
 
       if (hasProfile) {
         // Update existing records
-        const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
+        const parentDocRef = doc(db, 'parents', user.uid);
+              const parentSnap = await getDoc(parentDocRef);
+              const parentData = parentSnap.exists() ? parentSnap.data() : null;
+
+              const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
         const studentSnap = await getDocs(studentQuery);
         if (!studentSnap.empty) {
           await updateDoc(studentSnap.docs[0].ref, {
@@ -183,7 +210,7 @@ export default function DemoForm({
             phoneNumber: formData.phone,
             whatsappNumber: formData.whatsapp,
             email: formData.email,
-            address: formData.address,
+            address: combinedAddress,
             studentType: formData.studentType,
             classLevel: formData.classGrade,
             board: formData.board,
@@ -210,7 +237,7 @@ export default function DemoForm({
             languages: formData.languages,
             mode: formData.demoMode,
             preferredTimeRange: formData.hours,
-            area: formData.address,
+            area: combinedAddress,
             budget: parseInt(formData.budget) || 0,
           });
         }
@@ -239,7 +266,7 @@ export default function DemoForm({
           phoneNumber: formData.phone,
           whatsappNumber: formData.whatsapp,
           email: formData.email,
-          address: formData.address,
+          address: combinedAddress,
           studentType: formData.studentType,
           classLevel: formData.classGrade,
           board: formData.board,
@@ -266,7 +293,7 @@ export default function DemoForm({
           languages: formData.languages,
           mode: formData.demoMode,
           preferredTimeRange: formData.hours,
-          area: formData.address,
+          area: combinedAddress,
           budget: parseInt(formData.budget) || 0,
           status: 'open',
           createdAt: Date.now()
@@ -315,6 +342,10 @@ export default function DemoForm({
               <p className="text-lg font-bold text-slate-800">{formData.fullName || '-'}</p>
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Parent's Name</p>
+              <p className="text-lg font-bold text-slate-800">{formData.parentName || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Category</p>
               <p className="text-lg font-bold text-purple-600 capitalize">{formData.category || '-'}</p>
             </div>
@@ -325,6 +356,10 @@ export default function DemoForm({
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Email</p>
               <p className="text-lg font-bold text-slate-800">{formData.email || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 md:col-span-2">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Residential Address</p>
+              <p className="text-lg font-bold text-slate-800">{[formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ') || '-'}</p>
             </div>
             
             {formData.category === 'school' && (
@@ -504,9 +539,15 @@ export default function DemoForm({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              💬 WhatsApp No. *
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-semibold">
+                💬 WhatsApp No. *
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <input type="checkbox" checked={sameAsPhone} onChange={handleSameAsPhone} className="rounded" />
+                Same as Phone
+              </label>
+            </div>
 
             <input
               type="tel"
@@ -514,7 +555,8 @@ export default function DemoForm({
               placeholder="Enter WhatsApp number"
               value={formData.whatsapp}
               onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
+              disabled={sameAsPhone}
+              className={`w-full border border-slate-300 rounded-xl px-4 py-4 ${sameAsPhone ? 'bg-slate-100' : ''}`}
             />
           </div>
 
@@ -543,14 +585,35 @@ export default function DemoForm({
               🏠 Residential Address *
             </label>
 
-            <textarea
-              rows={4}
-              name="address"
-              placeholder="Enter address"
-              value={formData.address}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
+            <div className="space-y-3">
+              <input
+                type="text"
+                name="addressFlat"
+                placeholder="Flat / House No. & Building"
+                value={formData.addressFlat}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-xl px-4 py-3"
+              />
+              <input
+                type="text"
+                name="addressStreet"
+                placeholder="Street & Landmark"
+                value={formData.addressStreet}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-xl px-4 py-3"
+              />
+              <input
+                type="text"
+                name="addressPincode"
+                placeholder="Pincode"
+                value={formData.addressPincode}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-xl px-4 py-3"
+              />
+            </div>
           </div>
 
         </div>

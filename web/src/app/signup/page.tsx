@@ -60,6 +60,7 @@ function SignupContent() {
               referralCode: referralCode.trim().toUpperCase(),
               referralType: role,
               status: 'pending',
+              estimatedReward: 0,
               createdAt: Date.now()
             });
           }
@@ -119,6 +120,7 @@ function SignupContent() {
               referralCode: referralCode.trim().toUpperCase(),
               referralType: role,
               status: 'pending',
+              estimatedReward: 0,
               createdAt: Date.now()
             });
           }

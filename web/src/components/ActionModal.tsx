@@ -5,7 +5,7 @@ import { X, Clock, IndianRupee } from "lucide-react";
 interface ActionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string, date?: string, time?: string) => void;
   title: string;
   description: string;
   placeholder: string;
@@ -24,6 +24,8 @@ export default function ActionModal({
   initialValue = "",
 }: ActionModalProps) {
   const [value, setValue] = useState(initialValue);
+  const [dateValue, setDateValue] = useState("");
+  const [timeValue, setTimeValue] = useState("");
 
   // Reset value when modal opens
   useEffect(() => {
@@ -35,7 +37,12 @@ export default function ActionModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!value.trim()) return;
-    onSubmit(value);
+    if (type === "timing") {
+      if (!dateValue || !timeValue) return;
+      onSubmit(value, dateValue, timeValue);
+    } else {
+      onSubmit(value);
+    }
     setValue("");
   };
 
@@ -89,17 +96,40 @@ export default function ActionModal({
                         <span className="text-gray-500 font-bold">₹</span>
                       </div>
                     )}
-                    <input
-                      type={type === "price" ? "number" : "text"}
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      placeholder={placeholder}
-                      className={`w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${
-                        type === "price" ? "pl-8 pr-4" : "px-4"
-                      }`}
-                      autoFocus
-                      required
-                    />
+                    {type === "price" ? (
+                      <input
+                        type="number"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        placeholder={placeholder}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 pl-8 pr-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        autoFocus
+                        required
+                      />
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Date</label>
+                          <input
+                            type="date"
+                            value={dateValue}
+                            onChange={(e) => setDateValue(e.target.value)}
+                            className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 px-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Time</label>
+                          <input
+                            type="time"
+                            value={timeValue}
+                            onChange={(e) => setTimeValue(e.target.value)}
+                            className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 px-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -113,7 +143,7 @@ export default function ActionModal({
                   </button>
                   <button
                     type="submit"
-                    disabled={!value.trim()}
+                    disabled={type === "price" ? !value.trim() : (!dateValue || !timeValue)}
                     className="flex-1 py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-600 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 shadow-lg shadow-emerald-500/25"
                   >
                     Submit

@@ -16,11 +16,12 @@ import useSWR from 'swr';
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [subTab, setSubTab] = useState<string>('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string) => {} });
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -114,7 +115,7 @@ export default function TeacherDashboard() {
       availableStudents: matchedStudents,
       applications: applicationsWithSubjects,
       referrals,
-      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'scheduling'].includes(app.status)),
+      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status)),
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
         student: app.studentName || 'Assigned Student',
@@ -251,7 +252,7 @@ export default function TeacherDashboard() {
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
     await auth.signOut();
-    localStorage.removeItem('user');
+    localStorage.clear();
     toast.success("Logged out successfully!");
     router.push('/login');
   };
@@ -296,25 +297,27 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, newSchedule?: string) => {
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, date?: string, time?: string) => {
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc } = await import('firebase/firestore');
       
       const updateData: any = {};
       if (action === 'accept_price') {
-        updateData.status = 'scheduling';
-        updateData.scheduleStatus = 'pending_tutor';
+        updateData.status = 'demo_pending_payment';
         updateData.finalPrice = newOffer;
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'tutor';
       } else if (action === 'propose_schedule') {
-        updateData.scheduleStatus = 'pending_student';
-        updateData.proposedSchedule = newSchedule;
+        updateData.demoScheduleStatus = 'proposed';
+        updateData.demoScheduleUpdatedBy = 'tutor';
+        updateData.proposedDemoDate = date;
+        updateData.proposedDemoTime = time;
       } else if (action === 'accept_schedule') {
-        updateData.status = 'demo_pending_payment';
-        updateData.proposedSchedule = newSchedule;
+        updateData.demoScheduleStatus = 'accepted';
+        updateData.scheduledDemoDate = date;
+        updateData.scheduledDemoTime = time;
       }
 
       await updateDoc(doc(db, 'applications', appId), updateData);
@@ -513,7 +516,7 @@ export default function TeacherDashboard() {
       return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
     }).map((student: any) => {
                     const hasNegotiation = data?.applications?.some((app: any) => app.requestId === student.id && ['negotiating'].includes(app.status));
-                    const isPending = data?.applications?.some((app: any) => app.requestId === student.id && ['demo_pending_payment', 'demo_booked', 'scheduling'].includes(app.status));
+                    const isPending = data?.applications?.some((app: any) => app.requestId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
                     const isHired = data?.applications?.some((app: any) => app.requestId === student.id && ['tuition_started'].includes(app.status));
                     
                     if (hasNegotiation) return null; // Don't show students we are already negotiating with
@@ -568,12 +571,20 @@ export default function TeacherDashboard() {
                                   Pending
                                 </button>
                               ) : (
-                                <button 
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => setSelectedViewUser(student)}
+                                    className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                                  >
+                                    <User className="w-4 h-4" /> View Profile
+                                  </button>
+                                  <button 
                                   onClick={() => handleSendOffer(student)}
                                   className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md text-sm flex items-center justify-center gap-2"
                                 >
                                   <MessageCircle className="w-4 h-4" /> Send Proposal
                                 </button>
+                                </div>
                               )}
                             </>
                           )}
@@ -618,7 +629,7 @@ export default function TeacherDashboard() {
                         </div>
                         <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
                           <div className="text-center w-full sm:w-auto">
-                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'scheduling' ? 'Agreed Price' : 'Current Offer'}</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
                             <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
                           </div>
                           
@@ -660,12 +671,12 @@ export default function TeacherDashboard() {
                           )}
 
                           {/* Scheduling Logic */}
-                          {neg.status === 'scheduling' && (
-                            neg.scheduleStatus === 'pending_tutor' ? (
+                          {neg.status === 'demo_pending_payment' && (
+                            neg.demoScheduleUpdatedBy === 'student' && neg.demoScheduleStatus === 'proposed' ? (
                               <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                {neg.proposedSchedule && (
+                                {(neg.proposedDemoDate || neg.proposedDemoTime) && (
                                   <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedSchedule)}
+                                    onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedDemoDate, neg.proposedDemoTime)}
                                     className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                                   >
                                     Accept Timings
@@ -679,10 +690,10 @@ export default function TeacherDashboard() {
                                       title: 'Propose Timings',
                                       description: 'Suggest your preferred class timings.',
                                       placeholder: 'e.g. Mon & Wed 5 PM - 6 PM',
-                                      initialValue: neg.proposedSchedule || '',
-                                      onSubmit: (val: string) => {
+                                      initialValue: '',
+                                      onSubmit: (val: string, date?: string, time?: string) => {
                                         setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, val);
+                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, date, time);
                                       }
                                     });
                                   }}
@@ -820,7 +831,7 @@ export default function TeacherDashboard() {
                     <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
                   </div>
                 )}
-                <TeacherForm isDashboard={true} hasProfile={hasProfile} />
+                <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} />
               </div>
             )}
 
@@ -867,6 +878,55 @@ export default function TeacherDashboard() {
             )}
           </motion.div>
         </div>
+
+      
+      {/* View Student Profile Modal */}
+      {selectedViewUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
+            <button 
+              onClick={() => setSelectedViewUser(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
+            >
+              ✕
+            </button>
+            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-black uppercase">
+                {selectedViewUser.parentName ? selectedViewUser.parentName.charAt(0) : 'S'}
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.parentName || 'Parent'}</h3>
+                <p className="text-emerald-600 font-bold capitalize">Looking for a {selectedViewUser.category || 'Tutor'}</p>
+              </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Class/Grade</p>
+                <p className="text-lg font-bold text-gray-900">{selectedViewUser.classGrade || 'Not specified'}</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Budget</p>
+                <p className="text-lg font-bold text-emerald-600">₹{selectedViewUser.budget || 'Negotiable'}</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-5 rounded-2xl mb-6">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Requirements</p>
+              {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Technologies:</strong> {selectedViewUser.technologies.join(', ')}</p>}
+              {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
+              {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
+              <p className="mb-2"><strong className="text-gray-700">Preferred Days:</strong> {selectedViewUser.days || 'Not specified'}</p>
+              <p><strong className="text-gray-700">Preferred Time:</strong> {selectedViewUser.time || 'Not specified'}</p>
+            </div>
+            
+            <div className="bg-gray-50 p-5 rounded-2xl">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Location</p>
+              <p className="font-medium text-gray-900">{selectedViewUser.area || 'Not specified'} ({selectedViewUser.mode || 'Online'})</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       </main>
     </div>

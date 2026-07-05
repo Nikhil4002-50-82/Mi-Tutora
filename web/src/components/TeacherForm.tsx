@@ -20,6 +20,7 @@ export default function TeacherForm({
 
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(!hasProfile);
+  const [sameAsPhone, setSameAsPhone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [formData, setFormData] = useState({
@@ -117,12 +118,24 @@ export default function TeacherForm({
       HTMLSelectElement
     >
   ) => {
-
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+    const val = e.target.value;
+    const name = e.target.name;
+    
+    setFormData((prev: any) => {
+      const next = { ...prev, [name]: val };
+      if (name === 'phone' && sameAsPhone) {
+        next.whatsapp = val;
+      }
+      return next;
     });
+  };
 
+  const handleSameAsPhone = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSameAsPhone(checked);
+    if (checked) {
+      setFormData(prev => ({ ...prev, whatsapp: prev.phone }));
+    }
   };
 
   const handleSubmit = async (
@@ -363,10 +376,11 @@ export default function TeacherForm({
                 className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-emerald-500 transition-all cursor-pointer"
               >
                 <input 
-                  type="checkbox" 
-                  checked={formData.category ===(cat.id)}
-                  onChange={() => handleCheckboxChange('categories', cat.id)}
-                  className="w-5 h-5 accent-emerald-500 rounded"
+                  type="radio" 
+                  name="category"
+                  checked={formData.category === cat.id}
+                  onChange={() => setFormData((prev: any) => ({ ...prev, category: cat.id }))}
+                  className="w-5 h-5 accent-emerald-500"
                 />
                 <span className="font-semibold text-slate-700">{cat.label}</span>
               </label>
