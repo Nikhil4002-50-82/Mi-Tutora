@@ -10,12 +10,14 @@ interface Props {
   category?: string;
   isDashboard?: boolean;
   hasProfile?: boolean;
+  onSuccess?: () => void;
 }
 
 export default function DemoForm({
   category,
   isDashboard = false,
   hasProfile = false,
+  onSuccess,
 }: Props) {
 
   const [isEditing, setIsEditing] = useState(!hasProfile);
@@ -92,8 +94,8 @@ export default function DemoForm({
                   board: studentData.board || '',
                   subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
                   classMode: '',
-                  hours: requestData.preferredTimeRange || '',
-                  days: '',
+                  hours: studentData.hoursPerDay || requestData.preferredTimeRange || '',
+                  days: studentData.daysPerWeek || '',
                   goal: studentData.learningGoal || '',
                   source: '',
                   requirements: studentData.specialRequirements || '',
@@ -226,6 +228,8 @@ export default function DemoForm({
             preferredMode: formData.demoMode,
             learningGoal: formData.goal,
             specialRequirements: formData.requirements,
+            hoursPerDay: formData.hours,
+            daysPerWeek: formData.days,
             budget: parseInt(formData.budget) || 0,
           });
         }
@@ -283,6 +287,8 @@ export default function DemoForm({
           specialRequirements: formData.requirements,
           technologies: formData.technologies,
           languages: formData.languages,
+          hoursPerDay: formData.hours,
+          daysPerWeek: formData.days,
           createdAt: Date.now()
         });
 
@@ -310,7 +316,8 @@ export default function DemoForm({
 
       sessionStorage.removeItem('demoFormData');
       if (isDashboard) {
-        window.location.reload();
+        setSuccessMsg('Profile updated successfully!');
+        if (onSuccess) onSuccess();
       } else {
         setTimeout(() => router.push('/dashboard/student'), 2000);
       }
@@ -512,6 +519,7 @@ export default function DemoForm({
                     type="radio"
                     name="gender"
                     value={item}
+                    checked={formData.gender === item}
                     onChange={handleChange}
                   />
 
@@ -934,6 +942,7 @@ export default function DemoForm({
                       type="radio"
                       name="demoMode"
                       value={item}
+                      checked={formData.demoMode === item}
                       onChange={handleChange}
                     />
 

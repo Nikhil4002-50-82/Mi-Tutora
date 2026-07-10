@@ -10,12 +10,16 @@ interface Props {
   category?: string;
   isDashboard?: boolean;
   hasProfile?: boolean;
+  initialData?: any;
+  onSuccess?: () => void;
 }
 
 export default function TeacherForm({
   category,
   isDashboard = false,
   hasProfile = false,
+  initialData = null,
+  onSuccess,
 }: Props) {
 
   const router = useRouter();
@@ -24,31 +28,68 @@ export default function TeacherForm({
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [formData, setFormData] = useState({
-    fullName: '',
-    gender: '',
-    phone: '',
-    whatsapp: '',
-    email: '',
-    street: '',
-    city: '',
-    pincode: '',
-    qualification: '',
-    experience: '',
-    occupation: '',
-    subjects: '',
-    mode: '',
-    description: '',
-    studentsCount: '',
-    schoolNames: '',
-    locations: '',
-    travelKm: '',
-    feeRange: '',
-    classes: [] as string[],
-    boards: [] as string[],
-    technologies: [] as string[],
-    languages: [] as string[],
-    category: category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
+    fullName: initialData?.name || (typeof window !== 'undefined' ? localStorage.getItem('signup_name') || '' : ''),
+    gender: initialData?.gender || '',
+    phone: initialData?.phone || '',
+    whatsapp: initialData?.whatsapp || '',
+    email: initialData?.email || (typeof window !== 'undefined' ? localStorage.getItem('signup_email') || '' : ''),
+    street: initialData?.address ? initialData.address.split(',')[0]?.trim() : '',
+    city: initialData?.address ? initialData.address.split(',')[1]?.trim() : '',
+    pincode: initialData?.address ? initialData.address.split(',')[2]?.trim() : '',
+    qualification: initialData?.qualification || '',
+    experience: initialData?.experience || '',
+    occupation: initialData?.occupation || '',
+    subjects: initialData?.subjects ? initialData.subjects.join(', ') : '',
+    mode: initialData?.mode || '',
+    description: initialData?.teachingApproach || '',
+    studentsCount: initialData?.studentCount || '',
+    schoolNames: initialData?.schoolNames || '',
+    locations: initialData?.preferredLocations || '',
+    travelKm: initialData?.travelDistance || '',
+    feeRange: initialData?.feeRange || '',
+    classes: initialData?.classes || [] as string[],
+    boards: initialData?.boards || [] as string[],
+    technologies: initialData?.technologies || [] as string[],
+    languages: initialData?.languages || [] as string[],
+    category: initialData?.category || category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
   });
+
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    if (initialData && !dataLoaded) {
+      setFormData({
+        fullName: initialData.name || (typeof window !== 'undefined' ? localStorage.getItem('signup_name') || '' : ''),
+        gender: initialData.gender || '',
+        phone: initialData.phone || '',
+        whatsapp: initialData.whatsapp || '',
+        email: initialData.email || (typeof window !== 'undefined' ? localStorage.getItem('signup_email') || '' : ''),
+        street: initialData.address ? initialData.address.split(',')[0]?.trim() : '',
+        city: initialData.address ? initialData.address.split(',')[1]?.trim() : '',
+        pincode: initialData.address ? initialData.address.split(',')[2]?.trim() : '',
+        qualification: initialData.qualification || '',
+        experience: initialData.experience || '',
+        occupation: initialData.occupation || '',
+        subjects: initialData.subjects ? initialData.subjects.join(', ') : '',
+        mode: initialData.mode || '',
+        description: initialData.teachingApproach || '',
+        studentsCount: initialData.studentCount || '',
+        schoolNames: initialData.schoolNames || '',
+        locations: initialData.preferredLocations || '',
+        travelKm: initialData.travelDistance || '',
+        feeRange: initialData.feeRange || '',
+        classes: initialData.classes || [] as string[],
+        boards: initialData.boards || [] as string[],
+        technologies: initialData.technologies || [] as string[],
+        languages: initialData.languages || [] as string[],
+        category: initialData.category || category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
+      });
+      setDataLoaded(true);
+      if (!hasProfile) {
+        setIsEditing(true);
+      }
+    }
+  }, [initialData, dataLoaded, category, hasProfile]);
 
   const handleCheckboxChange = (field: string, value: string) => {
     setFormData((prev: any) => {
@@ -60,56 +101,6 @@ export default function TeacherForm({
       }
     });
   };
-
-  // Load profile from Supabase if inside dashboard
-  useEffect(() => {
-    if (isDashboard) {
-      const fetchProfile = async () => {
-        try {
-          const { auth, db } = await import('@/utils/firebase/client');
-          const { doc, getDoc } = await import('firebase/firestore');
-          await new Promise(resolve => auth.onAuthStateChanged(resolve));
-          const user = auth.currentUser;
-          if (user) {
-            const docSnap = await getDoc(doc(db, 'tutors', user.uid));
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              setIsEditing(false);
-              setFormData({
-                fullName: data.name || '',
-                gender: data.gender || '',
-                phone: data.phone || '',
-                whatsapp: data.whatsapp || '',
-                email: data.email || '',
-                street: (data.address || '').split(',')[0]?.trim() || '',
-                city: (data.address || '').split(',')[1]?.trim() || '',
-                pincode: (data.address || '').split(',')[2]?.trim() || '',
-                qualification: data.qualification || '',
-                experience: data.experience || '',
-                occupation: data.occupation || '',
-                subjects: data.subjects ? data.subjects.join(', ') : '',
-                mode: data.mode || '',
-                description: data.teachingApproach || '',
-                studentsCount: data.studentCount || '',
-                schoolNames: data.schoolNames || '',
-                locations: data.preferredLocations || '',
-                travelKm: data.travelDistance || '',
-                feeRange: data.feeRange || '',
-                classes: data.classes || [],
-                boards: data.boards || [],
-                technologies: data.technologies || [],
-                languages: data.languagesTaught || [],
-                category: data.category || '',
-              });
-            }
-          }
-        } catch (e) {
-          console.error('Failed to load profile', e);
-        }
-      };
-      fetchProfile();
-    }
-  }, [isDashboard]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -202,10 +193,9 @@ export default function TeacherForm({
 
       localStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
+      if (onSuccess) onSuccess();
       
-      if (isDashboard) {
-        window.location.reload();
-      } else {
+      if (!isDashboard) {
         setTimeout(() => router.push('/dashboard/teacher'), 1500);
       }
     } catch (error: any) {
@@ -357,7 +347,7 @@ export default function TeacherForm({
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} onKeyDown={(e: any) => { if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA') e.preventDefault(); }} className="space-y-8">
 
         {/* CATEGORY */}
         <div>
@@ -430,6 +420,7 @@ export default function TeacherForm({
                     type="radio"
                     name="gender"
                     value={item}
+                    checked={formData.gender === item}
                     onChange={handleChange}
                   />
 
@@ -617,6 +608,7 @@ export default function TeacherForm({
                   type="radio"
                   name="occupation"
                   value={item}
+                  checked={formData.occupation === item}
                   onChange={handleChange}
                 />
 
@@ -851,6 +843,7 @@ export default function TeacherForm({
                     type="radio"
                     name="mode"
                     value={item}
+                    checked={formData.mode === item}
                     onChange={handleChange}
                   />
 
@@ -876,6 +869,7 @@ export default function TeacherForm({
             rows={4}
             name="description"
             placeholder="Describe your teaching approach"
+            value={formData.description}
             onChange={handleChange}
             className="w-full border border-slate-300 rounded-xl px-4 py-4"
           />
@@ -893,6 +887,7 @@ export default function TeacherForm({
               type="text"
               name="studentsCount"
               placeholder="No. of students"
+              value={formData.studentsCount}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -907,6 +902,7 @@ export default function TeacherForm({
               type="text"
               name="schoolNames"
               placeholder="School names"
+              value={formData.schoolNames}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -926,6 +922,7 @@ export default function TeacherForm({
               type="text"
               name="locations"
               placeholder="Area / Pincode"
+              value={formData.locations}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -940,6 +937,7 @@ export default function TeacherForm({
               type="text"
               name="travelKm"
               placeholder="Travel distance"
+              value={formData.travelKm}
               onChange={handleChange}
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
@@ -957,6 +955,7 @@ export default function TeacherForm({
             type="text"
             name="feeRange"
             placeholder="Expected monthly fees"
+            value={formData.feeRange}
             onChange={handleChange}
             className="w-full border border-slate-300 rounded-xl px-4 py-4"
           />

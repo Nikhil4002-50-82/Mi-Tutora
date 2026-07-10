@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ export default function TeacherDashboard() {
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [mainSubTab, setMainSubTab] = useState<'new_tuition'|'requests'>('new_tuition');
   const [subTab, setSubTab] = useState<string>('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,27 +63,80 @@ export default function TeacherDashboard() {
     const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', user.uid)));
     const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-    const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('status', '==', 'open'), orderBy('createdAt', 'desc')));
-    const availableStudentsRaw = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    let availableStudentsRaw: any[] = [];
+    try {
+      const requestsSnap = await getDocs(collection(db, 'students'));
+      availableStudentsRaw = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      availableStudentsRaw.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } catch(e) {
+      console.warn("Failed to fetch students", e);
+    }
 
-    const uniqueParentIds = new Set();
-    const availableStudents = availableStudentsRaw?.filter((req: any) => {
-      if (uniqueParentIds.has(req.parentId)) return false;
-      uniqueParentIds.add(req.parentId);
-      return true;
-    }) || [];
+    const availableStudents = availableStudentsRaw;
 
     const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
     
     const matchedStudents = availableStudents?.filter((student: any) => {
       if (!tutorData) return true;
-      if (!teacherCategories.includes(student.category)) return false;
       
-      if (student.category === 'school') {
-        const boardMatch = !student.board || (tutorData.boards && tutorData.boards.includes(student.board));
-        const classMatch = !student.classLevel || (tutorData.classes && tutorData.classes.includes(student.classLevel));
-        return boardMatch || classMatch;
+      const studentCat = (student.category || '').toLowerCase().trim();
+      const teacherCats = teacherCategories.map((c:string) => c.toLowerCase().trim());
+      
+      if (!teacherCats.includes(studentCat)) return false;
+      
+      if (studentCat === 'school') {
+        const studentBoard = (student.board || '').toLowerCase().trim();
+        const teacherBoards = (tutorData.boards || []).map((b:string) => b.toLowerCase().trim());
+        const boardMatch = !studentBoard || teacherBoards.includes(studentBoard);
+        
+        const studentClass = (student.classLevel || '').toLowerCase().trim();
+        const teacherClasses = (tutorData.classes || []).map((c:string) => c.toLowerCase().trim());
+        const classMatch = !studentClass || teacherClasses.includes(studentClass);
+        
+        const teacherSubjects = tutorData.subjects || [];
+        const studentSubjects = student.subjects || [];
+        let subjectMatch = false;
+        if (studentSubjects.length > 0 && teacherSubjects.length > 0) {
+          subjectMatch = studentSubjects.some((sub: string) => {
+            const normalizedSub = sub.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return teacherSubjects.some((ts: string) => {
+              const normalizedTs = ts.toLowerCase().replace(/[^a-z0-9]/g, '');
+              // Match if one contains the other, ignoring non-alphanumeric
+              if (!normalizedSub || !normalizedTs) return false;
+              return normalizedSub.includes(normalizedTs) || normalizedTs.includes(normalizedSub);
+            });
+          });
+        } else {
+          subjectMatch = studentSubjects.length === 0 || teacherSubjects.length === 0; 
+        }
+        
+        return boardMatch || classMatch || subjectMatch;
       }
+
+      if (studentCat === 'programming') {
+        const teacherTech = tutorData.technologies || [];
+        const studentTech = student.technologies || [];
+        let techMatch = false;
+        if (studentTech.length > 0 && teacherTech.length > 0) {
+          techMatch = studentTech.some((tech: string) => teacherTech.includes(tech));
+        } else {
+          techMatch = studentTech.length === 0;
+        }
+        return techMatch;
+      }
+
+      if (studentCat === 'languages') {
+        const teacherLang = tutorData.languagesTaught || tutorData.languages || [];
+        const studentLang = student.languages || [];
+        let langMatch = false;
+        if (studentLang.length > 0 && teacherLang.length > 0) {
+          langMatch = studentLang.some((lang: string) => teacherLang.includes(lang));
+        } else {
+          langMatch = studentLang.length === 0;
+        }
+        return langMatch;
+      }
+      
       return true;
     }) || [];
 
@@ -92,7 +146,8 @@ export default function TeacherDashboard() {
     const studentIds = applications.map((app: any) => app.studentId).filter(Boolean);
     let studentsInfo: any[] = [];
     if (studentIds.length > 0) {
-      const studentsQuery = query(collection(db, 'students'), where('id', 'in', studentIds.slice(0, 10)));
+      const { documentId } = await import('firebase/firestore');
+      const studentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 10)));
       const sSnap = await getDocs(studentsQuery);
       studentsInfo = sSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
     }
@@ -101,11 +156,15 @@ export default function TeacherDashboard() {
       const student = studentsInfo.find(s => s.id === app.studentId);
       return { 
         ...app, 
+        studentDetails: student,
         subjects: student?.subjects || [],
         technologies: student?.technologies || [],
         languages: student?.languages || []
       };
     }) || [];
+
+    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status));
+    const recommendedNegotiations = allNegotiations.filter(app => matchedStudents.some((s:any) => s.id === app.studentId));
 
     return {
       user,
@@ -113,15 +172,20 @@ export default function TeacherDashboard() {
       profile: tutorData,
       teacherCategories,
       availableStudents: matchedStudents,
+      allStudents: availableStudentsRaw,
+      recommendedStudents: matchedStudents,
       applications: applicationsWithSubjects,
       referrals,
-      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status)),
+      negotiations: allNegotiations,
+      allNegotiations,
+      recommendedNegotiations,
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
         student: app.studentName || 'Assigned Student',
         subject: app.category || 'General',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
-        status: app.status === 'tuition_started' ? 'confirmed' : 'pending'
+        status: app.status === 'tuition_started' ? 'confirmed' : 'pending',
+        studentDetails: app.studentDetails
       }))
     };
   };
@@ -129,8 +193,11 @@ export default function TeacherDashboard() {
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('teacherDashboardData', fetcher);
   const hasProfile = data?.userData?.hasProfile || !!data?.profile?.phone || false;
 
+  const initialRedirectDone = useRef(false);
+
   useEffect(() => {
-    if (data && !hasProfile) {
+    if (data && !hasProfile && !initialRedirectDone.current) {
+      initialRedirectDone.current = true;
       setActiveTab('find_students');
       const storedCat = localStorage.getItem('selectedCategory');
       if (!storedCat) {
@@ -228,7 +295,7 @@ export default function TeacherDashboard() {
       }
     };
     processSilentSubmission();
-  }, [data?.user, mutate]);
+  }, [data?.user?.uid, mutate]);
 
   useEffect(() => {
     if (!data?.user) return;
@@ -247,7 +314,7 @@ export default function TeacherDashboard() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [data?.user, mutate]);
+  }, [data?.user?.uid, mutate]);
 
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
@@ -275,18 +342,18 @@ export default function TeacherDashboard() {
       await addDoc(collection(db, 'applications'), {
         tutorId: user?.uid,
         tutorName: data?.profile?.name,
-        requestId: student.id,
+        requestId: '',
         parentId: student.parentId,
-        studentId: student.studentId,
-        studentName: student.studentName,
+        studentId: student.id,
+        studentName: student.name,
         currentOffer: offerPrice,
         initialBudget: student.budget,
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
         category: student.category,
-        mode: student.mode,
-        demoHours: student.preferredTimeRange || 'Flexible',
+        mode: student.preferredMode || 'flexible',
+        demoHours: student.hoursPerDay || student.preferredTimeRange || 'Flexible',
         createdAt: Date.now()
       });
 
@@ -309,26 +376,18 @@ export default function TeacherDashboard() {
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'tutor';
-      } else if (action === 'propose_schedule') {
-        updateData.demoScheduleStatus = 'proposed';
-        updateData.demoScheduleUpdatedBy = 'tutor';
-        updateData.proposedDemoDate = date;
-        updateData.proposedDemoTime = time;
-      } else if (action === 'accept_schedule') {
-        updateData.demoScheduleStatus = 'accepted';
-        updateData.scheduledDemoDate = date;
-        updateData.scheduledDemoTime = time;
       }
 
       await updateDoc(doc(db, 'applications', appId), updateData);
-      toast.success(`Successfully ${action === 'accept_schedule' || action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      toast.success(`Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+  if (!data && swrError) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold">Error loading dashboard: {swrError.message}</div>;
+  if (!data) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
 
   const handleWithdrawSubmit = async () => {
     if (!upiId.includes('@')) {
@@ -368,8 +427,8 @@ export default function TeacherDashboard() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'find_students', label: 'Find Students', icon: Users },
-    { id: 'negotiations', label: 'Negotiations', icon: MessageCircle },
+    { id: 'all', label: 'All', icon: Globe },
+    { id: 'recommendation', label: 'Recommendation', icon: Star },
     { id: 'my_students', label: 'My Students', icon: BookOpen },
     { id: 'referrals', label: 'Referrals', icon: Gift },
     { id: 'profile', label: 'Profile', icon: User },
@@ -486,234 +545,222 @@ export default function TeacherDashboard() {
                 <p className="text-gray-500 max-w-md mx-auto text-lg">Your dashboard overview is currently being updated. In the meantime, use the sidebar to find students and manage your negotiations!</p>
               </div>
             )}
-
-            {/* TAB: FIND STUDENTS */}
-            {activeTab === 'find_students' && (
+            {/* TABS: ALL & RECOMMENDATION */}
+            {(activeTab === 'all' || activeTab === 'recommendation') && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Find Students</h2>
-                
-                {data?.teacherCategories?.length > 1 && (
-                  <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto pb-1">
-                    {data?.teacherCategories?.map((cat: string) => (
-                      <button
-                        key={cat}
-                        onClick={() => setSubTab(cat)}
-                        className={`px-4 py-2 text-sm font-bold rounded-t-lg capitalize ${
-                          subTab === cat 
-                            ? "bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500" 
-                            : "text-gray-500 hover:text-gray-900"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
+                    {activeTab === 'all' ? 'All Students & Requests' : 'Recommended for You'}
+                  </h2>
+                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
+                    <button 
+                      onClick={() => setMainSubTab('new_tuition')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'new_tuition' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                      New Tuition
+                    </button>
+                    <button 
+                      onClick={() => setMainSubTab('requests')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'requests' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                      Requests
+                    </button>
+                  </div>
+                </div>
+
+                {mainSubTab === 'new_tuition' && (
+                  <div>
+                    {data?.teacherCategories?.length > 1 && (
+                      <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto pb-1">
+                        {data?.teacherCategories?.map((cat: string) => (
+                          <button
+                            key={cat}
+                            onClick={() => setSubTab(cat)}
+                            className={`px-4 py-2 text-sm font-bold rounded-t-lg capitalize ${
+                              subTab === cat 
+                                ? "bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500" 
+                                : "text-gray-500 hover:text-gray-900"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {(activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        if (!hasProfile && selectedCategory) return s.category === selectedCategory;
+                        return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
+                      }).map((student: any) => {
+                        const hasNegotiation = data?.applications?.some((app: any) => app.studentId === student.id && ['negotiating'].includes(app.status));
+                        const isPending = data?.applications?.some((app: any) => app.studentId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
+                        const isHired = data?.applications?.some((app: any) => app.studentId === student.id && ['tuition_started'].includes(app.status));
+                        
+                        if (hasNegotiation) return null; // Don't show students we are already negotiating with
+
+                        return (
+                          <div key={student.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="text-xl font-bold text-gray-900">{student.name || 'Student Profile'}</h3>
+                                <p className="text-sm font-medium text-emerald-600">{student.category} • {student.board || student.preferredMode}</p>
+                              </div>
+                              <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-100">
+                                New
+                              </span>
+                            </div>
+                            
+                            <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm flex-grow">
+                              {student.classLevel && <p><span className="text-gray-500 font-medium">Class:</span> <span className="font-semibold text-gray-900">{student.classLevel}</span></p>}
+                              {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Technologies:</span> <span className="font-semibold text-gray-900">{student.technologies.join(', ')}</span></p>}
+                              {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Languages:</span> <span className="font-semibold text-gray-900">{student.languages.join(', ')}</span></p>}
+                              {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
+                              {student.area && <p><span className="text-gray-500 font-medium">Location:</span> <span className="font-semibold text-gray-900">{student.area}</span></p>}
+                              <p><span className="text-gray-500 font-medium">Budget:</span> <span className="font-black text-emerald-600 text-base">₹{student.budget}</span></p>
+                            </div>
+
+                            <div className="flex flex-col gap-3 mt-auto">
+                              {!hasProfile ? (
+                                <button 
+                                  onClick={() => setActiveTab('profile')}
+                                  className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm"
+                                >
+                                  <User className="w-4 h-4" /> View Student
+                                </button>
+                              ) : (
+                                <>
+                                  <div className="mb-4">
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
+                                    <input 
+                                      type="number"
+                                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                                      placeholder="e.g. 500"
+                                      value={negotiationOffer[student.id] || ''}
+                                      onChange={(e) => setNegotiationOffer({...negotiationOffer, [student.id]: e.target.value})}
+                                    />
+                                  </div>
+                                  {isHired ? (
+                                    <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                      <CheckCircle2 className="w-4 h-4" /> Already Your Student
+                                    </button>
+                                  ) : isPending ? (
+                                    <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                      Pending
+                                    </button>
+                                  ) : (
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => setSelectedViewUser(student)}
+                                        className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                                      >
+                                        <User className="w-4 h-4" /> View Profile
+                                      </button>
+                                      <button 
+                                      onClick={() => handleSendOffer(student)}
+                                      className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md text-sm flex items-center justify-center gap-2"
+                                    >
+                                      <MessageCircle className="w-4 h-4" /> Send Proposal
+                                    </button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {(!((activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        if (!hasProfile && selectedCategory) return s.category === selectedCategory;
+                        return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
+                      })) || ((activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        if (!hasProfile && selectedCategory) return s.category === selectedCategory;
+                        return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
+                      }).length === 0)) && (
+                        <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+                          <Users className="w-12 h-12 text-gray-300 mb-3" />
+                          <h3 className="text-lg font-bold text-gray-900">No students found</h3>
+                          <p className="text-gray-500 max-w-sm mt-2">There are no students currently available in this category.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.availableStudents?.filter((s:any) => {
-      if (!hasProfile && selectedCategory) return s.category === selectedCategory;
-      return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-    }).map((student: any) => {
-                    const hasNegotiation = data?.applications?.some((app: any) => app.requestId === student.id && ['negotiating'].includes(app.status));
-                    const isPending = data?.applications?.some((app: any) => app.requestId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
-                    const isHired = data?.applications?.some((app: any) => app.requestId === student.id && ['tuition_started'].includes(app.status));
-                    
-                    if (hasNegotiation) return null; // Don't show students we are already negotiating with
-
-                    return (
-                      <div key={student.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">{student.studentName || 'Student Request'}</h3>
-                            <p className="text-sm font-medium text-emerald-600">{student.category} • {student.board || student.mode}</p>
-                          </div>
-                          <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-100">
-                            New
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
-                          {student.classLevel && <p><span className="text-gray-500 font-medium">Class:</span> <span className="font-semibold text-gray-900">{student.classLevel}</span></p>}
-                          {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Technologies:</span> <span className="font-semibold text-gray-900">{student.technologies.join(', ')}</span></p>}
-                          {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Languages:</span> <span className="font-semibold text-gray-900">{student.languages.join(', ')}</span></p>}
-                          {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
-                          {student.area && <p><span className="text-gray-500 font-medium">Location:</span> <span className="font-semibold text-gray-900">{student.area}</span></p>}
-                          <p><span className="text-gray-500 font-medium">Budget:</span> <span className="font-black text-emerald-600 text-base">₹{student.budget}</span></p>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                          {!hasProfile ? (
-                            <button 
-                              onClick={() => setActiveTab('profile')}
-                              className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm"
-                            >
-                              <User className="w-4 h-4" /> View Student
-                            </button>
-                          ) : (
-                            <>
-                              <div className="mb-4">
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
-                                <input 
-                                  type="number"
-                                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                                  placeholder="e.g. 500"
-                                  value={negotiationOffer[student.id] || ''}
-                                  onChange={(e) => setNegotiationOffer({...negotiationOffer, [student.id]: e.target.value})}
-                                />
+                {mainSubTab === 'requests' && (
+                  <div>
+                    {((activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.length ?? 0) > 0 ? (
+                      <div className="space-y-4">
+                        {(activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.map((neg: any) => (
+                          <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
+                            <div>
+                              <h4 className="font-bold text-lg text-gray-900">{neg.studentName}</h4>
+                              <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
+                              {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
+                              {neg.category === 'languages' && neg.languages && neg.languages.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languages.join(', ')}</p>}
+                              {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
+                              <div className="text-center w-full sm:w-auto">
+                                <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
+                                <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
                               </div>
-                              {isHired ? (
-                                <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                  <CheckCircle2 className="w-4 h-4" /> Already Your Student
-                                </button>
-                              ) : isPending ? (
-                                <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                  Pending
-                                </button>
-                              ) : (
-                                <div className="flex gap-2">
-                                  <button 
-                                    onClick={() => setSelectedViewUser(student)}
-                                    className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
-                                  >
-                                    <User className="w-4 h-4" /> View Profile
-                                  </button>
-                                  <button 
-                                  onClick={() => handleSendOffer(student)}
-                                  className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md text-sm flex items-center justify-center gap-2"
-                                >
-                                  <MessageCircle className="w-4 h-4" /> Send Proposal
-                                </button>
+                              
+                              {/* Price Negotiation Logic */}
+                              {neg.status === 'negotiating' && (
+                                neg.lastUpdatedBy === 'student' ? (
+                                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
+                                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                    >
+                                      Accept Price
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setModalConfig({
+                                          isOpen: true,
+                                          type: 'price',
+                                          title: 'Counter Offer',
+                                          description: 'Propose a new monthly fee for this student.',
+                                          placeholder: 'e.g. 500',
+                                          initialValue: neg.currentOffer?.toString() || '',
+                                          onSubmit: (val: string) => {
+                                            setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
+                                          }
+                                        });
+                                      }}
+                                      className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                    >
+                                      Counter Offer
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                    <p className="text-sm font-semibold text-gray-600">Waiting for student response...</p>
+                                  </div>
+                                )
+                              )}
+
+                              {/* Direct Payment Waiting */}
+                              {neg.status === 'demo_pending_payment' && (
+                                <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                  <p className="text-sm font-semibold text-emerald-600">Waiting for student to complete payment...</p>
                                 </div>
                               )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(!data?.availableStudents || data?.availableStudents?.filter((s:any) => {
-      if (!hasProfile && selectedCategory) return s.category === selectedCategory;
-      return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-    }).length === 0) && (
-                    <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
-                      <Users className="w-12 h-12 text-gray-300 mb-3" />
-                      <h3 className="text-lg font-bold text-gray-900">No matching students found</h3>
-                      <p className="text-gray-500 max-w-sm mt-2">We'll notify you when new students matching your profile requirements post a request.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-                    {/* TAB: NEGOTIATIONS */}
-            {activeTab === 'negotiations' && (
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Negotiations & Scheduling</h2>
-                
-                {(data?.negotiations?.length ?? 0) > 0 ? (
-                  <div className="space-y-4">
-                    {data?.negotiations?.map((neg: any) => (
-                      <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div>
-                          <h4 className="font-bold text-lg text-gray-900">{neg.studentName}</h4>
-                          <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
-                          {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
-                          {neg.category === 'languages' && neg.languages && neg.languages.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languages.join(', ')}</p>}
-                          {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
-                          {neg.status === 'scheduling' && (
-                            <div className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
-                              <p><span className="font-bold">Student requested:</span> {neg.demoHours}</p>
-                              {neg.proposedSchedule && <p><span className="font-bold text-emerald-700">You Proposed:</span> {neg.proposedSchedule}</p>}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
-                          <div className="text-center w-full sm:w-auto">
-                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                            <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
                           </div>
-                          
-                          {/* Price Negotiation Logic */}
-                          {neg.status === 'negotiating' && (
-                            neg.lastUpdatedBy === 'student' ? (
-                              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                <button 
-                                  onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
-                                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-                                >
-                                  Accept Price
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setModalConfig({
-                                      isOpen: true,
-                                      type: 'price',
-                                      title: 'Counter Offer',
-                                      description: 'Propose a new monthly fee for this student.',
-                                      placeholder: 'e.g. 500',
-                                      initialValue: neg.currentOffer?.toString() || '',
-                                      onSubmit: (val: string) => {
-                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
-                                      }
-                                    });
-                                  }}
-                                  className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
-                                >
-                                  Counter Offer
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                <p className="text-sm font-semibold text-gray-600">Waiting for student response...</p>
-                              </div>
-                            )
-                          )}
-
-                          {/* Scheduling Logic */}
-                          {neg.status === 'demo_pending_payment' && (
-                            neg.demoScheduleUpdatedBy === 'student' && neg.demoScheduleStatus === 'proposed' ? (
-                              <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                {(neg.proposedDemoDate || neg.proposedDemoTime) && (
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedDemoDate, neg.proposedDemoTime)}
-                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-                                  >
-                                    Accept Timings
-                                  </button>
-                                )}
-                                <button 
-                                  onClick={() => {
-                                    setModalConfig({
-                                      isOpen: true,
-                                      type: 'timing',
-                                      title: 'Propose Timings',
-                                      description: 'Suggest your preferred class timings.',
-                                      placeholder: 'e.g. Mon & Wed 5 PM - 6 PM',
-                                      initialValue: '',
-                                      onSubmit: (val: string, date?: string, time?: string) => {
-                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, date, time);
-                                      }
-                                    });
-                                  }}
-                                  className="w-full sm:w-auto bg-[#063831] hover:bg-[#04241f] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"
-                                >
-                                  {neg.proposedSchedule ? 'Change Timings' : 'Propose Timings'}
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                <p className="text-sm font-semibold text-gray-600">Waiting for student to confirm timings...</p>
-                              </div>
-                            )
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center mt-4">
+                        <MessageCircle className="w-12 h-12 text-gray-300 mb-3" />
+                        <h3 className="text-lg font-bold text-gray-900">No active negotiations</h3>
+                        <p className="text-gray-500 max-w-sm mt-2">You don't have any ongoing proposals or requests here.</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-gray-500 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">No active negotiations.</p>
                 )}
               </div>
             )}
@@ -730,6 +777,16 @@ export default function TeacherDashboard() {
                           <div>
                             <p className="text-lg font-bold text-[#063831] truncate mb-1">{cls.subject}</p>
                             <p className="text-sm font-medium text-gray-500">Student: <span className="text-gray-900 font-bold">{cls.student}</span></p>
+                            {cls.status === 'confirmed' && cls.studentDetails && (
+                              <div className="mt-3 space-y-1 text-sm text-gray-600 bg-emerald-50/50 p-3 rounded-lg border border-emerald-100/50">
+                                {cls.studentDetails.phoneNumber && <p><span className="font-semibold text-emerald-800">Phone:</span> {cls.studentDetails.phoneNumber}</p>}
+                                {cls.studentDetails.whatsappNumber && <p><span className="font-semibold text-emerald-800">WhatsApp:</span> {cls.studentDetails.whatsappNumber}</p>}
+                                {cls.studentDetails.email && <p><span className="font-semibold text-emerald-800">Email:</span> {cls.studentDetails.email}</p>}
+                                {cls.studentDetails.address && <p><span className="font-semibold text-emerald-800">Address:</span> {cls.studentDetails.address}</p>}
+                                {cls.studentDetails.classLevel && <p><span className="font-semibold text-emerald-800">Class:</span> {cls.studentDetails.classLevel}</p>}
+                                {cls.studentDetails.board && <p><span className="font-semibold text-emerald-800">Board:</span> {cls.studentDetails.board}</p>}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-4">
                             <span className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border ${
@@ -831,7 +888,7 @@ export default function TeacherDashboard() {
                     <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
                   </div>
                 )}
-                <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} />
+                <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} initialData={data?.profile} onSuccess={() => mutate()} />
               </div>
             )}
 

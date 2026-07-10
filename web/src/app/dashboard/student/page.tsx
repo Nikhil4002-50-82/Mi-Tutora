@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { BookOpen, Users, LayoutDashboard, LogOut, ShieldCheck, User, Gift, Lock, CheckCircle2, MessageCircle, Menu, X } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock } from 'lucide-react';
 import DemoForm from '@/components/DemoForm';
 import ActionModal from '@/components/ActionModal';
 import { toast } from 'sonner';
@@ -25,6 +25,8 @@ export default function StudentDashboard() {
   const [useWallet, setUseWallet] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [withdrawModal, setWithdrawModal] = useState(false);
+  const [mainSubTab, setMainSubTab] = useState<'new_tuition'|'requests'>('new_tuition');
+  const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
@@ -110,20 +112,25 @@ export default function StudentDashboard() {
     if (tutorIds.length > 0) {
        // Note: In Firestore, 'in' queries max out at 10 items. For a robust implementation we might fetch individual docs or chunk.
        // Assuming <10 for this demo context.
-       const tutorsQuery = query(collection(db, 'tutors'), where('id', 'in', tutorIds.slice(0, 10)));
+       const { documentId } = await import('firebase/firestore');
+       const tutorsQuery = query(collection(db, 'tutors'), where(documentId(), 'in', tutorIds.slice(0, 10)));
        const tSnap = await getDocs(tutorsQuery);
-       tutorsInfo = tSnap.docs.map(d => d.data());
+       tutorsInfo = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
     const applicationsWithSubjects = applications.map((app: any) => {
       const tutor = tutorsInfo.find(t => t.id === app.tutorId);
       return { 
         ...app, 
+        tutorDetails: tutor,
         subjects: tutor?.subjects || [],
         technologies: tutor?.technologies || [],
         languagesTaught: tutor?.languagesTaught || []
       };
     }) || [];
+
+    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status));
+    const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorId));
 
     return {
       user,
@@ -133,15 +140,20 @@ export default function StudentDashboard() {
       myRequest,
       applications: applicationsWithSubjects,
       availableTeachers: matchedTutors,
+      allTutors: availableTutors,
+      recommendedTutors: matchedTutors,
       referrals,
-      negotiations: applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status)),
+      negotiations: allNegotiations,
+      allNegotiations,
+      recommendedNegotiations,
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
         subject: app.category || 'General',
         teacher: app.tutorName || 'Assigned Tutor',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
         status: app.status,
-        finalPrice: app.finalPrice || app.currentOffer || 4000
+        finalPrice: app.finalPrice || app.currentOffer || 4000,
+        tutorDetails: app.tutorDetails
       }))
     };
   };
@@ -149,8 +161,11 @@ export default function StudentDashboard() {
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('studentDashboardData', fetcher);
   const hasProfile = data?.userData?.hasProfile || !!data?.myStudent || false;
 
+  const initialRedirectDone = useRef(false);
+
   useEffect(() => {
-    if (data && !hasProfile) {
+    if (data && !hasProfile && !initialRedirectDone.current) {
+      initialRedirectDone.current = true;
       setActiveTab('find_tutors');
       const storedCat = localStorage.getItem('selectedCategory');
       if (!storedCat) {
@@ -330,7 +345,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, date?: string, time?: string) => {
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number) => {
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc } = await import('firebase/firestore');
@@ -342,19 +357,10 @@ export default function StudentDashboard() {
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'student';
-      } else if (action === 'propose_schedule') {
-        updateData.demoScheduleStatus = 'proposed';
-        updateData.demoScheduleUpdatedBy = 'student';
-        updateData.proposedDemoDate = date;
-        updateData.proposedDemoTime = time;
-      } else if (action === 'accept_schedule') {
-        updateData.demoScheduleStatus = 'accepted';
-        updateData.scheduledDemoDate = date;
-        updateData.scheduledDemoTime = time;
       }
 
       await updateDoc(doc(db, 'applications', appId), updateData);
-      toast.success(`Successfully ${action === 'accept_schedule' || action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      toast.success(`Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
@@ -388,8 +394,12 @@ export default function StudentDashboard() {
         await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
       }
 
-      // Update application to demo_booked
-      await updateDoc(doc(db, 'applications', payingClass.id), { status: 'demo_booked', demoPaymentPaid: true });
+      // Update application directly to tuition_started
+      await updateDoc(doc(db, 'applications', payingClass.id), { 
+        status: 'tuition_started', 
+        demoPaymentPaid: true,
+        startDate: new Date().toLocaleDateString('en-GB')
+      });
 
       toast.success("Payment completed successfully!");
       setPayingClass(null);
@@ -440,11 +450,11 @@ export default function StudentDashboard() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'find_tutors', label: 'Find Tutors', icon: Users },
-    { id: 'negotiations', label: 'Negotiations', icon: MessageCircle },
+    { id: 'all', label: 'All', icon: Globe },
+    { id: 'recommendation', label: 'Recommendation', icon: Star },
     { id: 'my_teachers', label: 'My Teachers', icon: BookOpen },
     { id: 'referrals', label: 'Referrals', icon: Gift },
-    { id: 'profile', label: 'Profile Settings', icon: User },
+    { id: 'profile', label: 'Profile', icon: User },
   ];
 
   return (
@@ -559,203 +569,194 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* TAB: FIND TUTORS */}
-            {activeTab === 'find_tutors' && (
+            {/* TABS: ALL & RECOMMENDATION */}
+            {(activeTab === 'all' || activeTab === 'recommendation') && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Find Your Perfect Tutor</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.availableTeachers?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
-                    const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
-                    const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
-                    const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
-                    
-                    if (hasNegotiation) return null; // Already negotiating
-                    
-                    return (
-                      <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
-                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
-                            {teacher.mode || 'Online'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.teachingApproach || 'Experienced Tutor'}</p>
-                        <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                          {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-gray-700">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
-                          {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
-                          {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
-                          {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
-                          <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
-                        </div>
-                        
-                        <div className="flex flex-col gap-3">
-                          {!hasProfile ? (
-                            <button 
-                              onClick={() => setActiveTab('profile')}
-                              className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
-                            >
-                              <User className="w-4 h-4" /> View Teacher
-                            </button>
-                          ) : (
-                            <>
-                              <div className="mb-4">
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
-                                <input 
-                                  type="number"
-                                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                                  placeholder="e.g. 500"
-                                  value={negotiationOffer[teacher.id] || ''}
-                                  onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
-                                />
-                              </div>
-                              {isHired ? (
-                                <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                  <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
-                                </button>
-                              ) : isPending ? (
-                                <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                  Pending
-                                </button>
-                              ) : (
-                                <div className="flex gap-2">
-                                  <button 
-                                    onClick={() => setSelectedViewUser(teacher)}
-                                    className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
-                                  >
-                                    <User className="w-4 h-4" /> View Profile
-                                  </button>
-                                  <button 
-                                  onClick={() => handleRequestTutor(teacher)}
-                                  className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
-                                >
-                                  <MessageCircle className="w-4 h-4" /> Request & Offer
-                                </button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(!data?.availableTeachers || data?.availableTeachers?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0) && (
-                    <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
-                      <Users className="w-12 h-12 text-gray-300 mb-3" />
-                      <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>
-                      <p className="text-gray-500 max-w-sm mt-2">We couldn't find tutors matching your exact requirements right now.</p>
-                    </div>
-                  )}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
+                    {activeTab === 'all' ? 'All Tutors & Requests' : 'Recommended for You'}
+                  </h2>
+                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
+                    <button 
+                      onClick={() => setMainSubTab('new_tuition')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'new_tuition' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                      New Tuition
+                    </button>
+                    <button 
+                      onClick={() => setMainSubTab('requests')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'requests' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                      Requests
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* TAB: NEGOTIATIONS */}
-            {activeTab === 'negotiations' && (
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Negotiations & Scheduling</h2>
-                
-                {(data?.negotiations?.length ?? 0) > 0 ? (
-                  <div className="space-y-4">
-                    {data?.negotiations?.map((neg: any) => (
-                      <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div>
-                          <h4 className="font-bold text-lg text-gray-900">Tutor: {neg.tutorName}</h4>
-                          <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
-                          {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
-                          {neg.category === 'languages' && neg.languagesTaught && neg.languagesTaught.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languagesTaught.join(', ')}</p>}
-                          {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
-                          {neg.status === 'scheduling' && (
-                            <div className="mt-2 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
-                              <p><span className="font-bold">You requested:</span> {neg.demoHours}</p>
-                              {neg.proposedSchedule && <p><span className="font-bold text-emerald-700">Tutor Proposed:</span> {neg.proposedSchedule}</p>}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
-                          <div className="text-center w-full sm:w-auto">
-                            <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                            <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
+                {mainSubTab === 'new_tuition' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(activeTab === 'all' ? data?.allTutors : data?.recommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
+                      const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
+                      const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
+                      const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
+                      
+                      if (hasNegotiation) return null; // Already negotiating
+                      
+                      return (
+                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
+                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                              {teacher.mode || 'Online'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.teachingApproach || 'Experienced Tutor'}</p>
+                          <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
+                            {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-gray-700">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
+                            {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
+                            {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
+                            {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
+                            <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
                           </div>
                           
-                          {/* Price Negotiation Logic */}
-                          {neg.status === 'negotiating' && (
-                            neg.lastUpdatedBy === 'tutor' ? (
-                              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                <button 
-                                  onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
-                                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-                                >
-                                  Accept Price
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setModalConfig({
-                                      isOpen: true,
-                                      type: 'price',
-                                      title: 'Counter Offer',
-                                      description: 'Propose a new monthly fee for this tutor.',
-                                      placeholder: 'e.g. 500',
-                                      initialValue: neg.currentOffer?.toString() || '',
-                                      onSubmit: (val: string) => {
-                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
-                                      }
-                                    });
-                                  }}
-                                  className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
-                                >
-                                  Counter Offer
-                                </button>
-                              </div>
+                          <div className="flex flex-col gap-3 mt-auto">
+                            {!hasProfile ? (
+                              <button 
+                                onClick={() => setActiveTab('profile')}
+                                className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                              >
+                                <User className="w-4 h-4" /> View Teacher
+                              </button>
                             ) : (
-                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor response...</p>
-                              </div>
-                            )
-                          )}
-
-                          {/* Scheduling Logic */}
-                          {neg.status === 'demo_pending_payment' && (
-                            neg.demoScheduleUpdatedBy === 'tutor' && neg.demoScheduleStatus === 'proposed' ? (
-                              <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                <button 
-                                  onClick={() => handleNegotiationAction(neg.id, 'accept_schedule', 0, neg.proposedDemoDate, neg.proposedDemoTime)}
-                                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"
-                                >
-                                  Accept Timings
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setModalConfig({
-                                      isOpen: true,
-                                      type: 'timing',
-                                      title: 'Propose Timings',
-                                      description: 'Suggest your preferred class timings.',
-                                      placeholder: 'e.g. Mon, Wed, Fri 6PM-7PM',
-                                      initialValue: '',
-                                      onSubmit: (val: string, date?: string, time?: string) => {
-                                        setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                        handleNegotiationAction(neg.id, 'propose_schedule', 0, date, time);
-                                      }
-                                    });
-                                  }}
-                                  className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm"
-                                >
-                                  Change Timings
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                <p className="text-sm font-semibold text-gray-600">Waiting for tutor response on timings...</p>
-                              </div>
-                            )
-                          )}
+                              <>
+                                <div className="mb-4">
+                                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
+                                  <input 
+                                    type="number"
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                                    placeholder="e.g. 500"
+                                    value={negotiationOffer[teacher.id] || ''}
+                                    onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
+                                  />
+                                </div>
+                                {isHired ? (
+                                  <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                    <CheckCircle2 className="w-4 h-4" /> Already Your Teacher
+                                  </button>
+                                ) : isPending ? (
+                                  <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                    Pending
+                                  </button>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => setSelectedViewUser(teacher)}
+                                      className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                                    >
+                                      <User className="w-4 h-4" /> View Profile
+                                    </button>
+                                    <button 
+                                    onClick={() => handleRequestTutor(teacher)}
+                                    className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                                  >
+                                    <MessageCircle className="w-4 h-4" /> Request & Offer
+                                  </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
+                      );
+                    })}
+                    {(!((activeTab === 'all' ? data?.allTutors : data?.recommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory)))) || ((activeTab === 'all' ? data?.allTutors : data?.recommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0)) && (
+                      <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+                        <Users className="w-12 h-12 text-gray-300 mb-3" />
+                        <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>
+                        <p className="text-gray-500 max-w-sm mt-2">We couldn't find tutors matching your exact requirements right now.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
-                ) : (
-                  <p className="text-gray-500 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">No active negotiations.</p>
+                )}
+
+                {mainSubTab === 'requests' && (
+                  <div>
+                    {((activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.length ?? 0) > 0 ? (
+                      <div className="space-y-4">
+                        {(activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.map((neg: any) => (
+                          <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
+                            <div>
+                              <h4 className="font-bold text-lg text-gray-900">Tutor: {neg.tutorName}</h4>
+                              <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
+                              {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
+                              {neg.category === 'languages' && neg.languagesTaught && neg.languagesTaught.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languagesTaught.join(', ')}</p>}
+                              {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
+                              <div className="text-center w-full sm:w-auto">
+                                <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
+                                <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
+                              </div>
+                              
+                              {/* Price Negotiation Logic */}
+                              {neg.status === 'negotiating' && (
+                                neg.lastUpdatedBy === 'tutor' ? (
+                                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
+                                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                    >
+                                      Accept Price
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setModalConfig({
+                                          isOpen: true,
+                                          type: 'price',
+                                          title: 'Counter Offer',
+                                          description: 'Propose a new monthly fee for this tutor.',
+                                          placeholder: 'e.g. 500',
+                                          initialValue: neg.currentOffer?.toString() || '',
+                                          onSubmit: (val: string) => {
+                                            setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
+                                          }
+                                        });
+                                      }}
+                                      className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                    >
+                                      Counter Offer
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                    <p className="text-sm font-semibold text-gray-600">Waiting for tutor response...</p>
+                                  </div>
+                                )
+                              )}
+
+                              {/* Direct Payment */}
+                              {neg.status === 'demo_pending_payment' && (
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                  <button 
+                                    onClick={() => setPayingClass(neg)}
+                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                  >
+                                    <Lock className="w-4 h-4" /> Pay Fee
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center mt-4">
+                        <MessageCircle className="w-12 h-12 text-gray-300 mb-3" />
+                        <h3 className="text-lg font-bold text-gray-900">No active negotiations</h3>
+                        <p className="text-gray-500 max-w-sm mt-2">You don't have any ongoing proposals or requests here.</p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -772,6 +773,16 @@ export default function StudentDashboard() {
                           <div>
                             <p className="text-lg font-bold text-[#063831] truncate mb-1">{cls.subject}</p>
                             <p className="text-sm font-medium text-gray-500">Tutor: <span className="text-gray-900 font-bold">{cls.teacher}</span></p>
+                            {cls.status === 'tuition_started' && cls.tutorDetails && (
+                              <div className="mt-3 space-y-1 text-sm text-gray-600 bg-emerald-50/50 p-3 rounded-lg border border-emerald-100/50">
+                                {cls.tutorDetails.phone && <p><span className="font-semibold text-emerald-800">Phone:</span> {cls.tutorDetails.phone}</p>}
+                                {cls.tutorDetails.whatsapp && <p><span className="font-semibold text-emerald-800">WhatsApp:</span> {cls.tutorDetails.whatsapp}</p>}
+                                {cls.tutorDetails.email && <p><span className="font-semibold text-emerald-800">Email:</span> {cls.tutorDetails.email}</p>}
+                                {cls.tutorDetails.address && <p><span className="font-semibold text-emerald-800">Address:</span> {cls.tutorDetails.address}</p>}
+                                {cls.tutorDetails.qualification && <p><span className="font-semibold text-emerald-800">Qualification:</span> {cls.tutorDetails.qualification}</p>}
+                                {cls.tutorDetails.experience && <p><span className="font-semibold text-emerald-800">Experience:</span> {cls.tutorDetails.experience}</p>}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-4">
                             <span className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border ${
@@ -781,7 +792,7 @@ export default function StudentDashboard() {
                             }`}>
                             {cls.status === 'demo_pending_payment' ? (
                               <button onClick={() => setPayingClass(cls)} className="text-orange-700 font-bold hover:text-orange-800 uppercase tracking-wider">
-                                Pay Demo Fee
+                                Pay Fee
                               </button>
                             ) : (
                               <span>{cls.status}</span>
@@ -879,7 +890,7 @@ export default function StudentDashboard() {
                     <Lock className="w-4 h-4" /> Please submit a demo request profile to unlock the rest of your dashboard!
                   </div>
                 )}
-                <DemoForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} />
+                <DemoForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} onSuccess={() => mutate()} />
               </div>
             )}
 
