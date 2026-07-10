@@ -73,9 +73,10 @@ export default function DemoForm({
               const requestDocs = requestSnap.docs.map(d => d.data());
               requestDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
               const requestData = requestDocs[0] || {};
-              if (studentData && !requestSnap.empty) {
+              if (studentData) {
                 setIsEditing(false);
-                setFormData({
+                setFormData(prev => ({
+                  ...prev,
                   fullName: studentData.name || '',
                   gender: studentData.gender || '',
                   phone: studentData.phoneNumber || '',
@@ -100,7 +101,12 @@ export default function DemoForm({
                   category: studentData.category || '',
                   technologies: studentData.technologies || [],
                   languages: studentData.languages || [],
-                });
+                }));
+              } else if (parentData) {
+                setFormData(prev => ({
+                  ...prev,
+                  parentName: parentData.name || ''
+                }));
               }
             } else {
               // Pre-fill name and email from auth user metadata if they don't have a profile yet
