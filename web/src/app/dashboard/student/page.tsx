@@ -975,11 +975,23 @@ export default function StudentDashboard() {
                         <button onClick={() => { setActiveStudentId(''); setEditingStudentId(''); }} className="font-bold underline">Cancel</button>
                       </div>
                     )}
-                    <DemoForm isDashboard={true} hasProfile={hasProfile && activeStudentId !== 'new'} category={selectedCategory} activeStudentId={editingStudentId || activeStudentId} onSuccess={() => {
-                      if(activeStudentId === 'new') setActiveStudentId('');
-                      if(editingStudentId) setEditingStudentId('');
-                      mutate();
-                    }} />
+                    <DemoForm 
+                      key={(editingStudentId || activeStudentId) || 'default'}
+                      isDashboard={true} 
+                      hasProfile={hasProfile && activeStudentId !== 'new'} 
+                      category={selectedCategory} 
+                      activeStudentId={editingStudentId || activeStudentId} 
+                      initialData={
+                        (editingStudentId || activeStudentId) !== 'new' && (editingStudentId || activeStudentId) !== '' 
+                          ? allStudents.find((s:any) => s.id === (editingStudentId || activeStudentId)) 
+                          : ((editingStudentId || activeStudentId) === '' ? allStudents[0] : null)
+                      }
+                      onSuccess={() => {
+                        if(activeStudentId === 'new') setActiveStudentId('');
+                        if(editingStudentId) setEditingStudentId('');
+                        mutate();
+                      }} 
+                    />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

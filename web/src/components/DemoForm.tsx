@@ -12,6 +12,7 @@ interface Props {
   hasProfile?: boolean;
   onSuccess?: () => void;
   activeStudentId?: string;
+  initialData?: any;
 }
 
 export default function DemoForm({
@@ -20,12 +21,39 @@ export default function DemoForm({
   hasProfile = false,
   onSuccess,
   activeStudentId,
+  initialData,
 }: Props) {
 
-  const [isEditing, setIsEditing] = useState(!hasProfile);
-  const [sameAsPhone, setSameAsPhone] = useState(false);
-  const [formData, setFormData] =
-    useState({
+  const getInitialFormData = () => {
+    if (initialData) {
+      return {
+        fullName: initialData.name || '',
+        gender: initialData.gender || '',
+        phone: initialData.phoneNumber || '',
+        whatsapp: initialData.whatsappNumber || '',
+        email: initialData.email || '',
+        addressFlat: initialData.address?.split(', ')[0] || '',
+        addressStreet: initialData.address?.split(', ')[1] || initialData.address || '',
+        addressPincode: initialData.address?.split(', ')[2] || '',
+        studentType: initialData.studentType || '',
+        classGrade: initialData.classLevel || '',
+        parentName: '',
+        demoMode: initialData.preferredMode || '',
+        board: initialData.board || '',
+        subjects: initialData.subjects ? initialData.subjects.join(', ') : '',
+        classMode: '',
+        hours: initialData.hoursPerDay || '',
+        days: initialData.daysPerWeek || '',
+        goal: initialData.learningGoal || '',
+        source: '',
+        requirements: initialData.specialRequirements || '',
+        budget: initialData.budget?.toString() || '',
+        category: initialData.category || category || '',
+        technologies: initialData.technologies || [],
+        languages: initialData.languages || [],
+      };
+    }
+    return {
       fullName: '',
       gender: '',
       phone: '',
@@ -50,11 +78,16 @@ export default function DemoForm({
       category: category || '',
       technologies: [] as string[],
       languages: [] as string[],
-    });
+    };
+  };
 
-  // Load profile from Supabase if inside dashboard
+  const [isEditing, setIsEditing] = useState(!hasProfile || !initialData);
+  const [sameAsPhone, setSameAsPhone] = useState(false);
+  const [formData, setFormData] = useState(getInitialFormData());
+
+  // Load profile from Supabase if inside dashboard and no initialData provided
   useEffect(() => {
-    if (isDashboard) {
+    if (isDashboard && !initialData) {
       const fetchProfile = async () => {
         try {
           const { auth, db } = await import('@/utils/firebase/client');
@@ -167,7 +200,7 @@ export default function DemoForm({
       };
       fetchProfile();
     }
-  }, [isDashboard, hasProfile, activeStudentId]);
+  }, [isDashboard, hasProfile, activeStudentId, initialData]);
 
   const handleCheckboxChange = (field: string, value: string) => {
     setFormData((prev: any) => {
