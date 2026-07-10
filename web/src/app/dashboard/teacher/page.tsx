@@ -18,7 +18,7 @@ export default function TeacherDashboard() {
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [mainSubTab, setMainSubTab] = useState<'new_tuition'|'requests'>('new_tuition');
+  const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
   const [subTab, setSubTab] = useState<string>('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -198,7 +198,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (data && !hasProfile && !initialRedirectDone.current) {
       initialRedirectDone.current = true;
-      setActiveTab('find_students');
+      setActiveTab('new_tuition');
       const storedCat = localStorage.getItem('selectedCategory');
       if (!storedCat) {
         setShowCategoryPopup(true);
@@ -427,8 +427,8 @@ export default function TeacherDashboard() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'all', label: 'All', icon: Globe },
-    { id: 'recommendation', label: 'Recommendation', icon: Star },
+    { id: 'new_tuition', label: 'New Tuition', icon: Globe },
+    { id: 'requests', label: 'Requests', icon: MessageCircle },
     { id: 'my_students', label: 'My Students', icon: BookOpen },
     { id: 'referrals', label: 'Referrals', icon: Gift },
     { id: 'profile', label: 'Profile', icon: User },
@@ -545,32 +545,31 @@ export default function TeacherDashboard() {
                 <p className="text-gray-500 max-w-md mx-auto text-lg">Your dashboard overview is currently being updated. In the meantime, use the sidebar to find students and manage your negotiations!</p>
               </div>
             )}
-            {/* TABS: ALL & RECOMMENDATION */}
-            {(activeTab === 'all' || activeTab === 'recommendation') && (
+            {/* TAB: NEW TUITION */}
+            {activeTab === 'new_tuition' && (
               <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
-                    {activeTab === 'all' ? 'All Students & Requests' : 'Recommended for You'}
+                    {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
                   </h2>
                   <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
                     <button 
-                      onClick={() => setMainSubTab('new_tuition')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'new_tuition' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => setTuitionSubTab('all')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
-                      New Tuition
+                      All
                     </button>
                     <button 
-                      onClick={() => setMainSubTab('requests')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${mainSubTab === 'requests' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => setTuitionSubTab('recommendation')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
-                      Requests
+                      Recommendation
                     </button>
                   </div>
                 </div>
 
-                {mainSubTab === 'new_tuition' && (
-                  <div>
-                    {data?.teacherCategories?.length > 1 && (
+                <div>
+                  {data?.teacherCategories?.length > 1 && (
                       <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto pb-1">
                         {data?.teacherCategories?.map((cat: string) => (
                           <button
@@ -589,91 +588,113 @@ export default function TeacherDashboard() {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
-                        if (!hasProfile && selectedCategory) return s.category === selectedCategory;
-                        return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-                      }).map((student: any) => {
-                        const hasNegotiation = data?.applications?.some((app: any) => app.studentId === student.id && ['negotiating'].includes(app.status));
-                        const isPending = data?.applications?.some((app: any) => app.studentId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
-                        const isHired = data?.applications?.some((app: any) => app.studentId === student.id && ['tuition_started'].includes(app.status));
-                        
-                        if (hasNegotiation) return null; // Don't show students we are already negotiating with
+                      {(() => {
+                        const studentsList = (tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                          if (!hasProfile && selectedCategory) return s.category === selectedCategory;
+                          return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
+                        }) || [];
 
-                        return (
-                          <div key={student.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full">
-                            <div className="flex justify-between items-start mb-4">
+                        const grouped = studentsList.reduce((acc: any, student: any) => {
+                          const hasNegotiation = data?.applications?.some((app: any) => app.studentId === student.id && ['negotiating'].includes(app.status));
+                          if (hasNegotiation) return acc;
+                          if (!acc[student.parentId]) {
+                            acc[student.parentId] = {
+                              parentId: student.parentId,
+                              address: student.area || student.address || 'Location Hidden',
+                              students: []
+                            };
+                          }
+                          acc[student.parentId].students.push(student);
+                          return acc;
+                        }, {});
+
+                        const households = Object.values(grouped) as any[];
+
+                        return households.map((household: any) => (
+                          <div key={household.parentId} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
+                            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center">
                               <div>
-                                <h3 className="text-xl font-bold text-gray-900">{student.name || 'Student Profile'}</h3>
-                                <p className="text-sm font-medium text-emerald-600">{student.category} • {student.board || student.preferredMode}</p>
+                                <h3 className="text-lg font-black text-gray-900">Household / Parent</h3>
+                                <p className="text-sm font-medium text-emerald-600">{household.students.length} Student(s) • {household.address}</p>
                               </div>
-                              <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-100">
-                                New
+                              <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                                New Request
                               </span>
                             </div>
                             
-                            <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm flex-grow">
-                              {student.classLevel && <p><span className="text-gray-500 font-medium">Class:</span> <span className="font-semibold text-gray-900">{student.classLevel}</span></p>}
-                              {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Technologies:</span> <span className="font-semibold text-gray-900">{student.technologies.join(', ')}</span></p>}
-                              {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Languages:</span> <span className="font-semibold text-gray-900">{student.languages.join(', ')}</span></p>}
-                              {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <p><span className="text-gray-500 font-medium">Subjects:</span> <span className="font-semibold text-gray-900">{student.subjects.join(', ')}</span></p>}
-                              {student.area && <p><span className="text-gray-500 font-medium">Location:</span> <span className="font-semibold text-gray-900">{student.area}</span></p>}
-                              <p><span className="text-gray-500 font-medium">Budget:</span> <span className="font-black text-emerald-600 text-base">₹{student.budget}</span></p>
-                            </div>
-
-                            <div className="flex flex-col gap-3 mt-auto">
-                              {!hasProfile ? (
-                                <button 
-                                  onClick={() => setActiveTab('profile')}
-                                  className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm"
-                                >
-                                  <User className="w-4 h-4" /> View Student
-                                </button>
-                              ) : (
-                                <>
-                                  <div className="mb-4">
-                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/hr)</label>
-                                    <input 
-                                      type="number"
-                                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                                      placeholder="e.g. 500"
-                                      value={negotiationOffer[student.id] || ''}
-                                      onChange={(e) => setNegotiationOffer({...negotiationOffer, [student.id]: e.target.value})}
-                                    />
-                                  </div>
-                                  {isHired ? (
-                                    <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                      <CheckCircle2 className="w-4 h-4" /> Already Your Student
-                                    </button>
-                                  ) : isPending ? (
-                                    <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-                                      Pending
-                                    </button>
-                                  ) : (
-                                    <div className="flex gap-2">
-                                      <button 
-                                        onClick={() => setSelectedViewUser(student)}
-                                        className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
-                                      >
-                                        <User className="w-4 h-4" /> View Profile
-                                      </button>
-                                      <button 
-                                      onClick={() => handleSendOffer(student)}
-                                      className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-3 rounded-xl transition-colors shadow-md text-sm flex items-center justify-center gap-2"
-                                    >
-                                      <MessageCircle className="w-4 h-4" /> Send Proposal
-                                    </button>
+                            <div className="p-4 space-y-4 flex-grow">
+                              {household.students.map((student: any) => {
+                                const isPending = data?.applications?.some((app: any) => app.studentId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
+                                const isHired = data?.applications?.some((app: any) => app.studentId === student.id && ['tuition_started'].includes(app.status));
+                                
+                                return (
+                                  <div key={student.id} className="border border-gray-100 rounded-xl p-4 bg-white relative">
+                                    <div className="mb-3">
+                                      <h4 className="font-bold text-gray-900 text-lg">{student.name || 'Student'} <span className="text-sm text-gray-500 font-normal capitalize">({student.category})</span></h4>
+                                      <div className="text-sm text-gray-600 mt-1 grid grid-cols-2 gap-y-1">
+                                        {student.classLevel && <span><strong className="text-gray-400">Class:</strong> {student.classLevel}</span>}
+                                        {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <span><strong className="text-gray-400">Sub:</strong> {student.subjects[0]}...</span>}
+                                        {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <span><strong className="text-gray-400">Tech:</strong> {student.technologies[0]}...</span>}
+                                        {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <span><strong className="text-gray-400">Lang:</strong> {student.languages[0]}...</span>}
+                                        <span className="col-span-2"><strong className="text-gray-400">Budget:</strong> <span className="text-emerald-600 font-bold">₹{student.budget}/mo</span></span>
+                                      </div>
                                     </div>
-                                  )}
-                                </>
-                              )}
+
+                                    {!hasProfile ? (
+                                      <button 
+                                        onClick={() => setActiveTab('profile')}
+                                        className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm"
+                                      >
+                                        Unlock to View
+                                      </button>
+                                    ) : (
+                                      <>
+                                        <div className="mb-3">
+                                          <input 
+                                            type="number"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50 text-sm"
+                                            placeholder="Your Offer (₹/hr)"
+                                            value={negotiationOffer[student.id] || ''}
+                                            onChange={(e) => setNegotiationOffer({...negotiationOffer, [student.id]: e.target.value})}
+                                          />
+                                        </div>
+                                        {isHired ? (
+                                          <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
+                                            Active Student
+                                          </button>
+                                        ) : isPending ? (
+                                          <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
+                                            Pending
+                                          </button>
+                                        ) : (
+                                          <div className="flex gap-2">
+                                            <button 
+                                              onClick={() => setSelectedViewUser(student)}
+                                              className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-2 rounded-lg transition-colors text-sm"
+                                            >
+                                              View
+                                            </button>
+                                            <button 
+                                              onClick={() => handleSendOffer(student)}
+                                              className="w-2/3 bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm"
+                                            >
+                                              Send Offer
+                                            </button>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                        );
-                      })}
-                      {(!((activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        ));
+                      })()}
+                      {(!((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
                         if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                         return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-                      })) || ((activeTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                      })) || ((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
                         if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                         return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
                       }).length === 0)) && (
@@ -685,16 +706,19 @@ export default function TeacherDashboard() {
                       )}
                     </div>
                   </div>
-                )}
+                </div>
+            )}
 
-                {mainSubTab === 'requests' && (
-                  <div>
-                    {((activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.length ?? 0) > 0 ? (
-                      <div className="space-y-4">
-                        {(activeTab === 'all' ? data?.allNegotiations : data?.recommendedNegotiations)?.map((neg: any) => (
+            {/* TAB: REQUESTS */}
+            {activeTab === 'requests' && (
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Requests & Offers</h2>
+                {((data?.allNegotiations)?.length ?? 0) > 0 ? (
+                  <div className="space-y-4">
+                    {data?.allNegotiations?.map((neg: any) => (
                           <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
                             <div>
-                              <h4 className="font-bold text-lg text-gray-900">{neg.studentName}</h4>
+                              <h4 className="font-bold text-lg text-gray-900">{neg.studentName} <span className="text-sm font-normal text-gray-500 capitalize">({neg.category})</span></h4>
                               <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
                               {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
                               {neg.category === 'languages' && neg.languages && neg.languages.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languages.join(', ')}</p>}
@@ -762,8 +786,6 @@ export default function TeacherDashboard() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
 
             {/* TAB: MY STUDENTS */}
             {activeTab === 'my_students' && (

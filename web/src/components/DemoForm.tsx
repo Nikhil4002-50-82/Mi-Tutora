@@ -11,6 +11,7 @@ interface Props {
   isDashboard?: boolean;
   hasProfile?: boolean;
   onSuccess?: () => void;
+  activeStudentId?: string;
 }
 
 export default function DemoForm({
@@ -18,6 +19,7 @@ export default function DemoForm({
   isDashboard = false,
   hasProfile = false,
   onSuccess,
+  activeStudentId,
 }: Props) {
 
   const [isEditing, setIsEditing] = useState(!hasProfile);
@@ -66,15 +68,32 @@ export default function DemoForm({
               const parentSnap = await getDoc(parentDocRef);
               const parentData = parentSnap.exists() ? parentSnap.data() : null;
 
-              const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
-              const studentSnap = await getDocs(studentQuery);
-              const studentData = !studentSnap.empty ? studentSnap.docs[0].data() : null;
+              let studentData = null;
+              if (activeStudentId && activeStudentId !== 'new') {
+                const studentSnap = await getDoc(doc(db, 'students', activeStudentId));
+                studentData = studentSnap.exists() ? studentSnap.data() : null;
+              } else if (!activeStudentId) {
+                const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
+                const studentSnap = await getDocs(studentQuery);
+                studentData = !studentSnap.empty ? studentSnap.docs[0].data() : null;
+              }
+
               // Fetch tuition request data
-              const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
-              const requestSnap = await getDocs(requestQuery);
-              const requestDocs = requestSnap.docs.map(d => d.data());
-              requestDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-              const requestData = requestDocs[0] || {};
+              let requestData = {};
+              if (activeStudentId && activeStudentId !== 'new') {
+                const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
+                const requestSnap = await getDocs(requestQuery);
+                const requestDocs = requestSnap.docs.map(d => d.data());
+                requestDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                requestData = requestDocs[0] || {};
+              } else if (!activeStudentId) {
+                const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
+                const requestSnap = await getDocs(requestQuery);
+                const requestDocs = requestSnap.docs.map(d => d.data());
+                requestDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                requestData = requestDocs[0] || {};
+              }
+
               if (studentData) {
                 setIsEditing(false);
                 setFormData(prev => ({
@@ -104,10 +123,33 @@ export default function DemoForm({
                   technologies: studentData.technologies || [],
                   languages: studentData.languages || [],
                 }));
-              } else if (parentData) {
+              } else {
+                setIsEditing(true);
                 setFormData(prev => ({
-                  ...prev,
-                  parentName: parentData.name || ''
+                  fullName: user.displayName || '',
+                  gender: '',
+                  phone: '',
+                  whatsapp: '',
+                  email: user.email || '',
+                  addressFlat: '',
+                  addressStreet: '',
+                  addressPincode: '',
+                  studentType: '',
+                  classGrade: '',
+                  parentName: parentData ? parentData.name : '',
+                  demoMode: '',
+                  board: '',
+                  subjects: '',
+                  classMode: '',
+                  hours: '',
+                  days: '',
+                  goal: '',
+                  source: '',
+                  requirements: '',
+                  budget: '',
+                  category: category || '',
+                  technologies: [],
+                  languages: [],
                 }));
               }
             } else {
@@ -125,7 +167,7 @@ export default function DemoForm({
       };
       fetchProfile();
     }
-  }, [isDashboard, hasProfile]);
+  }, [isDashboard, hasProfile, activeStudentId]);
 
   const handleCheckboxChange = (field: string, value: string) => {
     setFormData((prev: any) => {
@@ -202,39 +244,47 @@ export default function DemoForm({
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
 
-      if (hasProfile) {
-        // Update existing records
+      // Check if we need to create the parent and user profile first
+      if (!hasProfile) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+        await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
+
         const parentDocRef = doc(db, 'parents', user.uid);
-              const parentSnap = await getDoc(parentDocRef);
-              const parentData = parentSnap.exists() ? parentSnap.data() : null;
-
-              const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
-        const studentSnap = await getDocs(studentQuery);
-        if (!studentSnap.empty) {
-          await updateDoc(studentSnap.docs[0].ref, {
-            category: formData.category || '',
-            name: formData.fullName,
-            gender: formData.gender,
-            phoneNumber: formData.phone,
-            whatsappNumber: formData.whatsapp,
-            email: formData.email,
-            address: combinedAddress,
-            studentType: formData.studentType,
-            classLevel: formData.classGrade,
-            board: formData.board,
-            subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
-            technologies: formData.technologies,
-            languages: formData.languages,
-            preferredMode: formData.demoMode,
-            learningGoal: formData.goal,
-            specialRequirements: formData.requirements,
-            hoursPerDay: formData.hours,
-            daysPerWeek: formData.days,
-            budget: parseInt(formData.budget) || 0,
-          });
+        const parentDocSnap = await getDoc(parentDocRef);
+        if (!parentDocSnap.exists()) {
+          await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
         }
+      }
 
-        const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
+      if (activeStudentId && activeStudentId !== 'new') {
+        // Update specific student
+        const studentRef = doc(db, 'students', activeStudentId);
+        await updateDoc(studentRef, {
+          category: formData.category || '',
+          name: formData.fullName,
+          gender: formData.gender,
+          phoneNumber: formData.phone,
+          whatsappNumber: formData.whatsapp,
+          email: formData.email,
+          address: combinedAddress,
+          studentType: formData.studentType,
+          classLevel: formData.classGrade,
+          board: formData.board,
+          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          technologies: formData.technologies,
+          languages: formData.languages,
+          preferredMode: formData.demoMode,
+          learningGoal: formData.goal,
+          specialRequirements: formData.requirements,
+          hoursPerDay: formData.hours,
+          daysPerWeek: formData.days,
+          budget: parseInt(formData.budget) || 0,
+        });
+
+        // Find the tuition request for this specific student and update it
+        const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
         const requestSnap = await getDocs(requestQuery);
         if (!requestSnap.empty) {
           await updateDoc(requestSnap.docs[0].ref, {
@@ -254,20 +304,7 @@ export default function DemoForm({
         
         setSuccessMsg('Profile updated successfully!');
       } else {
-        // Mark user as having profile
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
-        await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
-
-        // Fetch parent (create if not exists)
-        const parentDocRef = doc(db, 'parents', user.uid);
-        const parentDocSnap = await getDoc(parentDocRef);
-        if (!parentDocSnap.exists()) {
-          await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
-        }
-
-        // Create student record
+        // Create new student record (either because activeStudentId is 'new' or no profile existed)
         const newStudentRef = await addDoc(collection(db, 'students'), {
           parentId: user.uid,
           category: formData.category || '',
@@ -311,12 +348,11 @@ export default function DemoForm({
           createdAt: Date.now()
         });
 
-        setSuccessMsg('Demo request submitted successfully!');
+        setSuccessMsg('Student added successfully!');
       }
 
       sessionStorage.removeItem('demoFormData');
       if (isDashboard) {
-        setSuccessMsg('Profile updated successfully!');
         if (onSuccess) onSuccess();
       } else {
         setTimeout(() => router.push('/dashboard/student'), 2000);
