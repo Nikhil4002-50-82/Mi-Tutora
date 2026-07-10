@@ -112,7 +112,7 @@ export default function DemoForm({
               }
 
               // Fetch tuition request data
-              let requestData = {};
+              let requestData: any = {};
               if (activeStudentId && activeStudentId !== 'new') {
                 const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
                 const requestSnap = await getDocs(requestQuery);
@@ -305,7 +305,7 @@ export default function DemoForm({
           studentType: formData.studentType,
           classLevel: formData.classGrade,
           board: formData.board,
-          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
           technologies: formData.technologies,
           languages: formData.languages,
           preferredMode: formData.demoMode,
@@ -325,7 +325,7 @@ export default function DemoForm({
             studentName: formData.fullName,
             classLevel: formData.classGrade,
             board: formData.board,
-            subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+            subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
             technologies: formData.technologies,
             languages: formData.languages,
             mode: formData.demoMode,
@@ -350,7 +350,7 @@ export default function DemoForm({
           studentType: formData.studentType,
           classLevel: formData.classGrade,
           board: formData.board,
-          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
           budget: parseInt(formData.budget) || 0,
           preferredMode: formData.demoMode,
           learningGoal: formData.goal,
@@ -370,7 +370,7 @@ export default function DemoForm({
           studentName: formData.fullName,
           classLevel: formData.classGrade,
           board: formData.board,
-          subjects: formData.subjects ? formData.subjects.split(',').map(s => s.trim()) : [],
+          subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
           technologies: formData.technologies,
           languages: formData.languages,
           mode: formData.demoMode,
@@ -465,8 +465,10 @@ export default function DemoForm({
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies</p>
                 <div className="flex gap-2 flex-wrap">
-                  {formData.technologies.map(t => (
-                    <span key={t} className="bg-purple-100/50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg text-sm font-bold">{t}</span>
+                  {formData.technologies.map((t: string) => (
+                    <span key={t} className="bg-purple-100/50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-md text-sm font-medium">
+                      {t}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -476,8 +478,10 @@ export default function DemoForm({
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages</p>
                 <div className="flex gap-2 flex-wrap">
-                  {formData.languages.map(l => (
-                    <span key={l} className="bg-purple-100/50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg text-sm font-bold">{l}</span>
+                  {formData.languages.map((l: string) => (
+                    <span key={l} className="bg-blue-100/50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-md text-sm font-medium">
+                      {l}
+                    </span>
                   ))}
                 </div>
               </div>

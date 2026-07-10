@@ -174,7 +174,7 @@ export default function TeacherForm({
         qualification: formData.qualification,
         experience: formData.experience,
         occupation: formData.occupation,
-        subjects: formData.subjects.split(',').map(s => s.trim()),
+        subjects: formData.subjects.split(',').map((s: string) => s.trim()),
         mode: formData.mode,
         teachingApproach: formData.description,
         studentCount: formData.studentsCount,
@@ -271,7 +271,7 @@ export default function TeacherForm({
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Classes (School)</p>
                   <div className="flex gap-2 flex-wrap mt-1">
-                    {formData.classes.map(c => (
+                    {formData.classes.map((c: string) => (
                       <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{c}</span>
                     ))}
                   </div>
@@ -279,7 +279,7 @@ export default function TeacherForm({
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Boards (School)</p>
                   <div className="flex gap-2 flex-wrap mt-1">
-                    {formData.boards.map(b => (
+                    {formData.boards.map((b: string) => (
                       <span key={b} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{b}</span>
                     ))}
                   </div>
@@ -291,7 +291,7 @@ export default function TeacherForm({
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies Taught</p>
                 <div className="flex gap-2 flex-wrap">
-                  {formData.technologies.map(t => (
+                  {formData.technologies.map((t: string) => (
                     <span key={t} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{t}</span>
                   ))}
                 </div>
@@ -302,7 +302,7 @@ export default function TeacherForm({
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages Taught</p>
                 <div className="flex gap-2 flex-wrap">
-                  {formData.languages.map(l => (
+                  {formData.languages.map((l: string) => (
                     <span key={l} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{l}</span>
                   ))}
                 </div>
