@@ -5,15 +5,32 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
+import { getFriendlyAuthError } from '@/utils/authErrors';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // We'll remove the local error state and use toast directly where needed
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleForgotPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error('Please enter your email address to reset password.');
+      return;
+    }
+    try {
+      const { auth } = await import('@/utils/firebase/client');
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent! Check your inbox.');
+    } catch (err: any) {
+      toast.error(getFriendlyAuthError(err));
+    }
+  };
   
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +49,12 @@ function LoginContent() {
       const user = userCredential.user;
       
       if (user) {
+        if (!user.emailVerified) {
+          await auth.signOut();
+          toast.error("Please verify your email before logging in. Check your inbox.");
+          return;
+        }
+
         // Fetch user role
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         const userRole = userDoc.exists() ? userDoc.data().role : role;
@@ -46,7 +69,7 @@ function LoginContent() {
         }
       }
     } catch (err: any) {
-      toast.error(err.message || 'Login failed');
+      toast.error(getFriendlyAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -232,7 +255,7 @@ function LoginContent() {
                   const next = searchParams.get('next');
                   router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
                 } catch (error: any) {
-                  toast.error(error.message);
+                  toast.error(getFriendlyAuthError(error));
                 }
               }}
               className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700"
@@ -282,7 +305,7 @@ function LoginContent() {
                 <label className="text-xs sm:text-sm font-bold text-gray-700">
                   Password<span className="text-[#00a992] ml-0.5">*</span>
                 </label>
-                <a href="#" className={`text-xs font-bold hover:text-emerald-700 transition-colors ${isTeacher ? 'text-emerald-500' : 'text-[#00a992]'}`}>
+                <a href="#" onClick={handleForgotPassword} className={`text-xs font-bold hover:text-emerald-700 transition-colors ${isTeacher ? 'text-emerald-500' : 'text-[#00a992]'}`}>
                   Forgot Password?
                 </a>
               </div>
@@ -291,15 +314,22 @@ function LoginContent() {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
+                  className={`w-full pl-11 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
@@ -341,7 +371,7 @@ function LoginContent() {
   );
 }
 
-export default function Login() {
+export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex bg-gray-50 items-center justify-center">Loading...</div>}>
       <LoginContent />

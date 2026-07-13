@@ -277,19 +277,23 @@ export default function DemoForm({
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
 
-      // Check if we need to create the parent and user profile first
+      // Check if we need to create the user profile first
       if (!hasProfile) {
         const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
         const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
         await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
-
-        const parentDocRef = doc(db, 'parents', user.uid);
-        const parentDocSnap = await getDoc(parentDocRef);
-        if (!parentDocSnap.exists()) {
-          await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
-        }
       }
+
+      // Always update parent document to ensure parentName changes are saved
+      const parentDocRef = doc(db, 'parents', user.uid);
+      await setDoc(parentDocRef, { 
+        id: user.uid, 
+        name: formData.parentName || formData.fullName,
+        phone: formData.phone,
+        whatsapp: formData.whatsapp,
+        email: formData.email
+      }, { merge: true });
 
       if (activeStudentId && activeStudentId !== 'new') {
         // Update specific student
@@ -422,6 +426,10 @@ export default function DemoForm({
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
               <p className="text-lg font-bold text-slate-800">{formData.fullName || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gender</p>
+              <p className="text-lg font-bold text-slate-800 capitalize">{formData.gender || '-'}</p>
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Parent's Name</p>
@@ -565,6 +573,7 @@ export default function DemoForm({
               placeholder="Enter your full name"
               value={formData.fullName}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>
@@ -594,6 +603,7 @@ export default function DemoForm({
                     value={item}
                     checked={formData.gender === item}
                     onChange={handleChange}
+                    required
                   />
 
                   {item}
@@ -621,6 +631,8 @@ export default function DemoForm({
               placeholder="Enter phone number"
               value={formData.phone}
               onChange={handleChange}
+              required
+              pattern="[0-9]{10,15}"
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>
@@ -643,6 +655,8 @@ export default function DemoForm({
               value={formData.whatsapp}
               onChange={handleChange}
               disabled={sameAsPhone}
+              required={!sameAsPhone}
+              pattern="[0-9]{10,15}"
               className={`w-full border border-slate-300 rounded-xl px-4 py-4 ${sameAsPhone ? 'bg-slate-100' : ''}`}
             />
           </div>
@@ -663,6 +677,7 @@ export default function DemoForm({
               placeholder="Enter email"
               value={formData.email}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>

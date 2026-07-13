@@ -3,13 +3,15 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 const logo = '/imports/logo.png';
+import { getFriendlyAuthError } from '@/utils/authErrors';
 
 function SignupContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
@@ -69,14 +71,20 @@ function SignupContent() {
         // Insert into parents or tutors
         if (role === 'student') {
           await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: name });
-          router.push(searchParams.get('next') || '/dashboard/student');
         } else {
           await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: name, email: email });
-          router.push(searchParams.get('next') || '/dashboard/teacher');
         }
+        
+        const { sendEmailVerification } = await import('firebase/auth');
+        await sendEmailVerification(user);
+        await auth.signOut();
+        setSuccessMsg('Account created successfully! Please check your email to verify your account before logging in.');
+        setTimeout(() => {
+          router.push(`/login?role=${role}`);
+        }, 3000);
       }
     } catch (err: any) {
-      setError(err.message || 'Signup failed');
+      setError(getFriendlyAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -140,7 +148,7 @@ function SignupContent() {
       const next = searchParams.get('next');
       router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
     } catch (err: any) {
-      setError(err.message || 'Google signup failed');
+      setError(getFriendlyAuthError(err));
     }
   };
 
@@ -356,15 +364,22 @@ function SignupContent() {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
+                  className={`w-full pl-11 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

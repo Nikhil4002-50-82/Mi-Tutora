@@ -37,6 +37,12 @@ export default function ActionModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!value.trim()) return;
+    if (type === "price") {
+      const parsed = parseFloat(value);
+      if (isNaN(parsed) || parsed <= 0) {
+        return;
+      }
+    }
     if (type === "timing") {
       if (!dateValue || !timeValue) return;
       onSubmit(value, dateValue, timeValue);
@@ -99,6 +105,7 @@ export default function ActionModal({
                     {type === "price" ? (
                       <input
                         type="number"
+                        min="0"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         placeholder={placeholder}

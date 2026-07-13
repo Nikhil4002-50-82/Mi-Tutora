@@ -134,6 +134,11 @@ export default function TeacherForm({
   ) => {
 
     e.preventDefault();
+    if (!formData.category) {
+      alert("Please select at least one teaching category.");
+      return;
+    }
+    
     setLoading(true);
     setSuccessMsg('');
 
@@ -167,6 +172,7 @@ export default function TeacherForm({
       await setDoc(doc(db, 'tutors', user.uid), {
         category: formData.category,
         name: formData.fullName,
+        email: formData.email,
         gender: formData.gender,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
@@ -228,6 +234,10 @@ export default function TeacherForm({
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
               <p className="text-lg font-bold text-slate-800">{formData.fullName || '-'}</p>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gender</p>
+              <p className="text-lg font-bold text-slate-800 capitalize">{formData.gender || '-'}</p>
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Teaching Categories</p>
@@ -393,6 +403,7 @@ export default function TeacherForm({
               placeholder="John Doe"
               value={formData.fullName}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>
@@ -449,6 +460,7 @@ export default function TeacherForm({
               placeholder="Enter phone number"
               value={formData.phone}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>
@@ -563,6 +575,7 @@ export default function TeacherForm({
               placeholder="Enter qualification"
               value={formData.qualification}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>

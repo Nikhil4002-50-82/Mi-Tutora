@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ export default function TeacherDashboard() {
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [offerLoading, setOfferLoading] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -44,6 +45,11 @@ export default function TeacherDashboard() {
     let userDocSnap = await getDoc(userDocRef);
     let userData = userDocSnap.exists() ? userDocSnap.data() : null;
     
+    if (userData && userData.role !== 'teacher') {
+      window.location.href = '/dashboard/student';
+      throw new Error('Unauthorized');
+    }
+
     if (!userData) {
       console.log("userData not found! Attempting insert.");
       userData = {
@@ -59,7 +65,7 @@ export default function TeacherDashboard() {
 
     const tutorDocSnap = await getDoc(doc(db, 'tutors', user.uid));
     const tutorData = tutorDocSnap.exists() ? tutorDocSnap.data() : null;
-
+    
     const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', user.uid)));
     const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
@@ -141,7 +147,7 @@ export default function TeacherDashboard() {
     }) || [];
 
     const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
-    const referrals = referralsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
     const studentIds = applications.map((app: any) => app.studentId).filter(Boolean);
     let studentsInfo: any[] = [];
@@ -191,6 +197,8 @@ export default function TeacherDashboard() {
   };
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('teacherDashboardData', fetcher);
+
+
   const hasProfile = data?.userData?.hasProfile || !!data?.profile?.phone || false;
 
   const initialRedirectDone = useRef(false);
@@ -320,11 +328,13 @@ export default function TeacherDashboard() {
     const { auth } = await import('@/utils/firebase/client');
     await auth.signOut();
     localStorage.clear();
+    sessionStorage.clear();
     toast.success("Logged out successfully!");
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   const handleSendOffer = async (student: any) => {
+    if (offerLoading) return;
     const offerPrice = parseInt(negotiationOffer[student.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid offer price.");
 
@@ -335,6 +345,7 @@ export default function TeacherDashboard() {
     }
 
     try {
+      setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
       const { collection, addDoc } = await import('firebase/firestore');
       const user = auth.currentUser;
@@ -361,6 +372,8 @@ export default function TeacherDashboard() {
       mutate();
     } catch (e: any) {
       toast.error("Error sending offer: " + e.message);
+    } finally {
+      setOfferLoading(false);
     }
   };
 
@@ -376,10 +389,12 @@ export default function TeacherDashboard() {
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'tutor';
+      } else if (action === 'decline') {
+        updateData.status = 'declined';
       }
 
       await updateDoc(doc(db, 'applications', appId), updateData);
-      toast.success(`Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
@@ -434,12 +449,26 @@ export default function TeacherDashboard() {
     { id: 'profile', label: 'Profile', icon: User },
   ];
 
+  if (loading && !data) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+          <p className="text-gray-500 font-medium animate-pulse">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
       
       {/* MOBILE HEADER */}
       <div className="md:hidden bg-gradient-to-r from-[#063831] to-[#04241f] text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
-        <img src={logo} alt="Mi Tutora Logo" className="h-8 w-auto object-contain" />
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-8 h-8 text-emerald-400" />
+          <span className="font-black text-xl tracking-tight">Teacher</span>
+        </div>
         <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -mr-2 text-white hover:bg-white/10 rounded-lg">
           <Menu className="w-6 h-6" />
         </button>
@@ -454,9 +483,12 @@ export default function TeacherDashboard() {
       <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
         <div className="p-6 border-b border-white/10 flex flex-col items-start gap-4">
           <div className="flex w-full justify-between items-center">
-            <div className="flex flex-col justify-center">
-              <img src={logo} alt="Mi Tutora Logo" className="h-12 w-auto object-contain object-left mb-1 -ml-2" />
-              <p className="text-[#00a992] text-[11px] font-bold uppercase tracking-widest mt-2">Teacher Portal</p>
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-8 h-8 text-emerald-400" />
+              <div className="flex flex-col">
+                <span className="font-black text-xl tracking-tight leading-none">Mi Tutora</span>
+                <span className="text-[#00a992] text-[10px] font-bold uppercase tracking-widest mt-1">Teacher</span>
+              </div>
             </div>
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-2 text-white/70 hover:text-white bg-white/5 rounded-lg">
               <X className="w-5 h-5" />
@@ -499,14 +531,14 @@ export default function TeacherDashboard() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors font-medium"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </button>
+        <div className="mt-auto p-4 border-t border-white/10 flex items-center gap-3 bg-white/5">
+          <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-lg shadow-inner">
+            {data?.profile?.name?.charAt(0) || 'T'}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <p className="font-bold text-sm truncate">{data?.profile?.name || 'Teacher'}</p>
+            <p className="text-xs text-emerald-400 font-medium">Teacher Account</p>
+          </div>
         </div>
       </aside>
 
@@ -524,9 +556,46 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
+        {/* TOP NAVIGATION BAR */}
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-6">
+            <button onClick={() => setActiveTab('requests')} className="text-gray-400 hover:text-emerald-600 transition-colors relative">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
+            
+            <div className="relative group cursor-pointer">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
+                  {data?.profile?.name?.charAt(0) || 'T'}
+                </div>
+              </div>
+              
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden transform origin-top-right group-hover:scale-100 scale-95">
+                 <div className="p-4 border-b border-gray-50 bg-gray-50/50">
+                   <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || 'Teacher'}</p>
+                   <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
+                 </div>
+                 <div className="p-2">
+                   <button onClick={() => setActiveTab('profile')} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
+                     <User className="w-4 h-4" /> Profile Settings
+                   </button>
+                   <button onClick={() => setActiveTab('my_students')} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
+                     <Users className="w-4 h-4" /> My Students
+                   </button>
+                   <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                   <button onClick={handleLogout} className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors">
+                     <LogOut className="w-4 h-4" /> Logout
+                   </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
-        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12 w-full flex-1">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -536,15 +605,150 @@ export default function TeacherDashboard() {
           >
             
             {/* TAB: DASHBOARD */}
-            {activeTab === 'dashboard' && (
-              <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4">
-                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                  <LayoutDashboard className="w-10 h-10 text-emerald-500" />
+            {activeTab === 'dashboard' && (() => {
+              const profileCompleteness = (() => {
+                if (!hasProfile) return 10;
+                const fields = [
+                  data?.profile?.name,
+                  data?.profile?.gender,
+                  data?.profile?.phone || data?.profile?.whatsapp,
+                  data?.profile?.email,
+                  data?.profile?.qualification,
+                  data?.profile?.experience,
+                  data?.profile?.category,
+                  data?.profile?.mode,
+                  data?.profile?.subjects?.length > 0 || data?.profile?.technologies?.length > 0 || data?.profile?.languages?.length > 0 ? true : false,
+                  data?.profile?.occupation
+                ];
+                const filled = fields.filter(f => f && String(f).trim() !== '' && f !== false).length;
+                return Math.max(10, Math.round((filled / fields.length) * 100));
+              })();
+              
+              const myActiveStudents = data?.upcomingClasses || [];
+              const computedRecommendedStudents = data?.recommendedStudents || [];
+
+              return (
+                <div className="flex flex-col gap-8 h-full pb-10">
+                  {/* Hero Section */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                      <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
+                        Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! <span className="text-4xl animate-bounce origin-bottom-right">👋</span>
+                      </h1>
+                      <p className="text-gray-500 text-lg">Nice to have you back, what an exciting day! Get ready to continue your teaching journey.</p>
+                    </div>
+
+                    {/* Profile Completeness Card */}
+                    <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm md:w-80 flex-shrink-0 flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                        <User className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="font-bold text-gray-900 text-sm">Strengthen your profile</p>
+                          <button onClick={() => setActiveTab('profile')} className="text-gray-400 hover:text-gray-600 -mt-1 -mr-1"><X className="w-4 h-4" /></button>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3 leading-snug">You're {profileCompleteness}% there! Add missing details to stand out.</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00a992] rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
+                          </div>
+                          <span className="text-xs font-bold text-[#00a992]">{profileCompleteness}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Split Layout */}
+                  <div className="grid lg:grid-cols-3 gap-8 items-start">
+                    
+                    {/* Left: My Students */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h2 className="text-xl font-bold text-gray-900">My Students</h2>
+                      
+                      {myActiveStudents.length === 0 ? (
+                        <div className="bg-white border border-gray-100 rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
+                          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                            <Users className="w-10 h-10 text-emerald-500" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-2">No students chosen yet</h3>
+                          <p className="text-gray-500 max-w-sm mb-8">Explore our catalog of students and find the perfect match to start your teaching journey.</p>
+                          <button 
+                            onClick={() => setActiveTab('new_tuition')}
+                            className="bg-[#00a992] text-white px-8 py-3.5 rounded-xl font-bold hover:bg-[#008f7b] transition-all shadow-lg shadow-[#00a992]/20 flex items-center gap-2"
+                          >
+                            <Globe className="w-5 h-5" /> Explore Students
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4">
+                          {myActiveStudents.slice(0, 3).map((cls: any) => (
+                            <div key={cls.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg">
+                                  {cls.student?.charAt(0) || 'S'}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-gray-900">{cls.student}</h4>
+                                  <p className="text-sm text-gray-500">{cls.subject}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => setActiveTab('my_students')} className="text-[#00a992] font-bold text-sm bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100">
+                                View
+                              </button>
+                            </div>
+                          ))}
+                          {myActiveStudents.length > 3 && (
+                            <button onClick={() => setActiveTab('my_students')} className="text-sm font-bold text-gray-500 hover:text-[#00a992] py-2 text-center w-full">
+                              View all {myActiveStudents.length} students →
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Recommended Students */}
+                    <div className="space-y-4">
+                      <h2 className="text-xl font-bold text-gray-900">Recommended Students</h2>
+                      <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
+                        {computedRecommendedStudents.length === 0 ? (
+                          <div className="text-center py-10">
+                            <p className="text-gray-500 text-sm">No recommendations yet.</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-50">
+                            {computedRecommendedStudents.slice(0, 4).map((student: any, index: number) => (
+                              <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
+                                  #{index + 1}
+                                </div>
+                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
+                                  {student.name?.charAt(0) || 'S'}
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                  <h4 className="font-bold text-gray-900 text-sm truncate">{student.name || 'Student'}</h4>
+                                  <p className="text-xs text-gray-500 truncate">{student.subjects ? student.subjects.join(', ') : student.category}</p>
+                                </div>
+                                <button onClick={() => setActiveTab('new_tuition')} className="text-xs font-bold text-[#00a992] bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 flex-shrink-0">
+                                  View
+                                </button>
+                              </div>
+                            ))}
+                            {computedRecommendedStudents.length > 4 && (
+                              <div className="pt-4 mt-2">
+                                <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
+                                  See more recommendations
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-4">Welcome back, {data?.profile?.name || 'Teacher'}!</h1>
-                <p className="text-gray-500 max-w-md mx-auto text-lg">Your dashboard overview is currently being updated. In the meantime, use the sidebar to find students and manage your negotiations!</p>
-              </div>
-            )}
+              );
+            })()}
             {/* TAB: NEW TUITION */}
             {activeTab === 'new_tuition' && (
               <div>
@@ -676,9 +880,10 @@ export default function TeacherDashboard() {
                                             </button>
                                             <button 
                                               onClick={() => handleSendOffer(student)}
-                                              className="w-2/3 bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm"
+                                              disabled={offerLoading}
+                                              className="w-2/3 bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                              Send Offer
+                                              {offerLoading ? 'Sending...' : 'Send Offer'}
                                             </button>
                                           </div>
                                         )}
@@ -759,10 +964,24 @@ export default function TeacherDashboard() {
                                     >
                                       Counter Offer
                                     </button>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                    >
+                                      Decline
+                                    </button>
                                   </div>
                                 ) : (
-                                  <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                    <p className="text-sm font-semibold text-gray-600">Waiting for student response...</p>
+                                  <div className="flex gap-3 items-center w-full sm:w-auto">
+                                    <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                      <p className="text-sm font-semibold text-gray-600">Waiting for student response...</p>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                    >
+                                      Decline
+                                    </button>
                                   </div>
                                 )
                               )}
