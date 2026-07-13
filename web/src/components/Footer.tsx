@@ -35,7 +35,7 @@ export function Footer() {
           <a href="#hero" className="inline-block mb-4 transition-transform hover:scale-105 duration-300">
             <Image
               src={logo}
-              alt="Mi Tutora"
+              alt="MiTutora"
               width={200}
               height={112}
               className="h-28 w-auto object-contain -ml-2"
@@ -124,7 +124,7 @@ export function Footer() {
       {/* DIVIDER & BOTTOM SECTION */}
       <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-6 max-w-7xl mx-auto relative z-10">
         <p className="text-xs sm:text-sm text-gray-500 text-center md:text-left font-medium">
-          © {new Date().getFullYear()} Mi Tutora. All rights reserved.
+          © {new Date().getFullYear()} MiTutora. All rights reserved.
         </p>
 
         {/* SOCIAL ICONS */}

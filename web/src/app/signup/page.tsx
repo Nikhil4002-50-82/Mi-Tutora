@@ -103,6 +103,13 @@ function SignupContent() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       let userRole = role;
       
+      if (userDoc.exists()) {
+        if (userDoc.data().role !== role) {
+          await auth.signOut();
+          throw new Error(`This email is registered as a ${userDoc.data().role === 'teacher' ? 'Teacher' : 'Student'}. Please use the correct login portal.`);
+        }
+      }
+      
       if (!userDoc.exists()) {
         await setDoc(doc(db, 'users', user.uid), {
           id: user.uid,
@@ -173,10 +180,7 @@ function SignupContent() {
         {/* Logo & Role Selector Toggle */}
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-white p-2 rounded-xl">
-              <img src={logo} alt="Mi Tutora Logo" className="h-8 w-auto object-contain" />
-            </div>
-            <span className="text-white font-bold text-xl tracking-wide">Mi Tutora</span>
+            <span className="text-white font-black text-2xl tracking-wide">MiTutora</span>
           </div>
 
           <div className="flex bg-white/10 p-1 rounded-xl backdrop-blur-md border border-white/10">
@@ -221,7 +225,7 @@ function SignupContent() {
               </h1>
               
               <p className="hidden lg:block text-emerald-100/80 text-lg leading-relaxed font-medium mb-12">
-                Create your account in seconds and get full access to the Mi Tutora platform.
+                Create your account in seconds and get full access to the MiTutora platform.
               </p>
             </motion.div>
           </AnimatePresence>
@@ -229,7 +233,7 @@ function SignupContent() {
 
         {/* Footer */}
         <div className="hidden lg:flex relative z-10 text-emerald-100/60 text-sm font-medium justify-between">
-          <span>© {new Date().getFullYear()} Mi Tutora. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} MiTutora. All rights reserved.</span>
           <span className="opacity-50">Support: +91 7483034168</span>
         </div>
       </div>

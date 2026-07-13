@@ -33,7 +33,7 @@ export function FAQ() {
       answer: 'We cover all subjects from Class 1 to 12, competitive exam preparation (NEET, JEE, SAT, IELTS), coding & programming, languages, music, arts, and more. Check our Services section for the complete list.',
     },
     {
-      question: 'How do I become a tutor with Mi Tutora?',
+      question: 'How do I become a tutor with MiTutora?',
       answer: 'Call us at +91 74830 34168 or email your resume to mitutoraeducation@gmail.com. We\'ll review your application and schedule an interview. We welcome passionate educators from all backgrounds.',
     },
     {

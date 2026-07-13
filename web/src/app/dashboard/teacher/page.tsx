@@ -486,7 +486,7 @@ export default function TeacherDashboard() {
             <div className="flex items-center gap-3">
               <BookOpen className="w-8 h-8 text-emerald-400" />
               <div className="flex flex-col">
-                <span className="font-black text-xl tracking-tight leading-none">Mi Tutora</span>
+                <span className="font-black text-xl tracking-tight leading-none">MiTutora</span>
                 <span className="text-[#00a992] text-[10px] font-bold uppercase tracking-widest mt-1">Teacher</span>
               </div>
             </div>

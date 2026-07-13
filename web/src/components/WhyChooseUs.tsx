@@ -69,7 +69,7 @@ export function WhyChooseUs() {
           >
             <p className="text-[#00a992] font-bold uppercase tracking-wider mb-4">India's Trusted Platform</p>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight mb-6">
-              Why Choose Mi Tutora? Experience the difference in quality education.
+              Why Choose MiTutora? Experience the difference in quality education.
             </h2>
             <p className="text-gray-300 text-lg leading-relaxed mb-8">
               We connect students with top-tier, background-verified educators. Whether you need home tuition or interactive online classes, our personalized learning approach ensures 98% of our students achieve their academic goals.

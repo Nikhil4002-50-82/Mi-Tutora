@@ -77,16 +77,10 @@ export function Navbar() {
         {/* Logo */}
         <motion.div
           whileHover={{ scale: 1.02 }}
-          className="flex items-center cursor-pointer transition duration-300"
+          className="flex items-center cursor-pointer transition duration-300 py-4"
           onClick={() => scrollToSection('hero')}
         >
-          <Image
-            src={logo}
-            alt="Mi Tutora"
-            width={180}
-            height={96}
-            className="h-16 md:h-24 w-auto object-contain"
-          />
+          <span className="text-white font-black text-2xl tracking-wide">MiTutora</span>
         </motion.div>
 
         {/* Desktop Menu */}

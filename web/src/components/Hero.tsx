@@ -187,7 +187,7 @@ export function Hero() {
                 transition={{ delay: 0.9, duration: 0.6 }}
                 className="absolute -bottom-4 sm:-bottom-6 -right-4 sm:-right-8 bg-gradient-to-r from-[#00a992] to-emerald-600 text-white rounded-2xl px-5 py-4 shadow-xl z-20 border border-[#00a992]/30"
               >
-                <p className="text-xs sm:text-sm font-semibold tracking-wider text-emerald-100 uppercase mb-1">Mi Tutora</p>
+                <p className="text-xs sm:text-sm font-semibold tracking-wider text-emerald-100 uppercase mb-1">MiTutora</p>
                 <p className="text-lg sm:text-xl font-black leading-none">10,000+ Students</p>
               </motion.div>
             </motion.div>

@@ -344,7 +344,7 @@ export default function TeacherForm({
                   ? 'Update your teaching details and preferences.'
                   : (isDashboard 
                     ? 'Review and confirm your details to complete your tutor profile.' 
-                    : 'Fill in your details to join Mi Tutora as a tutor.')}
+                    : 'Fill in your details to join MiTutora as a tutor.')}
               </p>
             </div>
             {hasProfile && (

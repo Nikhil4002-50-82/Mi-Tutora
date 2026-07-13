@@ -7,7 +7,7 @@ export function WhatsAppButton() {
   const handleWhatsAppClick = () => {
     // Using the first phone number for WhatsApp
     const phoneNumber = '917483034168'; // Remove + and spaces
-    const message = encodeURIComponent('Hi, I would like to know more about Mi Tutora services.');
+    const message = encodeURIComponent('Hi, I would like to know more about MiTutora services.');
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
 

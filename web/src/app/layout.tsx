@@ -15,30 +15,30 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://mitutora.com'),
   title: {
-    default: "Mi Tutora - Transforming Education in India",
-    template: "%s | Mi Tutora",
+    default: "MiTutora - Transforming Education in India",
+    template: "%s | MiTutora",
   },
   description: "India's fastest-growing platform connecting students with highly qualified, background-verified tutors for offline and online classes.",
   keywords: ["online tutoring India", "home tuition", "private tutors", "verified educators", "online classes", "CBSE", "ICSE", "State Board", "NEET", "JEE"],
-  authors: [{ name: "Mi Tutora" }],
-  creator: "Mi Tutora",
-  publisher: "Mi Tutora",
+  authors: [{ name: "MiTutora" }],
+  creator: "MiTutora",
+  publisher: "MiTutora",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
   openGraph: {
-    title: "Mi Tutora - Transforming Education in India",
+    title: "MiTutora - Transforming Education in India",
     description: "Connect with highly qualified tutors for offline and online classes.",
     url: "https://mitutora.com",
-    siteName: "Mi Tutora",
+    siteName: "MiTutora",
     images: [
       {
         url: "/imports/logo.png",
         width: 800,
         height: 600,
-        alt: "Mi Tutora Logo",
+        alt: "MiTutora Logo",
       },
     ],
     locale: "en_IN",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mi Tutora - Transforming Education",
+    title: "MiTutora - Transforming Education",
     description: "India's fastest-growing platform connecting students with top tutors.",
     images: ["/imports/logo.png"],
   },
@@ -73,7 +73,7 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "EducationalOrganization",
-    "name": "Mi Tutora",
+    "name": "MiTutora",
     "url": "https://mitutora.com",
     "logo": "https://mitutora.com/imports/logo.png",
     "contactPoint": {

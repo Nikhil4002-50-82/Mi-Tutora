@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Teacher Dashboard",
-  description: "Teacher dashboard portal for Mi Tutora.",
+  description: "Teacher dashboard portal for MiTutora.",
   robots: {
     index: false,
     follow: false,

@@ -11,14 +11,14 @@ export function Testimonials() {
       role: 'Parent',
       image: 'https://images.unsplash.com/photo-1758685848226-eedca8f6bce7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjB3b21hbiUyMHRlYWNoZXIlMjBzbWlsaW5nfGVufDF8fHx8MTc3NzMxMTI5M3ww&ixlib=rb-4.1.0&q=80&w=400',
       rating: 5,
-      text: "Mi Tutora transformed my daughter's learning experience. Her grades improved dramatically, and she's now confident in Math. The tutors are highly professional and caring.",
+      text: "MiTutora transformed my daughter's learning experience. Her grades improved dramatically, and she's now confident in Math. The tutors are highly professional and caring.",
     },
     {
       name: 'Rahul Verma',
       role: 'Student - JEE Aspirant',
       image: 'https://images.unsplash.com/photo-1659080925920-1683d25f772a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBzdHVkZW50JTIwc3VjY2VzcyUyMGdyYWR1YXRpb258ZW58MXx8fHwxNzc3MzExMjkzfDA&ixlib=rb-4.1.0&q=80&w=400',
       rating: 5,
-      text: 'The NEET coaching at Mi Tutora helped me crack the exam with flying colors. The personalized attention and study materials were exceptional. Highly recommended!',
+      text: 'The NEET coaching at MiTutora helped me crack the exam with flying colors. The personalized attention and study materials were exceptional. Highly recommended!',
     },
     {
       name: 'Anjali Patel',
@@ -32,21 +32,21 @@ export function Testimonials() {
       role: 'Tutor',
       image: 'https://images.unsplash.com/photo-1758612215020-842383aadb9e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvbmxpbmUlMjBsZWFybmluZyUyMHN0dWRlbnQlMjBsYXB0b3AlMjBzdHVkeXxlbnwxfHx8fDE3NzczMTEyOTJ8MA&ixlib=rb-4.1.0&q=80&w=400',
       rating: 5,
-      text: 'As a tutor with Mi Tutora, I love the flexibility and support. The platform makes it easy to connect with students and the payment process is seamless.',
+      text: 'As a tutor with MiTutora, I love the flexibility and support. The platform makes it easy to connect with students and the payment process is seamless.',
     },
     {
       name: 'Meera Krishnan',
       role: 'Parent',
       image: 'https://images.unsplash.com/photo-1758687126445-98edd4b15ba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwbGVhcm5pbmclMjB0dXRvciUyMHRlYWNoaW5nJTIwcHJlbWl1bSUyMGVkdWNhdGlvbnxlbnwxfHx8fDE3NzczMTEyOTF8MA&ixlib=rb-4.1.0&q=80&w=400',
       rating: 5,
-      text: 'Best decision we made for our child\'s education. The home tuition service is top-notch and very affordable. Thank you, Mi Tutora!',
+      text: 'Best decision we made for our child\'s education. The home tuition service is top-notch and very affordable. Thank you, MiTutora!',
     },
     {
       name: 'Arjun Mehta',
       role: 'Student - Class 12',
       image: 'https://images.unsplash.com/photo-1776178320111-a03c1ce2212e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjB0ZWFjaGVyJTIwbWVudG9yaW5nJTIwc3R1ZGVudCUyMGNsYXNzcm9vbXxlbnwxfHx8fDE3NzczMTEyOTJ8MA&ixlib=rb-4.1.0&q=80&w=400',
       rating: 5,
-      text: 'Mi Tutora helped me ace my board exams! The tutors are knowledgeable and explain concepts in a way that\'s easy to understand. Five stars!',
+      text: 'MiTutora helped me ace my board exams! The tutors are knowledgeable and explain concepts in a way that\'s easy to understand. Five stars!',
     },
   ];
 
