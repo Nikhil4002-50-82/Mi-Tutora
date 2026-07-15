@@ -209,6 +209,7 @@ export default function TeacherForm({
 
       localStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
+      setIsEditing(false);
       if (onSuccess) onSuccess();
       
       if (!isDashboard) {

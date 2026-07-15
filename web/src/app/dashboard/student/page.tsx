@@ -1267,7 +1267,7 @@ export default function StudentDashboard() {
                           onClick={() => setIsEditingParentProfile(true)}
                           className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
                         >
-                          Edit Profile
+                          View Profile
                         </button>
                       )}
                     </div>
@@ -1411,7 +1411,7 @@ export default function StudentDashboard() {
                             onClick={() => setEditingStudentId(s.id)}
                             className="flex-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 rounded-xl font-bold text-sm transition-colors"
                           >
-                            Edit Profile
+                            View Profile
                           </button>
                           <button 
                             onClick={() => setStudentToRemove(s)}
