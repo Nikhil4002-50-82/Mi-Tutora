@@ -39,7 +39,7 @@ export default function TeacherForm({
     qualification: initialData?.qualification || '',
     experience: initialData?.experience || '',
     occupation: initialData?.occupation || '',
-    subjects: initialData?.subjects ? initialData.subjects.join(', ') : '',
+    subjects: initialData?.subjects || [] as string[],
     mode: initialData?.mode || '',
     description: initialData?.teachingApproach || '',
     studentsCount: initialData?.studentCount || '',
@@ -70,7 +70,7 @@ export default function TeacherForm({
         qualification: initialData.qualification || '',
         experience: initialData.experience || '',
         occupation: initialData.occupation || '',
-        subjects: initialData.subjects ? initialData.subjects.join(', ') : '',
+        subjects: initialData.subjects || [] as string[],
         mode: initialData.mode || '',
         description: initialData.teachingApproach || '',
         studentsCount: initialData.studentCount || '',
@@ -170,17 +170,19 @@ export default function TeacherForm({
 
       // Update the existing tutor record
       await setDoc(doc(db, 'tutors', user.uid), {
+        id: user.uid,
         category: formData.category,
         name: formData.fullName,
         email: formData.email,
         gender: formData.gender,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
-        address: [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
+        mode: formData.mode,
+        address: (formData.mode?.toLowerCase() === 'online') ? '' : [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
         qualification: formData.qualification,
         experience: formData.experience,
         occupation: formData.occupation,
-        subjects: formData.subjects.split(',').map((s: string) => s.trim()),
+        subjects: formData.subjects,
         mode: formData.mode,
         teachingApproach: formData.description,
         studentCount: formData.studentsCount,
@@ -192,6 +194,14 @@ export default function TeacherForm({
         boards: formData.boards,
         technologies: formData.technologies,
         languagesTaught: formData.languages,
+        knownLanguages: [],
+        preferredTimeRange: '',
+        price: 0,
+        rating: 0.0,
+        area: formData.street || '',
+        city: formData.city || '',
+        latitude: 0.0,
+        longitude: 0.0,
         hasProfile: true
       }, { merge: true });
 
@@ -276,7 +286,7 @@ export default function TeacherForm({
               <>
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Subjects (School)</p>
-                  <p className="text-lg font-bold text-slate-800">{formData.subjects || '-'}</p>
+                  <p className="text-lg font-bold text-slate-800">{formData.subjects?.length > 0 ? formData.subjects.join(', ') : '-'}</p>
                 </div>
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Classes (School)</p>
@@ -361,31 +371,19 @@ export default function TeacherForm({
 
         {/* CATEGORY */}
         <div>
-          <label className="block text-lg font-bold mb-4">
-            📚 Select Teaching Categories (Multi-select)
-          </label>
-
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { id: 'school', label: 'School / Academics' },
-              { id: 'programming', label: 'Programming / IT' },
-              { id: 'languages', label: 'Languages' },
-            ].map((cat) => (
-              <label
-                key={cat.id}
-                className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-emerald-500 transition-all cursor-pointer"
-              >
-                <input 
-                  type="radio" 
-                  name="category"
-                  checked={formData.category === cat.id}
-                  onChange={() => setFormData((prev: any) => ({ ...prev, category: cat.id }))}
-                  className="w-5 h-5 accent-emerald-500"
-                />
-                <span className="font-semibold text-slate-700">{cat.label}</span>
-              </label>
-            ))}
-          </div>
+          <label className="block text-sm font-semibold mb-2">📚 Selected Category</label>
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+            required
+          >
+            <option value="">Select Category</option>
+            <option value="school">School / Academics</option>
+            <option value="programming">Programming / IT</option>
+            <option value="languages">Languages</option>
+          </select>
         </div>
 
         {/* FULL NAME + GENDER */}
@@ -512,40 +510,101 @@ export default function TeacherForm({
 
 
 
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="col-span-1 md:col-span-2">
+        {/* MODE */}
+        <div>
+          <label className="block text-sm font-semibold mb-3">
+            🌐 Preferred Mode
+          </label>
+
+          {(formData.category ===('programming') ||
+            formData.category ===('languages'))  ? (
+
+            <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl px-4 py-4 flex items-center gap-3">
+
+              <input
+                type="radio"
+                name="mode"
+                value="Online"
+                checked
+                readOnly
+              />
+
+              <span className="font-semibold text-emerald-700">
+                Online Only
+              </span>
+
+            </div>
+
+          ) : (
+
+            <div className="grid md:grid-cols-2 gap-3">
+
+              {[
+                'Online',
+                'Offline',
+              ].map((item) => (
+
+                <label
+                  key={item}
+                  className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3"
+                >
+
+                  <input
+                    type="radio"
+                    name="mode"
+                    value={item}
+                    checked={formData.mode === item}
+                    onChange={handleChange}
+                  />
+
+                  {item}
+
+                </label>
+
+              ))}
+
+            </div>
+
+          )}
+
+        </div>
+
+          {formData.mode !== 'Online' && (
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold mb-2">🏠 Residential Address {formData.mode !== 'Online' ? '*' : ''}</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-1 md:col-span-2">
+                  <input
+                    type="text"
+                    name="street"
+                    placeholder="Street / Locality"
+                    value={formData.street}
+                    onChange={handleChange}
+                    className="w-full border border-slate-300 rounded-xl px-4 py-4"
+                    required={formData.mode !== 'Online'}
+                  />
+                </div>
                 <input
                   type="text"
-                  name="street"
-                  placeholder="Street / Locality"
-                  value={formData.street}
+                  name="city"
+                  placeholder="City"
+                  value={formData.city}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-xl px-4 py-4"
-                  required
+                  required={formData.mode !== 'Online'}
+                />
+                <input
+                  type="text"
+                  name="pincode"
+                  placeholder="Pincode"
+                  value={formData.pincode}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-4"
+                  required={formData.mode !== 'Online'}
                 />
               </div>
-              <input
-                type="text"
-                name="city"
-                placeholder="City"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-                required
-              />
-              <input
-                type="text"
-                name="pincode"
-                placeholder="Pincode"
-                value={formData.pincode}
-                onChange={handleChange}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-                required
-              />
             </div>
-          </div>
+          )}
 
         </div>
 
@@ -569,15 +628,25 @@ export default function TeacherForm({
               🎓 Highest Qualification *
             </label>
 
-            <input
-              type="text"
+            <select
               name="qualification"
-              placeholder="Enter qualification"
               value={formData.qualification}
               onChange={handleChange}
               required
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+            >
+              <option value="">Select Qualification</option>
+              <option value="10th">10th</option>
+              <option value="12th">12th</option>
+              <option value="B.E / B.Tech">B.E / B.Tech</option>
+              <option value="B.Sc">B.Sc</option>
+              <option value="B.A">B.A</option>
+              <option value="B.Com">B.Com</option>
+              <option value="M.Sc">M.Sc</option>
+              <option value="M.A">M.A</option>
+              <option value="PhD">PhD</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
 
           <div>
@@ -603,57 +672,20 @@ export default function TeacherForm({
             💼 Current Occupation
           </label>
 
-          <div className="grid md:grid-cols-2 gap-3">
-
-            {[
-              'Freelancer',
-              'Full-Time Teacher',
-              'Student',
-              'Others',
-            ].map((item) => (
-
-              <label
-                key={item}
-                className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-emerald-500 transition-all"
-              >
-
-                <input
-                  type="radio"
-                  name="occupation"
-                  value={item}
-                  checked={formData.occupation === item}
-                  onChange={handleChange}
-                />
-
-                {item}
-
-              </label>
-
-            ))}
-
-          </div>
+          <input
+            type="text"
+            name="occupation"
+            placeholder="e.g. Full-Time Teacher, Software Engineer, Student"
+            value={formData.occupation}
+            onChange={handleChange}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4"
+          />
         </div>
 
         {/* SCHOOL CATEGORY */}
         {formData.category ===('school') && (
 
           <>
-
-            {/* SUBJECTS */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                📘 Subjects you Teach
-              </label>
-
-              <input
-                type="text"
-                name="subjects"
-                placeholder="Maths, Science, English"
-                value={formData.subjects}
-              onChange={handleChange}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-              />
-            </div>
 
             {/* CLASSES */}
             <div>
@@ -671,9 +703,6 @@ export default function TeacherForm({
                   '9th - 10th',
                   '1st PU',
                   '2nd PU',
-                  'KCET',
-                  'NEET',
-                  'JEE',
                 ].map((item) => (
 
                   <label
@@ -731,7 +760,63 @@ export default function TeacherForm({
               </div>
             </div>
 
-          </>
+          {/* SUBJECTS */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                📘 Subjects you Teach
+              </label>
+
+              {formData.boards.length === 0 || formData.classes.length === 0 ? (
+                <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">Please select at least one class and one board below to see the subjects.</p>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-3">
+                  {(() => {
+                    let availableSubjects = new Set();
+                    
+                    const hasEarly = formData.classes.some((c: string) => ['LKG', 'UKG', '1st - 5th'].includes(c));
+                    const hasMiddle = formData.classes.some((c: string) => ['6th - 8th'].includes(c));
+                    const hasHigh = formData.classes.some((c: string) => ['9th - 10th'].includes(c));
+                    const hasPU = formData.classes.some((c: string) => ['1st PU', '2nd PU'].includes(c));
+
+                    if (formData.boards.includes('ICSE')) {
+                      if (hasEarly) ['English', 'Second Language', 'Mathematics', 'Environmental Studies (EVS)', 'General Knowledge (GK)', 'Computer', 'Art', 'Music', 'Physical Education', 'Moral Science', 'Science', 'Social Studies'].forEach(s => availableSubjects.add(s));
+                      if (hasMiddle) ['English Language', 'English Literature', 'Second Language', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Integrated Science', 'History', 'Civics', 'Geography', 'Computer Applications', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasHigh) ['English Language', 'English Literature', 'Second Language', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Civics', 'Geography', 'Computer Applications', 'Physical Education', 'Economics', 'Commercial Studies', 'Yoga', 'Home Science'].forEach(s => availableSubjects.add(s));
+                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
+                    }
+                    if (formData.boards.includes('CBSE')) {
+                      if (hasEarly) ['English', 'Mathematics', 'EVS', 'Hindi/Regional Language', 'Hindi', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasMiddle) ['English', 'Mathematics', 'Science', 'Social Science', 'Hindi', 'Sanskrit/Third Language', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasHigh) ['English', 'Mathematics', 'Science', 'Social Science', 'Hindi', 'Artificial Intelligence/Information Technology', 'Health & Physical Education', 'Skill Subjects', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
+                    }
+                    if (formData.boards.includes('State Board') || formData.boards.includes('IB / IGCSE')) {
+                      if (hasEarly) ['Kannada', 'English', 'Mathematics', 'EVS', 'Science', 'Social Science', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasMiddle) ['Kannada', 'English', 'Hindi/Third Language', 'Mathematics', 'Science', 'Social Science', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasHigh) ['Kannada', 'English', 'Hindi/Third Language', 'Mathematics', 'Science', 'Social Science', 'Computer', 'Physical Education'].forEach(s => availableSubjects.add(s));
+                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
+                    }
+
+                    return Array.from(availableSubjects).sort().map((sub: any) => (
+                      <label
+                        key={sub as string}
+                        className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 hover:border-emerald-500 transition-all cursor-pointer"
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={formData.subjects?.includes(sub as string)}
+                          onChange={() => handleCheckboxChange('subjects', sub as string)}
+                          className="accent-emerald-500"
+                        />
+                        <span className="text-sm font-medium">{sub as string}</span>
+                      </label>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+
+            </>
         )}
 
         {/* PROGRAMMING CATEGORY */}
@@ -813,64 +898,6 @@ export default function TeacherForm({
           </div>
         )}
 
-        {/* MODE */}
-        <div>
-          <label className="block text-sm font-semibold mb-3">
-            🌐 Preferred Mode
-          </label>
-
-          {(formData.category ===('programming') ||
-            formData.category ===('languages'))  ? (
-
-            <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl px-4 py-4 flex items-center gap-3">
-
-              <input
-                type="radio"
-                name="mode"
-                value="Online"
-                checked
-                readOnly
-              />
-
-              <span className="font-semibold text-emerald-700">
-                Online Only
-              </span>
-
-            </div>
-
-          ) : (
-
-            <div className="grid md:grid-cols-2 gap-3">
-
-              {[
-                'Online',
-                'Offline',
-              ].map((item) => (
-
-                <label
-                  key={item}
-                  className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3"
-                >
-
-                  <input
-                    type="radio"
-                    name="mode"
-                    value={item}
-                    checked={formData.mode === item}
-                    onChange={handleChange}
-                  />
-
-                  {item}
-
-                </label>
-
-              ))}
-
-            </div>
-
-          )}
-
-        </div>
 
         {/* DESCRIPTION */}
         <div>
@@ -924,39 +951,43 @@ export default function TeacherForm({
         </div>
 
         {/* LOCATION + KM */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {formData.mode !== 'Online' && (
+          <div className="grid md:grid-cols-2 gap-6">
 
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              📍 Preferred Locations
-            </label>
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                📍 Preferred Locations *
+              </label>
 
-            <input
-              type="text"
-              name="locations"
-              placeholder="Area / Pincode"
-              value={formData.locations}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
+              <input
+                type="text"
+                name="locations"
+                placeholder="Area / Pincode"
+                value={formData.locations}
+                onChange={handleChange}
+                required={formData.mode !== 'Online'}
+                className="w-full border border-slate-300 rounded-xl px-4 py-4"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                🚗 Willing to travel within KM *
+              </label>
+
+              <input
+                type="text"
+                name="travelKm"
+                placeholder="Travel distance"
+                value={formData.travelKm}
+                onChange={handleChange}
+                required={formData.mode !== 'Online'}
+                className="w-full border border-slate-300 rounded-xl px-4 py-4"
+              />
+            </div>
+
           </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              🚗 Willing to travel within KM
-            </label>
-
-            <input
-              type="text"
-              name="travelKm"
-              placeholder="Travel distance"
-              value={formData.travelKm}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
-          </div>
-
-        </div>
+        )}
 
         {/* FEES */}
         <div>
@@ -964,14 +995,23 @@ export default function TeacherForm({
             💰 Expected Fee Range
           </label>
 
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-emerald-600 font-bold">₹{formData.feeRange || 1000}</span>
+          </div>
           <input
-            type="text"
+            type="range"
             name="feeRange"
-            placeholder="Expected monthly fees"
-            value={formData.feeRange}
+            min="1000"
+            max="20000"
+            step="500"
+            value={formData.feeRange || 1000}
             onChange={handleChange}
-            className="w-full border border-slate-300 rounded-xl px-4 py-4"
+            className="w-full accent-emerald-500"
           />
+          <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
+            <span>₹1,000</span>
+            <span>₹20,000</span>
+          </div>
         </div>
 
         {successMsg && (

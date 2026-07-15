@@ -28,6 +28,9 @@ export default function TeacherDashboard() {
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -571,7 +574,10 @@ export default function TeacherDashboard() {
                 </div>
               </div>
               
-              <div className={`absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isProfileDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}>
+              <div 
+                className={`absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isProfileDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}
+                onClick={(e) => e.stopPropagation()}
+              >
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                    <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || 'Teacher'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
@@ -580,7 +586,7 @@ export default function TeacherDashboard() {
                    <button onClick={() => { setActiveTab('profile'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
                      <User className="w-4 h-4" /> Profile Settings
                    </button>
-                   <button onClick={() => setActiveTab('my_students')} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
+                   <button onClick={() => { setActiveTab('my_students'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
                      <Users className="w-4 h-4" /> My Students
                    </button>
                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
@@ -805,7 +811,10 @@ export default function TeacherDashboard() {
                           if (!acc[student.parentId]) {
                             acc[student.parentId] = {
                               parentId: student.parentId,
-                              address: student.area || student.address || 'Location Hidden',
+                              parentName: student.guardianName || student.parentName || student.name || 'Household / Parent',
+                              address: student.preferredMode?.toLowerCase() === 'online' 
+                                ? 'Online' 
+                                : `Offline • ${student.area || student.address || 'Location Hidden'}`,
                               students: []
                             };
                           }
@@ -819,12 +828,9 @@ export default function TeacherDashboard() {
                           <div key={household.parentId} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
                             <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center">
                               <div>
-                                <h3 className="text-lg font-black text-gray-900">Household / Parent</h3>
+                                <h3 className="text-lg font-black text-gray-900">{household.parentName || 'Household / Parent'}</h3>
                                 <p className="text-sm font-medium text-emerald-600">{household.students.length} Student(s) • {household.address}</p>
                               </div>
-                              <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
-                                New Request
-                              </span>
                             </div>
                             
                             <div className="p-4 space-y-4 flex-grow">
@@ -1185,13 +1191,30 @@ export default function TeacherDashboard() {
 
             {/* TAB: PROFILE */}
             {activeTab === 'profile' && (
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
-                {!hasProfile && (
-                  <div className="bg-orange-50 border-b border-orange-100 p-4 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
-                    <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
+              <div className="space-y-6">
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
+                  {!hasProfile && (
+                    <div className="bg-orange-50 border-b border-orange-100 p-4 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
+                      <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
+                    </div>
+                  )}
+                  <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} initialData={data?.profile} onSuccess={() => mutate()} />
+                </div>
+                
+                <div className="mt-12 pt-8 border-t border-red-100">
+                  <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
+                    <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
+                    <p className="text-sm text-red-600/80 font-medium mb-4">
+                      Permanently delete your account and all associated data. This action cannot be undone.
+                    </p>
+                    <button 
+                      onClick={() => setShowDeleteAccountModal(true)}
+                      className="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                      Delete Account
+                    </button>
                   </div>
-                )}
-                <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} initialData={data?.profile} onSuccess={() => mutate()} />
+                </div>
               </div>
             )}
 
@@ -1242,7 +1265,7 @@ export default function TeacherDashboard() {
       
       {/* View Student Profile Modal */}
       {selectedViewUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
             <button 
               onClick={() => setSelectedViewUser(null)}
@@ -1252,10 +1275,10 @@ export default function TeacherDashboard() {
             </button>
             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
               <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-black uppercase">
-                {selectedViewUser.parentName ? selectedViewUser.parentName.charAt(0) : 'S'}
+                {(selectedViewUser.guardianName || selectedViewUser.parentName) ? (selectedViewUser.guardianName || selectedViewUser.parentName).charAt(0) : 'S'}
               </div>
               <div>
-                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.parentName || 'Parent'}</h3>
+                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.guardianName || selectedViewUser.parentName || 'Parent'}</h3>
                 <p className="text-emerald-600 font-bold capitalize">Looking for a {selectedViewUser.category || 'Tutor'}</p>
               </div>
             </div>
@@ -1263,7 +1286,7 @@ export default function TeacherDashboard() {
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div className="bg-gray-50 p-4 rounded-2xl">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Class/Grade</p>
-                <p className="text-lg font-bold text-gray-900">{selectedViewUser.classGrade || 'Not specified'}</p>
+                <p className="text-lg font-bold text-gray-900">{selectedViewUser.classLevel || 'Not specified'}</p>
               </div>
               <div className="bg-gray-50 p-4 rounded-2xl">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Budget</p>
@@ -1276,13 +1299,147 @@ export default function TeacherDashboard() {
               {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Technologies:</strong> {selectedViewUser.technologies.join(', ')}</p>}
               {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
               {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
-              <p className="mb-2"><strong className="text-gray-700">Preferred Days:</strong> {selectedViewUser.days || 'Not specified'}</p>
-              <p><strong className="text-gray-700">Preferred Time:</strong> {selectedViewUser.time || 'Not specified'}</p>
+              <p className="mb-2"><strong>Preferred Days:</strong> {selectedViewUser.daysPerWeek || 'Not specified'} {selectedViewUser.specificDays?.length > 0 ? `(${selectedViewUser.specificDays.join(', ')})` : ''}</p>
+              <p className="mb-2"><strong>Preferred Duration:</strong> {selectedViewUser.hoursPerDay || 'Not specified'}</p>
+              
+              {selectedViewUser.preferredMode?.toLowerCase() === 'online' ? (
+                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                  <MapPin className="w-5 h-5 text-gray-400" />
+                  <p className="font-medium text-gray-900">Online</p>
+                </div>
+              ) : (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="w-5 h-5 text-gray-400" />
+                    <p className="font-medium text-gray-900">Offline</p>
+                  </div>
+                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Preferred Location:</strong> {selectedViewUser.address || 'Location not specified'}</p>
+                </div>
+              )}
             </div>
-            
-            <div className="bg-gray-50 p-5 rounded-2xl">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Location</p>
-              <p className="font-medium text-gray-900">{selectedViewUser.area || 'Not specified'} ({selectedViewUser.mode || 'Online'})</p>
+
+            {/* Actions */}
+            {(() => {
+              const isPending = data?.applications?.some((app: any) => app.studentId === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted', 'negotiating'].includes(app.status));
+              const isHired = data?.applications?.some((app: any) => app.studentId === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              
+              if (isHired || isPending) return null;
+              
+              return (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
+                      <input 
+                        type="number"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                        placeholder="e.g. 500"
+                        value={negotiationOffer[selectedViewUser.id] || ''}
+                        onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
+                      />
+                    </div>
+                    <button 
+                      onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
+                      disabled={offerLoading}
+                      className="w-full bg-[#063831] text-white hover:bg-[#04241f] font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#063831]/20 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+      {/* Delete Account Modal */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-8">
+            <h3 className="text-2xl font-black text-red-600 mb-2">Delete Account</h3>
+            <p className="text-gray-600 font-medium mb-4">
+              This will permanently delete your account, teacher profile, and all tuition history.
+            </p>
+            <div className="bg-red-50 p-4 rounded-xl mb-6 border border-red-100">
+              <label className="text-sm font-bold text-red-800 block mb-2">Type "DELETE" to confirm</label>
+              <input 
+                type="text"
+                value={deleteAccountConfirm}
+                onChange={e => setDeleteAccountConfirm(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-red-200 focus:ring-2 focus:ring-red-500 font-bold"
+                placeholder="DELETE"
+              />
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => { setShowDeleteAccountModal(false); setDeleteAccountConfirm(''); }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={isDeletingAccount}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  if(deleteAccountConfirm !== 'DELETE') {
+                    toast.error('Please type DELETE to confirm');
+                    return;
+                  }
+                  setIsDeletingAccount(true);
+                  try {
+                    const { db, auth } = await import('@/utils/firebase/client');
+                    const { doc, deleteDoc, query, collection, where, getDocs } = await import('firebase/firestore');
+                    const { deleteUser } = await import('firebase/auth');
+                    
+                    if(!auth.currentUser) throw new Error('Not logged in');
+                    
+                    const uid = auth.currentUser.uid;
+                    
+                    // Delete tutor doc
+                    await deleteDoc(doc(db, 'tutors', uid));
+                    
+                    // Delete user doc
+                    await deleteDoc(doc(db, 'users', uid));
+                    
+                    // Delete all applications for this tutor
+                    const appQ = query(collection(db, 'applications'), where('tutorId', '==', uid));
+                    const appSnap = await getDocs(appQ);
+                    for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
+                    
+                    // Delete tutor requests
+                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('tutorId', '==', uid));
+                    const tutorReqSnap = await getDocs(tutorReqQ);
+                    for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
+
+                    // Delete direct requests
+                    const directReqQ = query(collection(db, 'direct_requests'), where('tutorId', '==', uid));
+                    const directReqSnap = await getDocs(directReqQ);
+                    for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
+
+                    try {
+                      await deleteUser(auth.currentUser);
+                      localStorage.clear();
+                      toast.success('Account deleted successfully');
+                      window.location.href = '/';
+                    } catch (e: any) {
+                      if(e.code === 'auth/requires-recent-login') {
+                        localStorage.clear();
+                        toast.success('Account deleted successfully');
+                        await auth.signOut();
+                        window.location.href = '/login';
+                      } else {
+                        throw e;
+                      }
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message);
+                    setIsDeletingAccount(false);
+                  }
+                }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50"
+                disabled={isDeletingAccount || deleteAccountConfirm !== 'DELETE'}
+              >
+                {isDeletingAccount ? 'Deleting...' : 'Permanently Delete'}
+              </button>
             </div>
           </div>
         </div>

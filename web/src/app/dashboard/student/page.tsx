@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin } from 'lucide-react';
 import DemoForm from '@/components/DemoForm';
 import ActionModal from '@/components/ActionModal';
 import { toast } from 'sonner';
@@ -33,6 +33,15 @@ export default function StudentDashboard() {
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [isEditingParentProfile, setIsEditingParentProfile] = useState(false);
+  const [parentFormData, setParentFormData] = useState({ name: '', email: '', phone: '', whatsapp: '', address: '' });
+  const [parentSameAsPhone, setParentSameAsPhone] = useState(false);
+  const [parentSaveLoading, setParentSaveLoading] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<any>(null);
+  const [isRemovingStudent, setIsRemovingStudent] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -648,7 +657,10 @@ export default function StudentDashboard() {
                 </div>
               </div>
               
-              <div className={`absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isProfileDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}>
+              <div 
+                className={`absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isProfileDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}
+                onClick={(e) => e.stopPropagation()}
+              >
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                    <p className="font-bold text-sm text-gray-900 truncate">{data?.user?.displayName || 'Student'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
@@ -888,6 +900,9 @@ export default function StudentDashboard() {
                             {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
                             {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
                             {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
+                            {teacher.mode !== 'Online' && teacher.locations && (
+                              <p><strong className="text-gray-700">📍 Location:</strong> {teacher.locations} {teacher.travelKm ? `(Travels up to ${teacher.travelKm}km)` : ''}</p>
+                            )}
                             <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
                           </div>
                           
@@ -1243,6 +1258,71 @@ export default function StudentDashboard() {
             {/* TAB: PROFILE */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
+                {hasProfile && (
+                  <>
+                    <div className="flex justify-between items-center mb-2">
+                      <h2 className="text-2xl font-black text-gray-900">Parent / Guardian Profile</h2>
+                      {!isEditingParentProfile && (
+                        <button 
+                          onClick={() => setIsEditingParentProfile(true)}
+                          className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
+                        >
+                          Edit Profile
+                        </button>
+                      )}
+                    </div>
+                    
+                    {isEditingParentProfile ? (
+                      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative mb-8">
+                        <div className="bg-emerald-50 border-b border-emerald-100 p-4 text-emerald-800 flex justify-between items-center font-medium text-sm">
+                          <span>Editing Parent / Guardian Profile</span>
+                          <button onClick={() => setIsEditingParentProfile(false)} className="font-bold underline">Cancel</button>
+                        </div>
+                        <div className="p-8">
+                          <DemoForm 
+                            isDashboard={true} 
+                            hasProfile={true} 
+                            parentOnly={true}
+                            initialData={{
+                              guardianName: data?.profile?.name || data?.user?.displayName || '',
+                              email: data?.profile?.email || data?.user?.email || '',
+                              phoneNumber: data?.profile?.phone || '',
+                              whatsappNumber: data?.profile?.whatsapp || '',
+                              address: data?.profile?.address || '',
+                              preferredMode: data?.profile?.preferredMode || '',
+                            }} 
+                            onSuccess={() => {
+                              mutate();
+                              setIsEditingParentProfile(false);
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Name</p>
+                            <p className="text-lg font-bold text-gray-900">{data?.profile?.name || data?.user?.displayName || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Email</p>
+                            <p className="text-lg font-bold text-gray-900">{data?.profile?.email || data?.user?.email || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Phone Number</p>
+                            <p className="text-lg font-bold text-gray-900">{data?.profile?.phone || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Preferred Mode' : 'Address'}</p>
+                            <p className="text-lg font-bold text-gray-900">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Online' : (data?.profile?.address || '-')}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-black text-gray-900">Registered Students</h2>
                   {hasProfile && (
@@ -1273,14 +1353,20 @@ export default function StudentDashboard() {
                     <DemoForm 
                       key={(editingStudentId || activeStudentId) || 'default'}
                       isDashboard={true} 
-                      hasProfile={hasProfile && activeStudentId !== 'new'} 
+                      hasProfile={hasProfile} 
                       category={selectedCategory} 
                       activeStudentId={editingStudentId || activeStudentId} 
-                      initialData={
-                        (editingStudentId || activeStudentId) !== 'new' && (editingStudentId || activeStudentId) !== '' 
-                          ? allStudents.find((s:any) => s.id === (editingStudentId || activeStudentId)) 
-                          : ((editingStudentId || activeStudentId) === '' ? allStudents[0] : null)
-                      }
+                      initialData={(() => {
+                        const activeId = editingStudentId || activeStudentId;
+                        if (activeId !== 'new' && activeId !== '') {
+                          return allStudents.find((s:any) => s.id === activeId);
+                        } else if (activeId === 'new') {
+                          const base = allStudents[0] || {};
+                          return { ...base, name: '', gender: '', classLevel: '', board: '', subjects: [], technologies: [], languages: [], studentType: '', budget: 4000 };
+                        } else {
+                          return allStudents[0];
+                        }
+                      })()}
                       onSuccess={() => {
                         if(activeStudentId === 'new') setActiveStudentId('');
                         if(editingStudentId) setEditingStudentId('');
@@ -1323,15 +1409,37 @@ export default function StudentDashboard() {
                           </button>
                           <button 
                             onClick={() => setEditingStudentId(s.id)}
-                            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 rounded-xl font-bold text-sm transition-colors"
+                            className="flex-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 rounded-xl font-bold text-sm transition-colors"
                           >
                             Edit Profile
+                          </button>
+                          <button 
+                            onClick={() => setStudentToRemove(s)}
+                            className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                            title="Remove Student"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
+
+                <div className="mt-12 pt-8 border-t border-red-100">
+                  <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
+                    <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
+                    <p className="text-sm text-red-600/80 font-medium mb-4">
+                      Permanently delete your account and all associated data. This action cannot be undone.
+                    </p>
+                    <button 
+                      onClick={() => setShowDeleteAccountModal(true)}
+                      className="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1446,10 +1554,10 @@ export default function StudentDashboard() {
           </motion.div>
         </div>
 
-      
+      {/* Modals End */}
       {/* View Teacher Profile Modal */}
       {selectedViewUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
             <button 
               onClick={() => setSelectedViewUser(null)}
@@ -1488,8 +1596,215 @@ export default function StudentDashboard() {
             </div>
             
             <div className="bg-gray-50 p-5 rounded-2xl">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
-              <p className="font-medium text-gray-900">{selectedViewUser.address || 'Not specified'}</p>
+              {selectedViewUser.mode?.toLowerCase() === 'online' ? (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-emerald-500" />
+                  <p className="font-bold text-emerald-700 uppercase tracking-wider text-sm">Online Classes</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="w-5 h-5 text-gray-400" />
+                      <p className="font-medium text-gray-900">Offline</p>
+                    </div>
+                    <p className="text-sm text-gray-600"><strong className="text-gray-700">Address:</strong> {selectedViewUser.address || 'Location not specified'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Actions */}
+            {(() => {
+              const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['negotiating'].includes(app.status));
+              const isPending = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+              const isHired = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              
+              if (isHired || isPending || hasNegotiation) return null;
+              
+              return (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
+                      <input 
+                        type="number"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                        placeholder="e.g. 500"
+                        value={negotiationOffer[selectedViewUser.id] || ''}
+                        onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
+                      />
+                    </div>
+                    <button 
+                      onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
+                      className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Send Request
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Remove Student Confirmation Modal */}
+      {studentToRemove && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-8">
+            <h3 className="text-2xl font-black text-gray-900 mb-2">Remove Student?</h3>
+            <p className="text-gray-500 font-medium mb-6">Are you sure you want to remove <strong className="text-gray-900">{studentToRemove.name}</strong>? All their tuition requests will also be deleted. This cannot be undone.</p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setStudentToRemove(null)}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={isRemovingStudent}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  setIsRemovingStudent(true);
+                  try {
+                    const { db } = await import('@/utils/firebase/client');
+                    const { doc, deleteDoc, query, collection, where, getDocs } = await import('firebase/firestore');
+                    
+                    // Delete student
+                    await deleteDoc(doc(db, 'students', studentToRemove.id));
+                    
+                    // Delete tuition requests
+                    const reqQ = query(collection(db, 'tuition_requests'), where('studentId', '==', studentToRemove.id));
+                    const reqSnap = await getDocs(reqQ);
+                    for (const reqDoc of reqSnap.docs) {
+                      await deleteDoc(doc(db, 'tuition_requests', reqDoc.id));
+                    }
+                    
+                    // Delete applications
+                    const appQ = query(collection(db, 'applications'), where('studentId', '==', studentToRemove.id));
+                    const appSnap = await getDocs(appQ);
+                    for (const appDoc of appSnap.docs) {
+                      await deleteDoc(doc(db, 'applications', appDoc.id));
+                    }
+                    
+                    toast.success('Student removed successfully');
+                    mutate();
+                    setStudentToRemove(null);
+                  } catch (err: any) {
+                    toast.error(err.message);
+                  } finally {
+                    setIsRemovingStudent(false);
+                  }
+                }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center"
+                disabled={isRemovingStudent}
+              >
+                {isRemovingStudent ? 'Removing...' : 'Yes, Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-8">
+            <h3 className="text-2xl font-black text-red-600 mb-2">Delete Account</h3>
+            <p className="text-gray-600 font-medium mb-4">
+              This will permanently delete your account, parents profile, all registered students, and all history.
+            </p>
+            <div className="bg-red-50 p-4 rounded-xl mb-6 border border-red-100">
+              <label className="text-sm font-bold text-red-800 block mb-2">Type "DELETE" to confirm</label>
+              <input 
+                type="text"
+                value={deleteAccountConfirm}
+                onChange={e => setDeleteAccountConfirm(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-red-200 focus:ring-2 focus:ring-red-500 font-bold"
+                placeholder="DELETE"
+              />
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => { setShowDeleteAccountModal(false); setDeleteAccountConfirm(''); }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={isDeletingAccount}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  if(deleteAccountConfirm !== 'DELETE') {
+                    toast.error('Please type DELETE to confirm');
+                    return;
+                  }
+                  setIsDeletingAccount(true);
+                  try {
+                    const { db, auth } = await import('@/utils/firebase/client');
+                    const { doc, deleteDoc, query, collection, where, getDocs } = await import('firebase/firestore');
+                    const { deleteUser } = await import('firebase/auth');
+                    
+                    if(!auth.currentUser) throw new Error('Not logged in');
+                    
+                    const uid = auth.currentUser.uid;
+                    
+                    // Delete parent doc
+                    await deleteDoc(doc(db, 'parents', uid));
+                    
+                    // Delete user doc
+                    await deleteDoc(doc(db, 'users', uid));
+                    
+                    // Delete all students
+                    const stuQ = query(collection(db, 'students'), where('parentId', '==', uid));
+                    const stuSnap = await getDocs(stuQ);
+                    for (const d of stuSnap.docs) await deleteDoc(doc(db, 'students', d.id));
+                    
+                    // Delete all requests
+                    const reqQ = query(collection(db, 'tuition_requests'), where('parentId', '==', uid));
+                    const reqSnap = await getDocs(reqQ);
+                    for (const d of reqSnap.docs) await deleteDoc(doc(db, 'tuition_requests', d.id));
+                    
+                    // Delete all applications
+                    const appQ = query(collection(db, 'applications'), where('parentId', '==', uid));
+                    const appSnap = await getDocs(appQ);
+                    for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
+                    
+                    // Delete tutor requests
+                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('parentId', '==', uid));
+                    const tutorReqSnap = await getDocs(tutorReqQ);
+                    for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
+
+                    // Delete direct requests
+                    const directReqQ = query(collection(db, 'direct_requests'), where('parentId', '==', uid));
+                    const directReqSnap = await getDocs(directReqQ);
+                    for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
+
+                    try {
+                      await deleteUser(auth.currentUser);
+                      localStorage.clear();
+                      toast.success('Account deleted successfully');
+                      window.location.href = '/';
+                    } catch (e: any) {
+                      if(e.code === 'auth/requires-recent-login') {
+                        localStorage.clear();
+                        toast.success('Account deleted successfully');
+                        await auth.signOut();
+                        window.location.href = '/login';
+                      } else {
+                        throw e;
+                      }
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message);
+                    setIsDeletingAccount(false);
+                  }
+                }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50"
+                disabled={isDeletingAccount || deleteAccountConfirm !== 'DELETE'}
+              >
+                {isDeletingAccount ? 'Deleting...' : 'Permanently Delete'}
+              </button>
             </div>
           </div>
         </div>

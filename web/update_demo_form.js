@@ -1,4 +1,10 @@
+const fs = require('fs');
 
+const ICSE_SUBJECTS = ['English', 'English Language', 'English Literature', 'Second Language', 'Mathematics', 'Environmental Studies (EVS)', 'General Knowledge (GK)', 'Computer', 'Computer Applications', 'Science', 'Integrated Science', 'Physics', 'Chemistry', 'Biology', 'History', 'Civics', 'Geography', 'Art', 'Music', 'Physical Education', 'Moral Science', 'Economics', 'Commercial Studies', 'Yoga', 'Home Science'];
+const CBSE_SUBJECTS = ['English', 'Mathematics', 'EVS', 'Hindi/Regional Language', 'Hindi', 'Sanskrit/Third Language', 'Science', 'Social Science', 'Computer', 'Artificial Intelligence/Information Technology', 'Health & Physical Education', 'Skill Subjects', 'Art', 'Physical Education'];
+const STATE_BOARD_SUBJECTS = ['Kannada', 'English', 'Hindi/Third Language', 'Mathematics', 'EVS', 'Science', 'Social Science', 'Computer', 'Art', 'Physical Education'];
+
+const content = `
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -11,12 +17,11 @@ interface Props {
   onSuccess?: () => void;
   activeStudentId?: string;
   initialData?: any;
-  parentOnly?: boolean;
 }
 
-const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
-const CBSE_SUBJECTS = ["English","Mathematics","EVS","Hindi/Regional Language","Hindi","Sanskrit/Third Language","Science","Social Science","Computer","Artificial Intelligence/Information Technology","Health & Physical Education","Skill Subjects","Art","Physical Education"];
-const STATE_BOARD_SUBJECTS = ["Kannada","English","Hindi/Third Language","Mathematics","EVS","Science","Social Science","Computer","Art","Physical Education"];
+const ICSE_SUBJECTS = ${JSON.stringify(ICSE_SUBJECTS)};
+const CBSE_SUBJECTS = ${JSON.stringify(CBSE_SUBJECTS)};
+const STATE_BOARD_SUBJECTS = ${JSON.stringify(STATE_BOARD_SUBJECTS)};
 
 export default function DemoForm({
   category,
@@ -25,15 +30,14 @@ export default function DemoForm({
   onSuccess,
   activeStudentId,
   initialData,
-  parentOnly = false,
 }: Props) {
 
   const getInitialFormData = () => {
     if (initialData) {
       return {
-        step: (hasProfile && !parentOnly) ? 2 : 1,
+        step: 1,
         numberOfStudents: 1,
-        parentName: initialData.guardianName || initialData.parentName || '',
+        parentName: initialData.parentName || '',
         phone: initialData.phoneNumber || '',
         whatsapp: initialData.whatsappNumber || '',
         email: initialData.email || '',
@@ -47,7 +51,7 @@ export default function DemoForm({
         specificDays: initialData.specificDays || [],
         goal: initialData.learningGoal || '',
         requirements: initialData.specialRequirements || '',
-        // Budget removed from global level
+        budget: initialData.budget?.toString() || '4000',
         students: [
           {
             fullName: initialData.name || '',
@@ -55,7 +59,7 @@ export default function DemoForm({
             studentType: initialData.studentType || '',
             classGrade: initialData.classLevel || '',
             board: initialData.board || '',
-            subjects: initialData.subjects || [],
+            subjects: initialData.subjects ? initialData.subjects.join(', ') : '',
             technologies: initialData.technologies || [],
             languages: initialData.languages || [],
           }
@@ -63,7 +67,7 @@ export default function DemoForm({
       };
     }
     return {
-      step: (hasProfile && !parentOnly) ? 2 : 1,
+      step: 1,
       numberOfStudents: 1,
       parentName: '',
       phone: '',
@@ -79,7 +83,7 @@ export default function DemoForm({
       specificDays: [],
       goal: '',
       requirements: '',
-      // Budget removed from global level
+      budget: '4000',
       students: [
         {
           fullName: '',
@@ -87,15 +91,15 @@ export default function DemoForm({
           studentType: '',
           classGrade: '',
           board: '',
-          subjects: [] as string[],
+          subjects: '',
           technologies: [] as string[],
-          budget: '4000',
+          languages: [] as string[],
         }
       ]
     };
   };
 
-  const [isEditing, setIsEditing] = useState(!hasProfile || !initialData || activeStudentId === 'new');
+  const [isEditing, setIsEditing] = useState(!hasProfile || !initialData);
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [formData, setFormData] = useState(getInitialFormData());
 
@@ -156,7 +160,7 @@ export default function DemoForm({
                   specificDays: studentData.specificDays || [],
                   goal: studentData.learningGoal || '',
                   requirements: studentData.specialRequirements || '',
-                  budget: '4000',
+                  budget: studentData.budget?.toString() || '4000',
                   numberOfStudents: 1,
                   students: [{
                     fullName: studentData.name || '',
@@ -164,10 +168,9 @@ export default function DemoForm({
                     studentType: studentData.studentType || '',
                     classGrade: studentData.classLevel || '',
                     board: studentData.board || '',
-                    subjects: studentData.subjects || [],
+                    subjects: studentData.subjects ? studentData.subjects.join(', ') : '',
                     technologies: studentData.technologies || [],
                     languages: studentData.languages || [],
-                    budget: studentData.budget?.toString() || '4000',
                   }]
                 }));
               } else {
@@ -207,12 +210,6 @@ export default function DemoForm({
       if (name === 'phone' && sameAsPhone) {
         next.whatsapp = val;
       }
-      if (name === 'days') {
-        const maxDays = val === 'Daily' ? 7 : parseInt(val.charAt(0)) || 0;
-        if (maxDays > 0 && next.specificDays && next.specificDays.length > maxDays) {
-          next.specificDays = next.specificDays.slice(0, maxDays);
-        }
-      }
       return next;
     });
   };
@@ -232,26 +229,34 @@ export default function DemoForm({
     setFormData((prev: any) => {
       const newStudents = [...prev.students];
       const array = newStudents[index][field] || [];
-      const newArray = array.includes(value)
-        ? array.filter((item: string) => item !== value)
-        : [...array, value];
-      newStudents[index] = { ...newStudents[index], [field]: newArray };
+      if (array.includes(value)) {
+        newStudents[index][field] = array.filter((item: string) => item !== value);
+      } else {
+        newStudents[index][field] = [...array, value];
+      }
       return { ...prev, students: newStudents };
     });
   };
   
-
+  const handleStudentSubjectsCheckbox = (index: number, value: string) => {
+    setFormData((prev) => {
+      const newStudents = [...prev.students];
+      const subjectsArray = newStudents[index].subjects ? newStudents[index].subjects.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if (subjectsArray.includes(value)) {
+        newStudents[index].subjects = subjectsArray.filter(s => s !== value).join(', ');
+      } else {
+        newStudents[index].subjects = [...subjectsArray, value].join(', ');
+      }
+      return { ...prev, students: newStudents };
+    });
+  };
 
   const handleSpecificDayCheckbox = (day: string) => {
     setFormData((prev) => {
       const array = prev.specificDays || [];
       if (array.includes(day)) {
-        return { ...prev, specificDays: array.filter((d: string) => d !== day) };
+        return { ...prev, specificDays: array.filter(d => d !== day) };
       } else {
-        const maxDays = prev.days === 'Daily' ? 7 : parseInt(prev.days?.charAt(0)) || 0;
-        if (maxDays > 0 && array.length >= maxDays) {
-          return prev;
-        }
         return { ...prev, specificDays: [...array, day] };
       }
     });
@@ -268,10 +273,9 @@ export default function DemoForm({
             studentType: '',
             classGrade: '',
             board: '',
-            subjects: [],
+            subjects: '',
             technologies: [],
             languages: [],
-            budget: '4000',
           });
         }
       } else if (num < currentStudents.length) {
@@ -292,7 +296,7 @@ export default function DemoForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!parentOnly && formData.step < formData.numberOfStudents + 1) {
+    if (formData.step < formData.numberOfStudents + 1) {
       setFormData(prev => ({ ...prev, step: prev.step + 1 }));
       return;
     }
@@ -300,8 +304,7 @@ export default function DemoForm({
     setLoading(true);
     setSuccessMsg('');
 
-    const isOnline = formData.demoMode?.toLowerCase() === 'online';
-    const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
+    const combinedAddress = [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
     if (!isDashboard) {
       const { auth } = await import('@/utils/firebase/client');
@@ -333,44 +336,13 @@ export default function DemoForm({
         name: formData.parentName,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
-        email: formData.email,
-        address: combinedAddress,
-        preferredMode: formData.demoMode || ''
+        email: formData.email
       }, { merge: true });
-
-      if (parentOnly) {
-        const studentsQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
-        const studentsSnap = await getDocs(studentsQuery);
-        for (const sDoc of studentsSnap.docs) {
-          await updateDoc(sDoc.ref, {
-            address: combinedAddress,
-            preferredMode: formData.demoMode || ''
-          });
-        }
-
-        const requestsQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
-        const requestsSnap = await getDocs(requestsQuery);
-        for (const rDoc of requestsSnap.docs) {
-          await updateDoc(rDoc.ref, {
-            address: combinedAddress,
-            city: formData.demoMode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-            preferredMode: formData.demoMode || ''
-          });
-        }
-
-        setSuccessMsg('Parent profile updated successfully!');
-        sessionStorage.removeItem('demoFormData');
-        if (onSuccess) onSuccess();
-        return;
-      }
 
       if (activeStudentId && activeStudentId !== 'new') {
         const s = formData.students[0];
         const studentRef = doc(db, 'students', activeStudentId);
         await updateDoc(studentRef, {
-          id: activeStudentId,
-          guardianName: formData.parentName,
-          dob: '',
           category: formData.category || '',
           name: s.fullName,
           gender: s.gender,
@@ -381,48 +353,40 @@ export default function DemoForm({
           studentType: s.studentType,
           classLevel: s.classGrade,
           board: s.board,
-          subjects: s.subjects || [],
-          technologies: s.technologies || [],
-          languages: s.languages || [],
-          preferredMode: formData.demoMode || '',
-          learningGoal: formData.goal || '',
-          specialRequirements: formData.requirements || '',
-          hoursPerDay: formData.hours || '',
-          daysPerWeek: formData.days || '',
-          specificDays: formData.specificDays || [],
-          budget: parseInt(s.budget) || 0,
+          subjects: s.subjects ? s.subjects.split(',').map((sub: string) => sub.trim()) : [],
+          technologies: s.technologies,
+          languages: s.languages,
+          preferredMode: formData.demoMode,
+          learningGoal: formData.goal,
+          specialRequirements: formData.requirements,
+          hoursPerDay: formData.hours,
+          daysPerWeek: formData.days,
+          specificDays: formData.specificDays,
+          budget: parseInt(formData.budget) || 0,
         });
 
         const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
         const requestSnap = await getDocs(requestQuery);
         if (!requestSnap.empty) {
           await updateDoc(requestSnap.docs[0].ref, {
-            id: requestSnap.docs[0].id,
-            city: '',
-            latitude: 0.0,
-            longitude: 0.0,
             category: formData.category || '',
             studentName: s.fullName,
             classLevel: s.classGrade,
             board: s.board,
-            subjects: s.subjects || [],
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            mode: formData.demoMode || '',
-            preferredTimeRange: formData.hours || '',
+            subjects: s.subjects ? s.subjects.split(',').map((sub: string) => sub.trim()) : [],
+            technologies: s.technologies,
+            languages: s.languages,
+            mode: formData.demoMode,
+            preferredTimeRange: formData.hours,
             area: combinedAddress,
-            budget: parseInt(s.budget) || 0,
+            budget: parseInt(formData.budget) || 0,
           });
         }
         setSuccessMsg('Profile updated successfully!');
       } else {
         for (let i = 0; i < formData.numberOfStudents; i++) {
           const s = formData.students[i];
-          const newStudentRef = doc(collection(db, 'students'));
-          await setDoc(newStudentRef, {
-            id: newStudentRef.id,
-            guardianName: formData.parentName,
-            dob: '',
+          const newStudentRef = await addDoc(collection(db, 'students'), {
             parentId: user.uid,
             category: formData.category || '',
             name: s.fullName,
@@ -434,39 +398,33 @@ export default function DemoForm({
             studentType: s.studentType,
             classLevel: s.classGrade,
             board: s.board,
-            subjects: s.subjects || [],
-            budget: parseInt(s.budget) || 0,
-            preferredMode: formData.demoMode || '',
-            learningGoal: formData.goal || '',
-            specialRequirements: formData.requirements || '',
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            hoursPerDay: formData.hours || '',
-            daysPerWeek: formData.days || '',
-            specificDays: formData.specificDays || [],
+            subjects: s.subjects ? s.subjects.split(',').map((sub: string) => sub.trim()) : [],
+            budget: parseInt(formData.budget) || 0,
+            preferredMode: formData.demoMode,
+            learningGoal: formData.goal,
+            specialRequirements: formData.requirements,
+            technologies: s.technologies,
+            languages: s.languages,
+            hoursPerDay: formData.hours,
+            daysPerWeek: formData.days,
+            specificDays: formData.specificDays,
             createdAt: Date.now()
           });
 
-          const newRequestRef = doc(collection(db, 'tuition_requests'));
-          await setDoc(newRequestRef, {
-            id: newRequestRef.id,
-            city: '',
-            latitude: 0.0,
-            longitude: 0.0,
-            acceptedTutorId: '',
+          await addDoc(collection(db, 'tuition_requests'), {
             parentId: user.uid,
             studentId: newStudentRef.id,
             category: formData.category || '',
             studentName: s.fullName,
             classLevel: s.classGrade,
             board: s.board,
-            subjects: s.subjects || [],
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            mode: formData.demoMode || '',
-            preferredTimeRange: formData.hours || '',
+            subjects: s.subjects ? s.subjects.split(',').map((sub: string) => sub.trim()) : [],
+            technologies: s.technologies,
+            languages: s.languages,
+            mode: formData.demoMode,
+            preferredTimeRange: formData.hours,
             area: combinedAddress,
-            budget: parseInt(s.budget) || 0,
+            budget: parseInt(formData.budget) || 0,
             status: 'open',
             createdAt: Date.now()
           });
@@ -500,10 +458,6 @@ export default function DemoForm({
       CBSE_SUBJECTS.forEach(s => availableSubjects.add(s));
       STATE_BOARD_SUBJECTS.forEach(s => availableSubjects.add(s));
     }
-    const puGrades = ['1st PU', '2nd PU', '11th Standard', '12th Standard'];
-    if (puGrades.includes(classGrade)) {
-      ['KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
-    }
     return Array.from(availableSubjects).sort();
   };
 
@@ -525,28 +479,22 @@ export default function DemoForm({
         </div>
         
         <div className="grid md:grid-cols-2 gap-6">
-          {!parentOnly && (
-            <>
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
-                <p className="text-lg font-bold text-slate-800">{student.fullName || '-'}</p>
-              </div>
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gender</p>
-                <p className="text-lg font-bold text-slate-800 capitalize">{student.gender || '-'}</p>
-              </div>
-            </>
-          )}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
+            <p className="text-lg font-bold text-slate-800">{student.fullName || '-'}</p>
+          </div>
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gender</p>
+            <p className="text-lg font-bold text-slate-800 capitalize">{student.gender || '-'}</p>
+          </div>
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Parent's Name</p>
             <p className="text-lg font-bold text-slate-800">{formData.parentName || '-'}</p>
           </div>
-          {!parentOnly && (
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Category</p>
-              <p className="text-lg font-bold text-purple-600 capitalize">{formData.category || '-'}</p>
-            </div>
-          )}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Category</p>
+            <p className="text-lg font-bold text-purple-600 capitalize">{formData.category || '-'}</p>
+          </div>
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Phone / WhatsApp</p>
             <p className="text-lg font-bold text-slate-800">{formData.phone || formData.whatsapp || '-'}</p>
@@ -570,7 +518,7 @@ export default function DemoForm({
               </div>
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Subjects</p>
-                <p className="text-lg font-bold text-slate-800">{student.subjects?.length > 0 ? student.subjects.join(', ') : '-'}</p>
+                <p className="text-lg font-bold text-slate-800">{student.subjects || '-'}</p>
               </div>
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Board</p>
@@ -605,7 +553,10 @@ export default function DemoForm({
             </div>
           )}
 
-
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Budget</p>
+            <p className="text-xl font-black text-emerald-600">₹{formData.budget || 0} <span className="text-sm text-slate-500 font-medium">/ month</span></p>
+          </div>
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Preferred Mode</p>
             <p className="text-lg font-bold text-slate-800">{formData.demoMode || '-'}</p>
@@ -626,7 +577,7 @@ export default function DemoForm({
     if (formData.step === 1) {
       return (
         <div className="space-y-8">
-          {!activeStudentId && !parentOnly && (
+          {!activeStudentId && (
             <div>
               <label className="block text-sm font-semibold mb-2">👥 Number of Students</label>
               <select
@@ -641,23 +592,21 @@ export default function DemoForm({
             </div>
           )}
 
-          {!parentOnly && (
-            <div>
-              <label className="block text-sm font-semibold mb-2">📚 Selected Category</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleCommonChange}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="school">School / Academics</option>
-                <option value="programming">Programming / IT</option>
-                <option value="languages">Languages</option>
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-semibold mb-2">📚 Selected Category</label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleCommonChange}
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+              required
+            >
+              <option value="">Select Category</option>
+              <option value="school">School / Academics</option>
+              <option value="programming">Programming / IT</option>
+              <option value="languages">Languages</option>
+            </select>
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
@@ -717,7 +666,7 @@ export default function DemoForm({
                 disabled={sameAsPhone}
                 required={!sameAsPhone}
                 pattern="[0-9]{10,15}"
-                className={`w-full border border-slate-300 rounded-xl px-4 py-4 ${sameAsPhone ? 'bg-slate-100' : ''}`}
+                className={\`w-full border border-slate-300 rounded-xl px-4 py-4 \${sameAsPhone ? 'bg-slate-100' : ''}\`}
               />
             </div>
           </div>
@@ -749,7 +698,7 @@ export default function DemoForm({
             )}
           </div>
 
-          {(formData.demoMode !== 'Online') && (
+          {formData.demoMode !== 'Online' && (
             <div>
               <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
               <div className="space-y-3">
@@ -784,74 +733,82 @@ export default function DemoForm({
             </div>
           )}
 
-          {!parentOnly && (
-            <>
-              <div>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">⏱ Preferred Study Time</label>
-                    <select name="hours" value={formData.hours} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
-                      <option value="">Select duration</option>
-                      <option value="1 Hour/Day">1 Hour / Day</option>
-                      <option value="1.5 Hours/Day">1.5 Hours / Day</option>
-                      <option value="2 Hours/Day">2 Hours / Day</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">📅 Days per Week</label>
-                    <select name="days" value={formData.days} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
-                      <option value="">Select days</option>
-                      <option value="1 Day/Week">1 Day / Week</option>
-                      <option value="2 Days/Week">2 Days / Week</option>
-                      <option value="3 Days/Week">3 Days / Week</option>
-                      <option value="4 Days/Week">4 Days / Week</option>
-                      <option value="5 Days/Week">5 Days / Week</option>
-                      <option value="6 Days/Week">6 Days / Week</option>
-                      <option value="Daily">Daily</option>
-                    </select>
-                  </div>
-                </div>
+          <div>
+            <label className="block text-sm font-semibold mb-2 flex justify-between">
+              <span>💰 Expected Budget / Monthly Fee</span>
+              <span className="text-emerald-600 font-bold">₹{formData.budget}</span>
+            </label>
+            <input
+              type="range"
+              name="budget"
+              min="1000"
+              max="20000"
+              step="500"
+              value={formData.budget}
+              onChange={handleCommonChange}
+              className="w-full accent-emerald-500"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
+              <span>₹1,000</span>
+              <span>₹20,000</span>
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold mb-2">⏱ Preferred Study Time</label>
+              <select name="hours" value={formData.hours} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
+                <option value="">Select duration</option>
+                <option value="1 Hour/Day">1 Hour / Day</option>
+                <option value="1.5 Hours/Day">1.5 Hours / Day</option>
+                <option value="2 Hours/Day">2 Hours / Day</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2">📅 Days per Week</label>
+              <select name="days" value={formData.days} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
+                <option value="">Select days</option>
+                <option value="1 Day/Week">1 Day / Week</option>
+                <option value="2 Days/Week">2 Days / Week</option>
+                <option value="3 Days/Week">3 Days / Week</option>
+                <option value="4 Days/Week">4 Days / Week</option>
+                <option value="5 Days/Week">5 Days / Week</option>
+                <option value="6 Days/Week">6 Days / Week</option>
+                <option value="Daily">Daily</option>
+              </select>
+            </div>
+          </div>
+          
+          {formData.days && (
+            <div>
+              <label className="block text-sm font-semibold mb-3">📆 Specific Days of the Week (Optional)</label>
+              <div className="flex flex-wrap gap-3">
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                  <label key={day} className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:border-purple-500">
+                    <input
+                      type="checkbox"
+                      checked={formData.specificDays.includes(day)}
+                      onChange={() => handleSpecificDayCheckbox(day)}
+                      className="accent-purple-500"
+                    />
+                    <span className="text-sm font-medium">{day}</span>
+                  </label>
+                ))}
               </div>
-              
-              {formData.days && (
-                <div>
-                  <label className="block text-sm font-semibold mb-3">📆 Specific Days of the Week (Optional)</label>
-                  <div className="flex flex-wrap gap-3">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                      const isChecked = formData.specificDays.includes(day);
-                      const maxDays = formData.days === 'Daily' ? 7 : parseInt(formData.days?.charAt(0)) || 0;
-                      const isAtMax = maxDays > 0 && formData.specificDays.length >= maxDays;
-                      const isDisabled = !isChecked && isAtMax;
-                      return (
-                      <label key={day} className={`flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500'}`}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={isDisabled}
-                          onChange={() => handleSpecificDayCheckbox(day)}
-                          className="accent-purple-500"
-                        />
-                        <span className="text-sm font-medium">{day}</span>
-                      </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold mb-2">🎯 Learning Goal</label>
-                <textarea
-                  name="goal"
-                  value={formData.goal}
-                  onChange={handleCommonChange}
-                  placeholder="E.g., Improve grades, learn conversational German..."
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
-                  rows={2}
-                />
-              </div>
-            </>
+            </div>
           )}
+
+          <div>
+            <label className="block text-sm font-semibold mb-2">🎯 Learning Goal</label>
+            <textarea
+              name="goal"
+              value={formData.goal}
+              onChange={handleCommonChange}
+              placeholder="E.g., Improve grades, learn conversational German..."
+              className="w-full border border-slate-300 rounded-xl px-4 py-3"
+              rows={2}
+            />
+          </div>
         </div>
       );
     }
@@ -861,7 +818,7 @@ export default function DemoForm({
 
     return (
       <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
-        <h3 className="text-2xl font-bold border-b pb-4">Details for Student</h3>
+        <h3 className="text-2xl font-bold border-b pb-4">Details for Student {sIndex + 1}</h3>
         
         <div className="grid md:grid-cols-2 gap-6">
           <div>
@@ -894,27 +851,6 @@ export default function DemoForm({
                 </label>
               ))}
             </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-          <label className="block text-sm font-semibold mb-2 flex justify-between">
-            <span>💰 Expected Budget / Monthly Fee</span>
-            <span className="text-emerald-600 font-bold">₹{student.budget}</span>
-          </label>
-          <input
-            type="range"
-            name="budget"
-            min="1000"
-            max="20000"
-            step="500"
-            value={student.budget || '4000'}
-            onChange={(e) => handleStudentChange(sIndex, e)}
-            className="w-full accent-emerald-500"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
-            <span>₹1,000</span>
-            <span>₹20,000</span>
           </div>
         </div>
 
@@ -959,7 +895,7 @@ export default function DemoForm({
                       <option value="LKG">LKG</option>
                       <option value="UKG">UKG</option>
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                        <option key={num} value={`${num}th Standard`}>{num}th Standard</option>
+                        <option key={num} value={\`\${num}th Standard\`}>{num}th Standard</option>
                       ))}
                     </>
                   )}
@@ -997,8 +933,8 @@ export default function DemoForm({
                     <label key={sub} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500">
                       <input
                         type="checkbox"
-                        checked={student.subjects?.includes(sub)}
-                        onChange={() => handleStudentCheckbox(sIndex, 'subjects', sub)}
+                        checked={(student.subjects || '').split(', ').includes(sub)}
+                        onChange={() => handleStudentSubjectsCheckbox(sIndex, sub)}
                         className="accent-purple-500"
                       />
                       <span className="text-sm font-medium">{sub}</span>
@@ -1060,15 +996,13 @@ export default function DemoForm({
           <div className="flex justify-between items-start mb-8">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-black mb-2">
-                {activeStudentId === 'new' ? '👤 Add Student' : (hasProfile ? '👤 Edit Profile' : (isDashboard ? '🎓 Complete Demo Request' : '🎓 Book a Free Demo'))}
+                {hasProfile ? '👤 Edit Profile' : (isDashboard ? '🎓 Complete Demo Request' : '🎓 Book a Free Demo')}
               </h2>
-              {activeStudentId !== 'new' && (
-                <p className="text-slate-500 text-base">
-                  {formData.step === 1 ? 'Step 1: Common Details & Preferences' : `Step ${formData.step}: Details for Student ${formData.step - 1}`}
-                </p>
-              )}
+              <p className="text-slate-500 text-base">
+                {formData.step === 1 ? 'Step 1: Common Details & Preferences' : \`Step \${formData.step}: Details for Student \${formData.step - 1}\`}
+              </p>
             </div>
-            {hasProfile && activeStudentId !== 'new' && (
+            {hasProfile && (
               <button 
                 onClick={() => setIsEditing(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold text-sm px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
@@ -1088,7 +1022,7 @@ export default function DemoForm({
             )}
 
             <div className="flex gap-4 pt-4 border-t border-slate-100">
-              {formData.step > (hasProfile ? 2 : 1) && (
+              {formData.step > 1 && (
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
@@ -1103,7 +1037,7 @@ export default function DemoForm({
                 disabled={loading}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg text-lg"
               >
-                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < formData.numberOfStudents + 1 ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
+                {loading ? 'Processing...' : (formData.step < formData.numberOfStudents + 1 ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request'))}
               </button>
             </div>
           </form>
@@ -1112,3 +1046,7 @@ export default function DemoForm({
     </div>
   );
 }
+`;
+
+fs.writeFileSync('c:\\\\Users\\\\Dell\\\\Desktop\\\\mushi\\\\web\\\\src\\\\components\\\\DemoForm.tsx', content);
+console.log('DemoForm.tsx rewritten successfully.');
