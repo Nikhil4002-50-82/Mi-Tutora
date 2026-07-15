@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -406,7 +407,7 @@ export default function TeacherDashboard() {
   };
 
   if (!data && swrError) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold">Error loading dashboard: {swrError.message}</div>;
-  if (!data) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+  if (!data) return <LoadingScreen />;
 
   const handleWithdrawSubmit = async () => {
     if (!upiId.includes('@')) {
@@ -452,14 +453,7 @@ export default function TeacherDashboard() {
   ];
 
   if (loading && !data) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
-          <p className="text-gray-500 font-medium animate-pulse">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (

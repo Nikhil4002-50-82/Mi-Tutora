@@ -183,7 +183,6 @@ export default function TeacherForm({
         experience: formData.experience,
         occupation: formData.occupation,
         subjects: formData.subjects,
-        mode: formData.mode,
         teachingApproach: formData.description,
         studentCount: formData.studentsCount,
         schoolNames: formData.schoolNames,

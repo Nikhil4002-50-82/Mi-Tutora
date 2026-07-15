@@ -58,6 +58,7 @@ export default function DemoForm({
             subjects: initialData.subjects || [],
             technologies: initialData.technologies || [],
             languages: initialData.languages || [],
+            budget: initialData.budget?.toString() || '4000',
           }
         ]
       };
@@ -89,6 +90,7 @@ export default function DemoForm({
           board: '',
           subjects: [] as string[],
           technologies: [] as string[],
+          languages: [] as string[],
           budget: '4000',
         }
       ]
@@ -202,7 +204,7 @@ export default function DemoForm({
     const val = e.target.value;
     const name = e.target.name;
     
-    setFormData((prev) => {
+    setFormData((prev: any) => {
       const next = { ...prev, [name]: val };
       if (name === 'phone' && sameAsPhone) {
         next.whatsapp = val;
@@ -221,7 +223,7 @@ export default function DemoForm({
     const val = e.target.value;
     const name = e.target.name;
     
-    setFormData((prev) => {
+    setFormData((prev: any) => {
       const newStudents = [...prev.students];
       newStudents[index] = { ...newStudents[index], [name]: val };
       return { ...prev, students: newStudents };
@@ -243,7 +245,7 @@ export default function DemoForm({
 
 
   const handleSpecificDayCheckbox = (day: string) => {
-    setFormData((prev) => {
+    setFormData((prev: any) => {
       const array = prev.specificDays || [];
       if (array.includes(day)) {
         return { ...prev, specificDays: array.filter((d: string) => d !== day) };
@@ -258,7 +260,7 @@ export default function DemoForm({
   };
 
   const updateNumberOfStudents = (num: number) => {
-    setFormData((prev) => {
+    setFormData((prev: any) => {
       const currentStudents = [...prev.students];
       if (num > currentStudents.length) {
         for (let i = currentStudents.length; i < num; i++) {

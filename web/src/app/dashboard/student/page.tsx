@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin, Search, Calendar, ChevronRight, Settings, Clock, ArrowRight, MoreVertical, Home, CreditCard, Banknote } from 'lucide-react';
 import DemoForm from '@/components/DemoForm';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 import ActionModal from '@/components/ActionModal';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
@@ -130,14 +131,11 @@ export default function StudentDashboard() {
       return true;
     }) || [];
 
-    // referrals fetched sequentially above
-
     const tutorIds = applications.map((app: any) => app.tutorId).filter(Boolean);
     let tutorsInfo: any[] = [];
     if (tutorIds.length > 0) {
        const { documentId } = await import('firebase/firestore');
        
-       // Chunk tutorIds into groups of 10
        for (let i = 0; i < tutorIds.length; i += 10) {
          const chunk = tutorIds.slice(i, i + 10);
          const tutorsQuery = query(collection(db, 'tutors'), where(documentId(), 'in', chunk));
@@ -535,14 +533,7 @@ export default function StudentDashboard() {
   ];
 
   if (loading && !data) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-[#00a992]/30 border-t-[#00a992] rounded-full animate-spin"></div>
-          <p className="text-gray-500 font-medium animate-pulse">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
