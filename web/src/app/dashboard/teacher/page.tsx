@@ -9,6 +9,7 @@ import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, 
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { generateReferralCode } from '@/utils/referral';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -238,7 +239,7 @@ export default function TeacherDashboard() {
           const { db } = await import('@/utils/firebase/client');
           const { doc, updateDoc } = await import('firebase/firestore');
           const baseName = data?.profile?.name || data?.user?.displayName || 'USER';
-          const newCode = baseName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+          const newCode = generateReferralCode(baseName, data.user.uid);
           
           mutate({ ...data, userData: { ...data.userData, referralCode: newCode, referralcode: newCode } }, false);
           
@@ -273,7 +274,7 @@ export default function TeacherDashboard() {
           const userDocRef = doc(db, 'users', user.uid);
           const userDocSnap = await getDoc(userDocRef);
           const existingCode = userDocSnap.exists() && userDocSnap.data().referralCode;
-          const newCode = existingCode || (parsedData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+          const newCode = existingCode || generateReferralCode(parsedData.fullName, user.uid);
           await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
           await updateDoc(doc(db, 'tutors', user.uid), {

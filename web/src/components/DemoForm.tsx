@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { generateReferralCode } from '@/utils/referral';
 
 interface Props {
   category?: string;
@@ -325,7 +326,7 @@ export default function DemoForm({
       if (!hasProfile) {
         const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
-        const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.parentName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+        const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.parentName, user.uid);
         await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
       }
 

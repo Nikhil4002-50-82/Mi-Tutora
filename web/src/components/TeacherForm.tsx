@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { generateReferralCode } from '@/utils/referral';
 
 
 interface Props {
@@ -165,7 +166,7 @@ export default function TeacherForm({
       // Update user hasProfile flag and referral code
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
-      const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || (formData.fullName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+      const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.fullName, user.uid);
       await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
       // Update the existing tutor record
