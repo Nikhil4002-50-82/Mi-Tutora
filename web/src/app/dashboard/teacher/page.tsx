@@ -18,6 +18,8 @@ import useSWR from 'swr';
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [showProfileReminder, setShowProfileReminder] = useState(false);
+  const [hasDismissedReminder, setHasDismissedReminder] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
@@ -229,6 +231,15 @@ export default function TeacherDashboard() {
   };
 
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+
+  useEffect(() => {
+    if (data && !hasProfile && !showCategoryPopup && !hasDismissedReminder && activeTab === 'new_tuition') {
+      const timer = setTimeout(() => {
+        setShowProfileReminder(true);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [data, hasProfile, showCategoryPopup, hasDismissedReminder, activeTab]);
 
   useEffect(() => {
     const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
@@ -530,10 +541,10 @@ export default function TeacherDashboard() {
 
         <div className="mt-auto p-4 border-t border-white/10 flex items-center gap-3 bg-white/5">
           <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-lg shadow-inner">
-            {data?.profile?.name?.charAt(0) || 'T'}
+            {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="font-bold text-sm truncate">{data?.profile?.name || 'Teacher'}</p>
+            <p className="font-bold text-sm truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
             <p className="text-xs text-emerald-400 font-medium">Teacher Account</p>
           </div>
         </div>
@@ -553,6 +564,35 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+      {/* Profile Completion Reminder Modal */}
+      {showProfileReminder && !hasProfile && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-32 bg-[#00a992] -z-10"></div>
+            <button 
+              onClick={() => { setShowProfileReminder(false); setHasDismissedReminder(true); }}
+              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
+            >
+              ✕
+            </button>
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg mt-4 ring-4 ring-[#00a992]/20">
+              <User className="w-10 h-10 text-[#00a992]" />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-3">Complete Your Profile</h2>
+            <p className="text-gray-500 mb-8 font-medium">To unlock the ability to send requests and fully explore our platform, please complete your profile settings first.</p>
+            <button 
+              onClick={() => {
+                setShowProfileReminder(false);
+                setHasDismissedReminder(true);
+                setActiveTab('profile');
+              }}
+              className="w-full bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              Go to Profile Settings
+            </button>
+          </div>
+        </div>
+      )}
       <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
@@ -565,7 +605,7 @@ export default function TeacherDashboard() {
             <div className="relative group cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
-                  {data?.profile?.name?.charAt(0) || 'T'}
+                  {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
                 </div>
               </div>
               
@@ -574,7 +614,7 @@ export default function TeacherDashboard() {
                 onClick={(e) => e.stopPropagation()}
               >
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-                   <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || 'Teacher'}</p>
+                   <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
                  </div>
                  <div className="p-2">
@@ -695,7 +735,7 @@ export default function TeacherDashboard() {
                                   <p className="text-sm text-gray-500">{cls.subject}</p>
                                 </div>
                               </div>
-                              <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-[#00a992] font-bold text-sm bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100">
+                              <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200">
                                 View
                               </button>
                             </div>
@@ -731,7 +771,7 @@ export default function TeacherDashboard() {
                                   <h4 className="font-bold text-gray-900 text-sm truncate">{student.name || 'Student'}</h4>
                                   <p className="text-xs text-gray-500 truncate">{student.subjects ? student.subjects.join(', ') : student.category}</p>
                                 </div>
-                                <button onClick={() => setSelectedViewUser(student)} className="text-xs font-bold text-[#00a992] bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 flex-shrink-0">
+                                <button onClick={() => setSelectedViewUser(student)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
                                   View
                                 </button>
                               </div>
@@ -821,10 +861,10 @@ export default function TeacherDashboard() {
 
                         return households.map((household: any) => (
                           <div key={household.parentId} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
-                            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center">
+                            <div className="bg-[#00a992] p-6 flex justify-between items-center">
                               <div>
-                                <h3 className="text-lg font-black text-gray-900">{household.parentName || 'Household / Parent'}</h3>
-                                <p className="text-sm font-medium text-emerald-600">{household.students.length} Student(s) • {household.address}</p>
+                                <h3 className="text-xl font-black text-white">{household.parentName || 'Household / Parent'}</h3>
+                                <p className="text-sm font-medium text-emerald-100">{household.students.length} Student(s) • {household.address}</p>
                               </div>
                             </div>
                             
@@ -883,7 +923,7 @@ export default function TeacherDashboard() {
                                             <button 
                                               onClick={() => handleSendOffer(student)}
                                               disabled={offerLoading}
-                                              className="w-2/3 bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                              className="w-2/3 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                               {offerLoading ? 'Sending...' : 'Send Offer'}
                                             </button>
@@ -1261,22 +1301,23 @@ export default function TeacherDashboard() {
       {/* View Student Profile Modal */}
       {selectedViewUser && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
               onClick={() => setSelectedViewUser(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
+              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
             >
               ✕
             </button>
-            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-black uppercase">
+            <div className="bg-[#00a992] p-6 md:p-8 flex items-center gap-4">
+              <div className="w-16 h-16 bg-white text-[#00a992] rounded-full flex items-center justify-center text-2xl font-black uppercase shadow-sm">
                 {(selectedViewUser.guardianName || selectedViewUser.parentName) ? (selectedViewUser.guardianName || selectedViewUser.parentName).charAt(0) : 'S'}
               </div>
               <div>
-                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.guardianName || selectedViewUser.parentName || 'Parent'}</h3>
-                <p className="text-emerald-600 font-bold capitalize">Looking for a {selectedViewUser.category || 'Tutor'}</p>
+                <h3 className="text-2xl font-black text-white">{selectedViewUser.guardianName || selectedViewUser.parentName || 'Parent'}</h3>
+                <p className="text-emerald-100 font-bold capitalize">Looking for a {selectedViewUser.category || 'Tutor'}</p>
               </div>
             </div>
+            <div className="p-6 md:p-8 pt-6">
             
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div className="bg-gray-50 p-4 rounded-2xl">
@@ -1296,22 +1337,17 @@ export default function TeacherDashboard() {
               {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
               <p className="mb-2"><strong>Preferred Days:</strong> {selectedViewUser.daysPerWeek || 'Not specified'} {selectedViewUser.specificDays?.length > 0 ? `(${selectedViewUser.specificDays.join(', ')})` : ''}</p>
               <p className="mb-2"><strong>Preferred Duration:</strong> {selectedViewUser.hoursPerDay || 'Not specified'}</p>
-              
-              {selectedViewUser.preferredMode?.toLowerCase() === 'online' ? (
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-                  <MapPin className="w-5 h-5 text-gray-400" />
-                  <p className="font-medium text-gray-900">Online</p>
-                </div>
-              ) : (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="w-5 h-5 text-gray-400" />
-                    <p className="font-medium text-gray-900">Offline</p>
-                  </div>
-                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Preferred Location:</strong> {selectedViewUser.address || 'Location not specified'}</p>
-                </div>
-              )}
+              <p className="mb-2"><strong>Mode:</strong> {selectedViewUser.preferredMode || 'Online'}</p>
             </div>
+            
+            {selectedViewUser.preferredMode?.toLowerCase() !== 'online' && selectedViewUser.address && (
+              <div className="bg-gray-50 p-5 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Preferred Location:</strong> {selectedViewUser.address}</p>
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             {(() => {
@@ -1336,7 +1372,7 @@ export default function TeacherDashboard() {
                     <button 
                       onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
                       disabled={offerLoading}
-                      className="w-full bg-[#063831] text-white hover:bg-[#04241f] font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#063831]/20 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                      className="w-full bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
                     </button>
@@ -1344,6 +1380,7 @@ export default function TeacherDashboard() {
                 </div>
               );
             })()}
+            </div>
           </div>
         </div>
       )}

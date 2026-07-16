@@ -18,6 +18,8 @@ import useSWR from 'swr';
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [showProfileReminder, setShowProfileReminder] = useState(false);
+  const [hasDismissedReminder, setHasDismissedReminder] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
@@ -247,6 +249,15 @@ export default function StudentDashboard() {
   };
 
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+
+  useEffect(() => {
+    if (data && !hasProfile && !showCategoryPopup && !hasDismissedReminder && activeTab === 'new_tuition') {
+      const timer = setTimeout(() => {
+        setShowProfileReminder(true);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [data, hasProfile, showCategoryPopup, hasDismissedReminder, activeTab]);
 
   useEffect(() => {
     const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
@@ -610,10 +621,10 @@ export default function StudentDashboard() {
 
         <div className="mt-auto p-4 border-t border-white/10 flex items-center gap-3 bg-white/5">
           <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-lg shadow-inner">
-            {data?.user?.displayName?.charAt(0) || 'S'}
+            {(data?.profile?.name || data?.user?.displayName || 'S').charAt(0)}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="font-bold text-sm truncate">{data?.user?.displayName || 'Student'}</p>
+            <p className="font-bold text-sm truncate">{data?.profile?.name || data?.user?.displayName || 'Student'}</p>
             <p className="text-xs text-emerald-400 font-medium">Student Account</p>
           </div>
         </div>
@@ -633,6 +644,35 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
+      {/* Profile Completion Reminder Modal */}
+      {showProfileReminder && !hasProfile && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-32 bg-[#00a992] -z-10"></div>
+            <button 
+              onClick={() => { setShowProfileReminder(false); setHasDismissedReminder(true); }}
+              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
+            >
+              ✕
+            </button>
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg mt-4 ring-4 ring-[#00a992]/20">
+              <User className="w-10 h-10 text-[#00a992]" />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-3">Complete Your Profile</h2>
+            <p className="text-gray-500 mb-8 font-medium">To unlock the ability to send requests and fully explore our platform, please complete your profile settings first.</p>
+            <button 
+              onClick={() => {
+                setShowProfileReminder(false);
+                setHasDismissedReminder(true);
+                setActiveTab('profile');
+              }}
+              className="w-full bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              Go to Profile Settings
+            </button>
+          </div>
+        </div>
+      )}
       <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
@@ -645,7 +685,7 @@ export default function StudentDashboard() {
             <div className="relative group cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
-                  {data?.user?.displayName?.charAt(0) || 'S'}
+                  {(data?.profile?.name || data?.user?.displayName || 'S').charAt(0)}
                 </div>
               </div>
               
@@ -654,7 +694,7 @@ export default function StudentDashboard() {
                 onClick={(e) => e.stopPropagation()}
               >
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-                   <p className="font-bold text-sm text-gray-900 truncate">{data?.user?.displayName || 'Student'}</p>
+                   <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || 'Student'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
                  </div>
                  <div className="p-2">
@@ -774,7 +814,7 @@ export default function StudentDashboard() {
                                   <p className="text-sm text-gray-500">{cls.subject}</p>
                                 </div>
                               </div>
-                              <button onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }} className="text-[#00a992] font-bold text-sm bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100">
+                              <button onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200">
                                 View
                               </button>
                             </div>
@@ -810,7 +850,7 @@ export default function StudentDashboard() {
                                   <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
                                   <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
                                 </div>
-                                <button onClick={() => setSelectedViewUser(tutor)} className="text-xs font-bold text-[#00a992] bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 flex-shrink-0">
+                                <button onClick={() => setSelectedViewUser(tutor)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
                                   View
                                 </button>
                               </div>
@@ -879,14 +919,17 @@ export default function StudentDashboard() {
                       if (hasNegotiation) return null; // Already negotiating
                       
                       return (
-                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold text-gray-900">{teacher.name}</h3>
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full overflow-hidden">
+                          <div className="bg-[#00a992] p-6 flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-white">{teacher.name}</h3>
+                            <span className="px-3 py-1 bg-white/20 text-white text-xs font-bold rounded-full border border-white/30">
                               {teacher.mode || 'Online'}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 mb-4 h-10 overflow-hidden leading-relaxed">{teacher.teachingApproach || 'Experienced Tutor'}</p>
+                          <div className="p-6 flex flex-col flex-grow">
+                            {teacher.teachingApproach && (
+                              <p className="text-sm text-gray-600 mb-4 overflow-hidden leading-relaxed">{teacher.teachingApproach}</p>
+                            )}
                           <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
                             {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-gray-700">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
                             {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
@@ -927,24 +970,25 @@ export default function StudentDashboard() {
                                     Pending
                                   </button>
                                 ) : (
-                                  <div className="flex gap-2">
+                                  <div className="flex gap-2 mt-auto">
                                     <button 
                                       onClick={() => setSelectedViewUser(teacher)}
-                                      className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                                      className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center"
                                     >
-                                      <User className="w-4 h-4" /> View Profile
+                                      View
                                     </button>
                                     <button 
                                       onClick={() => handleRequestTutor(teacher)}
                                       disabled={requestLoading}
-                                      className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="w-2/3 bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                      <MessageCircle className="w-4 h-4" /> {requestLoading ? 'Requesting...' : 'Request & Offer'}
+                                      {requestLoading ? 'Requesting...' : 'Request & Offer'}
                                     </button>
                                   </div>
                                 )}
                               </>
                             )}
+                          </div>
                           </div>
                         </div>
                       );
@@ -1291,23 +1335,23 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     ) : (
-                      <div className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden mb-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="relative bg-white rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 overflow-hidden mb-8">
+                        <div className="bg-[#00a992] p-6 flex justify-between items-center">
                           <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Name</p>
-                            <p className="text-lg font-bold text-gray-900">{data?.profile?.name || data?.user?.displayName || '-'}</p>
+                            <h3 className="text-xl font-black text-white">{data?.profile?.name || data?.user?.displayName || 'Parent Profile'}</h3>
+                            <p className="text-sm font-medium text-emerald-100">{data?.profile?.email || data?.user?.email || 'No email provided'}</p>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Email</p>
-                            <p className="text-lg font-bold text-gray-900">{data?.profile?.email || data?.user?.email || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Phone Number</p>
-                            <p className="text-lg font-bold text-gray-900">{data?.profile?.phone || '-'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Preferred Mode' : 'Address'}</p>
-                            <p className="text-lg font-bold text-gray-900">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Online' : (data?.profile?.address || '-')}</p>
+                        </div>
+                        <div className="p-6 bg-gray-50/50">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Phone Number</p>
+                              <p className="text-lg font-bold text-gray-900">{data?.profile?.phone || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Preferred Mode' : 'Address'}</p>
+                              <p className="text-lg font-bold text-gray-900">{data?.profile?.preferredMode?.toLowerCase() === 'online' ? 'Online' : (data?.profile?.address || '-')}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1369,14 +1413,15 @@ export default function StudentDashboard() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {allStudents.map((s:any) => (
-                      <div key={s.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-all flex flex-col">
-                        <div className="flex justify-between items-start mb-4">
+                      <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col overflow-hidden">
+                        <div className="bg-[#00a992] p-6 flex justify-between items-start">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">{s.name}</h3>
-                            <p className="text-sm font-medium text-emerald-600 capitalize">{s.category}</p>
+                            <h3 className="text-xl font-bold text-white">{s.name}</h3>
+                            <p className="text-sm font-medium text-emerald-100 capitalize">{s.category}</p>
                           </div>
                         </div>
-                        <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
+                        <div className="p-6 flex flex-col flex-grow">
+                          <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
                           {s.classLevel && <p><strong className="text-gray-700">Class:</strong> {s.classLevel}</p>}
                           {s.board && <p><strong className="text-gray-700">Board:</strong> {s.board}</p>}
                           {s.subjects && s.subjects.length > 0 && <p><strong className="text-gray-700">Subjects:</strong> {s.subjects.join(', ')}</p>}
@@ -1384,34 +1429,35 @@ export default function StudentDashboard() {
                           {s.languages && s.languages.length > 0 && <p><strong className="text-gray-700">Languages:</strong> {s.languages.join(', ')}</p>}
                           <p><strong className="text-gray-700">Budget:</strong> ₹{s.budget}/mo</p>
                         </div>
-                        <div className="flex gap-2 mt-auto">
+                        <div className="flex gap-3 mt-auto pt-2">
                           <button 
                             onClick={() => setActiveStudentId(s.id)}
-                            className={`w-full py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
+                            className={`w-[45%] py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
                               activeStudentId === s.id || (activeStudentId === '' && activeStudent?.id === s.id) 
                                 ? 'bg-emerald-100 text-emerald-800' 
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                           >
                             {activeStudentId === s.id || (activeStudentId === '' && activeStudent?.id === s.id) ? (
-                              <><CheckCircle2 className="w-4 h-4" /> Active Student</>
+                              <><CheckCircle2 className="w-4 h-4" /> Active</>
                             ) : (
                               'Select'
                             )}
                           </button>
                           <button 
                             onClick={() => setEditingStudentId(s.id)}
-                            className="flex-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 rounded-xl font-bold text-sm transition-colors"
+                            className="w-[35%] bg-gray-100 text-gray-700 hover:bg-gray-200 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
                           >
-                            View Profile
+                            View
                           </button>
                           <button 
                             onClick={() => setStudentToRemove(s)}
-                            className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                            className="w-[20%] bg-red-50 text-red-600 hover:bg-red-100 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
                             title="Remove Student"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                        </div>
                         </div>
                       </div>
                     ))}
@@ -1550,22 +1596,23 @@ export default function StudentDashboard() {
       {/* View Teacher Profile Modal */}
       {selectedViewUser && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-8">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
               onClick={() => setSelectedViewUser(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
+              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
             >
               ✕
             </button>
-            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-black uppercase">
+            <div className="bg-[#00a992] p-6 md:p-8 flex items-center gap-4">
+              <div className="w-16 h-16 bg-white text-[#00a992] rounded-full flex items-center justify-center text-2xl font-black uppercase shadow-sm">
                 {selectedViewUser.name.charAt(0)}
               </div>
               <div>
-                <h3 className="text-2xl font-black text-gray-900">{selectedViewUser.name}</h3>
-                <p className="text-emerald-600 font-bold capitalize">{selectedViewUser.category || 'Tutor'}</p>
+                <h3 className="text-2xl font-black text-white">{selectedViewUser.name}</h3>
+                <p className="text-emerald-100 font-bold capitalize">{selectedViewUser.category || 'Tutor'}</p>
               </div>
             </div>
+            <div className="p-6 md:p-8 pt-6">
             
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div className="bg-gray-50 p-4 rounded-2xl">
@@ -1584,28 +1631,18 @@ export default function StudentDashboard() {
               {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
               {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
               <p className="mb-2"><strong className="text-gray-700">Teaching Approach:</strong> {selectedViewUser.teachingApproach || 'Not specified'}</p>
+              <p className="mb-2"><strong className="text-gray-700">Mode:</strong> {selectedViewUser.mode || 'Online'}</p>
               <p><strong className="text-gray-700">Fee Range:</strong> {selectedViewUser.feeRange || 'Negotiable'}</p>
             </div>
             
-            <div className="bg-gray-50 p-5 rounded-2xl">
-              {selectedViewUser.mode?.toLowerCase() === 'online' ? (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-emerald-500" />
-                  <p className="font-bold text-emerald-700 uppercase tracking-wider text-sm">Online Classes</p>
+            {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
+              <div className="bg-gray-50 p-5 rounded-2xl">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Address:</strong> {selectedViewUser.address}</p>
                 </div>
-              ) : (
-                <>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
-                  <div className="mt-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-5 h-5 text-gray-400" />
-                      <p className="font-medium text-gray-900">Offline</p>
-                    </div>
-                    <p className="text-sm text-gray-600"><strong className="text-gray-700">Address:</strong> {selectedViewUser.address || 'Location not specified'}</p>
-                  </div>
-                </>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Actions */}
             {(() => {
@@ -1630,7 +1667,7 @@ export default function StudentDashboard() {
                     </div>
                     <button 
                       onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
-                      className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                      className="w-full bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"
                     >
                       <CheckCircle2 className="w-4 h-4" /> Send Request
                     </button>
@@ -1638,6 +1675,7 @@ export default function StudentDashboard() {
                 </div>
               );
             })()}
+            </div>
           </div>
         </div>
       )}
