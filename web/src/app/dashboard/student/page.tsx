@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin, Search, Calendar, ChevronRight, Settings, Clock, ArrowRight, MoreVertical, Home, CreditCard, Banknote } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin, Search, Calendar, ChevronRight, Settings, Clock, ArrowRight, MoreVertical, Home, CreditCard, Banknote, Handshake } from 'lucide-react';
 import DemoForm from '@/components/DemoForm';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import ActionModal from '@/components/ActionModal';
@@ -25,6 +25,8 @@ export default function StudentDashboard() {
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isNotificationsDropdownOpen, setIsNotificationsDropdownOpen] = useState(false);
+  const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
   const [requestLoading, setRequestLoading] = useState(false);
   const [payingClass, setPayingClass] = useState<any>(null);
   const [useWallet, setUseWallet] = useState(false);
@@ -159,6 +161,9 @@ export default function StudentDashboard() {
     }) || [];
 
     const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status));
+    const allNotifications = applicationsWithSubjects
+      .filter((app: any) => ['negotiating', 'demo_pending_payment', 'declined', 'tuition_started'].includes(app.status))
+      .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
     const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorId));
 
     return {
@@ -175,6 +180,7 @@ export default function StudentDashboard() {
       referrals,
       negotiations: allNegotiations,
       allNegotiations,
+      allNotifications,
       recommendedNegotiations,
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
         id: app.id,
@@ -447,6 +453,7 @@ export default function StudentDashboard() {
       } else if (action === 'decline') {
         updateData.status = 'declined';
       }
+      updateData.updatedAt = Date.now();
 
       await updateDoc(doc(db, 'applications', appId), updateData);
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
@@ -487,7 +494,8 @@ export default function StudentDashboard() {
       await updateDoc(doc(db, 'applications', payingClass.id), { 
         status: 'tuition_started', 
         demoPaymentPaid: true,
-        startDate: new Date().toLocaleDateString('en-GB')
+        startDate: new Date().toLocaleDateString('en-GB'),
+        updatedAt: Date.now()
       });
 
       toast.success("Payment completed successfully!");
@@ -540,6 +548,8 @@ export default function StudentDashboard() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'new_tuition', label: 'New Tuition', icon: Globe },
+    { id: 'requests', label: 'Requests & Offers', icon: Handshake },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'my_teachers', label: 'My Teachers', icon: BookOpen },
     { id: 'referrals', label: 'Referrals', icon: Gift },
   ];
@@ -601,6 +611,7 @@ export default function StudentDashboard() {
                     return;
                   }
                   setActiveTab(item.id);
+                  setActiveRequestViewId(null);
                   setIsMobileMenuOpen(false);
                 }}
                 disabled={isLocked}
@@ -677,10 +688,57 @@ export default function StudentDashboard() {
         {/* TOP NAVIGATION BAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
           <div className="flex items-center gap-6">
-            <button onClick={() => setActiveTab('requests')} className="text-gray-400 hover:text-emerald-600 transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
+            <div className="relative group cursor-pointer" onClick={() => setIsNotificationsDropdownOpen(!isNotificationsDropdownOpen)}>
+              <button className="text-gray-400 hover:text-emerald-600 transition-colors relative mt-1">
+                <Bell className="w-5 h-5" />
+                {((data?.allNotifications)?.length ?? 0) > 0 && (
+                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                )}
+              </button>
+              
+              <div 
+                className={`absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isNotificationsDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-gray-900">Notifications</h3>
+                  <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">{data?.allNotifications?.length || 0} New</span>
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  {((data?.allNotifications)?.length ?? 0) > 0 ? (
+                    data?.allNotifications?.slice(0, 3).map((neg: any, idx: number) => {
+                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
+                      return (
+                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
+                          <p className="text-sm text-gray-800 font-medium line-clamp-2">
+                            {neg.status === 'declined' ? (
+                              <span>Request declined for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
+                            ) : neg.status === 'tuition_started' ? (
+                              <span>Fees paid for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
+                            ) : (
+                              <span>New update on request with <span className="font-bold">{neg.tutorName}</span> for <span className="font-bold">{studentForApp.name}</span></span>
+                            )}
+                          </p>
+                          <p className="text-xs text-emerald-600 font-bold mt-1">Price: ₹{neg.finalPrice || neg.currentOffer}</p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-6 text-center text-gray-500 text-sm">
+                      No new notifications
+                    </div>
+                  )}
+                </div>
+                <div className="p-2 border-t border-gray-50 bg-gray-50/50">
+                  <button 
+                    onClick={() => { setActiveTab('notifications'); setIsNotificationsDropdownOpen(false); }}
+                    className="w-full text-center px-4 py-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"
+                  >
+                    Show all notifications
+                  </button>
+                </div>
+              </div>
+            </div>
             
             <div className="relative group cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
               <div className="flex items-center gap-3">
@@ -1004,13 +1062,67 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* TAB: REQUESTS */}
-            {activeTab === 'requests' && (
+            {/* TAB: NOTIFICATIONS */}
+            {activeTab === 'notifications' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Requests & Offers</h2>
-                {((data?.allNegotiations)?.length ?? 0) > 0 ? (
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">All Notifications</h2>
+                {((data?.allNotifications)?.length ?? 0) > 0 ? (
                   <div className="space-y-4">
-                    {data?.allNegotiations?.map((neg: any) => {
+                    {data?.allNotifications?.map((neg: any) => {
+                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
+                      return (
+                        <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
+                          <div>
+                            <p className="text-gray-900 font-medium">
+                              {neg.status === 'declined' ? (
+                                <span>Request declined for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
+                              ) : neg.status === 'tuition_started' ? (
+                                <span>Fees paid for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
+                              ) : (
+                                <span>New update on request with <span className="font-bold">{neg.tutorName}</span> for <span className="font-bold">{studentForApp.name}</span></span>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(neg.updatedAt || neg.createdAt || Date.now()).toLocaleString()}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+                    <Bell className="w-12 h-12 text-gray-300 mb-3" />
+                    <h3 className="text-lg font-bold text-gray-900">No notifications</h3>
+                    <p className="text-gray-500 mt-2">You don't have any notifications right now.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: REQUESTS */}
+            {activeTab === 'requests' && (() => {
+              const displayRequests = activeRequestViewId 
+                ? data?.allNotifications?.filter((n: any) => n.id === activeRequestViewId) 
+                : data?.allNegotiations;
+              
+              return (
+              <div>
+                <div className="flex items-center gap-4 mb-8">
+                  {activeRequestViewId && (
+                    <button 
+                      onClick={() => { setActiveRequestViewId(null); setActiveTab('notifications'); }}
+                      className="p-2 bg-white hover:bg-gray-50 text-gray-600 rounded-full shadow-sm border border-gray-200 transition-colors"
+                    >
+                      <ArrowRight className="w-5 h-5 rotate-180" />
+                    </button>
+                  )}
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Requests & Offers</h2>
+                </div>
+                {(displayRequests?.length ?? 0) > 0 ? (
+                  <div className="space-y-4">
+                    {displayRequests?.map((neg: any) => {
                       const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
                       return (
                       <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
@@ -1030,8 +1142,20 @@ export default function StudentDashboard() {
                                 <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
                               </div>
                               
-                              {/* Price Negotiation Logic */}
-                              {neg.status === 'negotiating' && (
+                              {/* Request Specific Status UI */}
+                              {neg.status === 'declined' ? (
+                                <div className="flex gap-3 items-center w-full sm:w-auto">
+                                  <div className="w-full sm:w-auto bg-red-50 px-5 py-3 rounded-xl border border-red-100 text-center">
+                                    <p className="text-sm font-black text-red-600 uppercase tracking-wide">Declined</p>
+                                  </div>
+                                </div>
+                              ) : neg.status === 'tuition_started' ? (
+                                <div className="flex gap-3 items-center w-full sm:w-auto">
+                                  <div className="w-full sm:w-auto bg-emerald-50 px-5 py-3 rounded-xl border border-emerald-100 text-center">
+                                    <p className="text-sm font-black text-emerald-600 uppercase tracking-wide">Fees Paid</p>
+                                  </div>
+                                </div>
+                              ) : neg.status === 'negotiating' && (
                                 neg.lastUpdatedBy === 'tutor' ? (
                                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                     <button 
@@ -1105,7 +1229,8 @@ export default function StudentDashboard() {
                       </div>
                     )}
                   </div>
-                )}
+              );
+            })()}
 
             {/* TAB: MY TEACHERS */}
             {activeTab === 'my_teachers' && (
