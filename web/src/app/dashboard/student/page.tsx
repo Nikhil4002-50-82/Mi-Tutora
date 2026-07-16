@@ -732,12 +732,12 @@ export default function StudentDashboard() {
                   activeStudent?.gender,
                   activeStudent?.phoneNumber || activeStudent?.whatsappNumber,
                   data?.profile?.name,
-                  activeStudent?.address,
+                  activeStudent?.preferredMode === 'Online' ? true : activeStudent?.address,
                   activeStudent?.classLevel || activeStudent?.technologies?.length > 0 || activeStudent?.languages?.length > 0 ? true : false,
-                  activeStudent?.board,
+                  activeStudent?.category === 'programming' || activeStudent?.category === 'languages' ? true : activeStudent?.board,
                   activeStudent?.category,
                   activeStudent?.budget,
-                  activeStudent?.subjects?.length > 0 ? true : false,
+                  activeStudent?.category === 'programming' || activeStudent?.category === 'languages' ? true : (activeStudent?.subjects?.length > 0 ? true : false),
                   activeStudent?.learningGoal
                 ];
                 const filled = fields.filter(f => f && String(f).trim() !== '' && f !== false).length;

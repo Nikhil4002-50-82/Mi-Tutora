@@ -170,6 +170,9 @@ export default function TeacherForm({
       await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
       // Update the existing tutor record
+      const isOnlineOnlyCategory = formData.category === 'programming' || formData.category === 'languages';
+      const actualMode = isOnlineOnlyCategory ? 'Online' : formData.mode;
+      
       await setDoc(doc(db, 'tutors', user.uid), {
         id: user.uid,
         category: formData.category,
@@ -178,8 +181,8 @@ export default function TeacherForm({
         gender: formData.gender,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
-        mode: formData.mode,
-        address: (formData.mode?.toLowerCase() === 'online') ? '' : [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
+        mode: actualMode,
+        address: (actualMode?.toLowerCase() === 'online') ? '' : [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
         qualification: formData.qualification,
         experience: formData.experience,
         occupation: formData.occupation,
@@ -280,7 +283,7 @@ export default function TeacherForm({
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Mode of Teaching</p>
-              <p className="text-lg font-bold text-slate-800">{formData.mode || '-'}</p>
+              <p className="text-lg font-bold text-slate-800">{(formData.category === 'programming' || formData.category === 'languages') ? 'Online' : (formData.mode || '-')}</p>
             </div>
             
             {formData.category ===('school') && (
@@ -570,9 +573,9 @@ export default function TeacherForm({
 
         </div>
 
-          {formData.mode !== 'Online' && (
+          {(formData.mode !== 'Online' && formData.category !== 'programming' && formData.category !== 'languages') && (
             <div className="space-y-4">
-              <label className="block text-sm font-semibold mb-2">🏠 Residential Address {formData.mode !== 'Online' ? '*' : ''}</label>
+              <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-1 md:col-span-2">
                   <input
@@ -952,7 +955,7 @@ export default function TeacherForm({
         </div>
 
         {/* LOCATION + KM */}
-        {formData.mode !== 'Online' && (
+        {(formData.mode !== 'Online' && formData.category !== 'programming' && formData.category !== 'languages') && (
           <div className="grid md:grid-cols-2 gap-6">
 
             <div>

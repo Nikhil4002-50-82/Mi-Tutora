@@ -657,7 +657,7 @@ export default function TeacherDashboard() {
                   data?.profile?.experience,
                   data?.profile?.category,
                   data?.profile?.mode,
-                  data?.profile?.subjects?.length > 0 || data?.profile?.technologies?.length > 0 || data?.profile?.languages?.length > 0 ? true : false,
+                  data?.profile?.subjects?.length > 0 || data?.profile?.technologies?.length > 0 || data?.profile?.languagesTaught?.length > 0 || data?.profile?.languages?.length > 0 ? true : false,
                   data?.profile?.occupation
                 ];
                 const filled = fields.filter(f => f && String(f).trim() !== '' && f !== false).length;

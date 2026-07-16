@@ -303,6 +303,10 @@ export default function DemoForm({
     setLoading(true);
     setSuccessMsg('');
 
+    const actualCategory = formData.category || category;
+    if (actualCategory === 'programming') {
+      formData.demoMode = 'Online';
+    }
     const isOnline = formData.demoMode?.toLowerCase() === 'online';
     const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
@@ -611,7 +615,7 @@ export default function DemoForm({
 
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Preferred Mode</p>
-            <p className="text-lg font-bold text-slate-800">{formData.demoMode || '-'}</p>
+            <p className="text-lg font-bold text-slate-800">{(formData.category === 'programming') ? 'Online' : (formData.demoMode || '-')}</p>
           </div>
           
           {(formData.goal || formData.requirements) && (
@@ -752,7 +756,7 @@ export default function DemoForm({
             )}
           </div>
 
-          {(formData.demoMode !== 'Online') && (
+          {(formData.demoMode !== 'Online' && formData.category !== 'programming') && (
             <div>
               <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
               <div className="space-y-3">
