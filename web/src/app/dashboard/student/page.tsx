@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Lock, GraduationCap, Bell, Phone, Mail, Trash2, MapPin, Search, Calendar, ChevronRight, Settings, Clock, ArrowRight, MoreVertical, Home, CreditCard, Banknote, Handshake } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap } from 'lucide-react';
+
+import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import ActionModal from '@/components/ActionModal';
+import MessageModal from '@/components/MessageModal';
 import { generateReferralCode } from '@/utils/referral';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
@@ -33,12 +36,14 @@ export default function StudentDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState<string>('');
+  const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [editingStudentId, setEditingStudentId] = useState<string>('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
   const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', min: undefined as number | undefined, max: undefined as number | undefined, onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [isEditingParentProfile, setIsEditingParentProfile] = useState(false);
   const [parentFormData, setParentFormData] = useState({ name: '', email: '', phone: '', whatsapp: '', address: '' });
   const [parentSameAsPhone, setParentSameAsPhone] = useState(false);
@@ -48,6 +53,7 @@ export default function StudentDashboard() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showGroupManager, setShowGroupManager] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -171,6 +177,7 @@ export default function StudentDashboard() {
       userData,
       profile: parentData,
       myStudent,
+      students: students,
       allStudents: students,
       myRequest,
       applications: applicationsWithSubjects,
@@ -199,7 +206,25 @@ export default function StudentDashboard() {
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('studentDashboardData', fetcher);
 
 
-  const allStudents = data?.allStudents || [];
+  const allStudents = data?.students || (data?.myStudent ? [data.myStudent] : []);
+  
+  const studentGroups = useMemo(() => {
+    const acc: any = {};
+    allStudents.forEach((student: any) => {
+      const gId = student.groupId || `indv_${student.id}`;
+      if (!acc[gId]) acc[gId] = { id: gId, students: [], totalBudget: 0, categories: [] };
+      acc[gId].students.push(student);
+      acc[gId].totalBudget += (parseInt(student.budget) || 0);
+      acc[gId].categories.push(student.category);
+    });
+    return Object.values(acc).map((g: any) => ({
+      ...g,
+      name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any)=>s.name).join(', ')}`,
+      category: g.categories[0]
+    }));
+  }, [allStudents]);
+
+  const activeGroup = studentGroups.find(g => g.id === activeGroupId) || studentGroups[0] || null;
   const activeStudent = allStudents.find((s:any) => s.id === activeStudentId) || data?.myStudent || allStudents[0] || null;
   
   const computedRecommendedTutors = data?.allTutors?.filter((tutor: any) => {
@@ -387,10 +412,29 @@ export default function StudentDashboard() {
     window.location.href = '/login';
   };
 
+  const getTutorBasePrice = (tutor: any) => {
+    if (tutor.price && tutor.price > 0) return tutor.price;
+    if (tutor.feeRange) {
+      const match = String(tutor.feeRange).match(/\d+/);
+      if (match) return parseInt(match[0]);
+    }
+    return 0;
+  };
+
   const handleRequestTutor = async (tutor: any) => {
     if (requestLoading) return;
     const offerPrice = parseInt(negotiationOffer[tutor.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid budget offer.");
+    
+    const tutorPrice = getTutorBasePrice(tutor);
+    if (tutorPrice > 0 && offerPrice > tutorPrice) {
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot increase the price, the maximum you can offer is Rs. ${tutorPrice}. Please adjust your offer.` });
+      return;
+    }
+    if (tutorPrice > 0 && offerPrice < tutorPrice * 0.6) {
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since it is a 40% rule, you can only decrease the price to Rs. ${Math.ceil(tutorPrice * 0.6)}. Please adjust your offer.` });
+      return;
+    }
     
     // Redirect logic if profile is incomplete
     if (!hasProfile) {
@@ -405,8 +449,8 @@ export default function StudentDashboard() {
       const { collection, addDoc } = await import('firebase/firestore');
       const user = auth.currentUser;
       
-      const studentToUse = activeStudent || data?.myStudent;
-      if (!studentToUse) {
+      const groupToUse = activeGroup;
+      if (!groupToUse) {
         toast.error("Please add a student profile first.");
         setRequestLoading(false);
         return;
@@ -416,14 +460,17 @@ export default function StudentDashboard() {
         tutorId: tutor.id,
         tutorName: tutor.name,
         parentId: user?.uid,
-        studentId: studentToUse.id,
-        studentName: studentToUse.name || 'Student',
+        groupId: groupToUse.id,
+        studentIds: groupToUse.students.map((s: any) => s.id),
+        studentName: groupToUse.name,
         currentOffer: offerPrice,
-        initialBudget: studentToUse.budget || offerPrice,
+        initialBudget: groupToUse.totalBudget || offerPrice,
+        absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
+        absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
         lastUpdatedBy: 'student',
         status: 'negotiating',
         source: 'direct',
-        category: tutor.category,
+        category: tutor.category || groupToUse.category || '',
         mode: tutor.mode,
         demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
         createdAt: Date.now()
@@ -438,7 +485,20 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number) => {
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
+    if (action === 'counter_price' && newOffer && neg) {
+      const maxAllowed = neg.currentOffer;
+      const minAllowed = neg.absoluteMin || Math.ceil((neg.initialBudget || neg.currentOffer) * 0.6);
+      if (newOffer > maxAllowed) {
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot increase the price, the maximum offer allowed is Rs. ${maxAllowed}. Please adjust your offer.` });
+        return;
+      }
+      if (newOffer < minAllowed) {
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
+        return;
+      }
+    }
+    
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc } = await import('firebase/firestore');
@@ -452,6 +512,7 @@ export default function StudentDashboard() {
         updateData.lastUpdatedBy = 'student';
       } else if (action === 'decline') {
         updateData.status = 'declined';
+        updateData.declinedAt = Date.now();
       }
       updateData.updatedAt = Date.now();
 
@@ -773,6 +834,8 @@ export default function StudentDashboard() {
         </header>
 
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
+        <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
+        
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12 w-full flex-1">
           <motion.div
             key={activeTab}
@@ -937,16 +1000,16 @@ export default function StudentDashboard() {
                     <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
                       {tuitionSubTab === 'all' ? 'All Tutors' : 'Recommended Tutors'}
                     </h2>
-                    {tuitionSubTab === 'recommendation' && allStudents.length > 1 && (
+                    {tuitionSubTab === 'recommendation' && studentGroups.length > 0 && (
                       <div className="mt-4 flex items-center gap-3">
                         <label className="text-sm font-bold text-gray-600">Shopping for:</label>
                         <select 
                           className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-[#00a992] focus:outline-none focus:ring-2 focus:ring-[#00a992]/50"
-                          value={activeStudentId || activeStudent?.id || ''}
-                          onChange={(e) => setActiveStudentId(e.target.value)}
+                          value={activeGroupId || activeGroup?.id || ''}
+                          onChange={(e) => setActiveGroupId(e.target.value)}
                         >
-                          {allStudents.map((s:any) => (
-                            <option key={s.id} value={s.id}>{s.name} ({s.category})</option>
+                          {studentGroups.map((g:any) => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
                           ))}
                         </select>
                       </div>
@@ -971,13 +1034,28 @@ export default function StudentDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                       const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
-                      const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
+                      const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                       const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
                       
-                      if (hasNegotiation) return null; // Already negotiating
+                      const cooldownApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+                      const isCooldown = !!cooldownApp;
+                      const isLocked = hasNegotiation || isPending || isHired || isCooldown;
                       
                       return (
-                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full overflow-hidden">
+                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full relative overflow-hidden">
+                          {isLocked && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-6 text-center">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isCooldown ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                <Lock className={`w-6 h-6 ${isCooldown ? 'text-red-600' : 'text-emerald-600'}`} />
+                              </div>
+                              <h4 className="font-bold text-gray-900 mb-1">{isCooldown ? 'Locked' : 'Offer Sent'}</h4>
+                              <p className="text-sm text-gray-600 font-medium">
+                                {isCooldown 
+                                  ? `Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` 
+                                  : 'Waiting for response...'}
+                              </p>
+                            </div>
+                          )}
                           <div className="bg-[#00a992] p-6 flex items-center justify-between">
                             <h3 className="text-xl font-bold text-white">{teacher.name}</h3>
                             <span className="px-3 py-1 bg-white/20 text-white text-xs font-bold rounded-full border border-white/30">
@@ -1013,8 +1091,10 @@ export default function StudentDashboard() {
                                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                                   <input 
                                     type="number"
+                                    min={getTutorBasePrice(teacher) ? Math.ceil(getTutorBasePrice(teacher) * 0.6) : 0}
+                                    max={getTutorBasePrice(teacher) || undefined}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                                    placeholder="e.g. 500"
+                                    placeholder={getTutorBasePrice(teacher) ? `e.g. ${getTutorBasePrice(teacher)}` : "e.g. 500"}
                                     value={negotiationOffer[teacher.id] || ''}
                                     onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
                                   />
@@ -1173,9 +1253,11 @@ export default function StudentDashboard() {
                                           description: 'Propose a new monthly fee for this tutor.',
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
+                                          min: neg.absoluteMin || Math.ceil((neg.initialBudget || neg.currentOffer) * 0.6),
+                                          max: neg.currentOffer,
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
+                                          handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
                                           }
                                         });
                                       }}
@@ -1240,8 +1322,7 @@ export default function StudentDashboard() {
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
-                        onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }}
-                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
+                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 transition-all duration-300 group overflow-hidden flex flex-col"
                       >
                         
                         {/* Decorative background element */}
@@ -1324,7 +1405,7 @@ export default function StudentDashboard() {
 
                           {/* Action Button */}
                           {cls.status === 'demo_pending_payment' && (
-                            <button onClick={() => setPayingClass(cls)} className="mt-auto w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); setPayingClass(cls); }} className="mt-auto w-full bg-[#00a992] text-white hover:bg-[#008f7b] py-3.5 rounded-xl font-bold shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2">
                               Complete Payment
                             </button>
                           )}
@@ -1487,14 +1568,24 @@ export default function StudentDashboard() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-black text-gray-900">Registered Students</h2>
                   {hasProfile && (
-                    <button 
-                      onClick={() => {
-                        setActiveStudentId('new');
-                      }}
-                      className="bg-[#00a992] text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-600 transition-colors"
-                    >
-                      + Add Student
-                    </button>
+                    <div className="flex gap-3">
+                      {allStudents.length > 1 && (
+                        <button 
+                          onClick={() => setShowGroupManager(true)}
+                          className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 border border-emerald-200"
+                        >
+                          <Users className="w-4 h-4" /> Manage Groups
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                          setActiveStudentId('new');
+                        }}
+                        className="bg-[#00a992] text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-600 transition-colors"
+                      >
+                        + Add Student
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1537,55 +1628,49 @@ export default function StudentDashboard() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {allStudents.map((s:any) => (
-                      <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col overflow-hidden">
-                        <div className="bg-[#00a992] p-6 flex justify-between items-start">
-                          <div>
-                            <h3 className="text-xl font-bold text-white">{s.name}</h3>
-                            <p className="text-sm font-medium text-emerald-100 capitalize">{s.category}</p>
+                    {allStudents.map((s:any) => {
+                      const groupIndex = studentGroups.findIndex((g: any) => g.id === (s.groupId || `indv_${s.id}`));
+                      const groupLabel = groupIndex >= 0 ? `Group ${groupIndex + 1}` : '';
+                      const isGrouped = s.groupId && !s.groupId.startsWith('indv_');
+                      
+                      return (
+                        <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col overflow-hidden">
+                          <div className="bg-[#00a992] p-6 flex justify-between items-start">
+                            <div>
+                              <h3 className="text-xl font-bold text-white">{s.name}</h3>
+                              <p className="text-sm font-medium text-emerald-100 capitalize">
+                                {s.category} {isGrouped ? `• ${groupLabel}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="p-6 flex flex-col flex-grow">
+                            <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
+                            {s.classLevel && <p><strong className="text-gray-700">Class:</strong> {s.classLevel}</p>}
+                            {s.board && <p><strong className="text-gray-700">Board:</strong> {s.board}</p>}
+                            {s.subjects && s.subjects.length > 0 && <p><strong className="text-gray-700">Subjects:</strong> {s.subjects.join(', ')}</p>}
+                            {s.technologies && s.technologies.length > 0 && <p><strong className="text-gray-700">Technologies:</strong> {s.technologies.join(', ')}</p>}
+                            {s.languages && s.languages.length > 0 && <p><strong className="text-gray-700">Languages:</strong> {s.languages.join(', ')}</p>}
+                            <p><strong className="text-gray-700">Budget:</strong> ₹{s.budget}/mo</p>
+                          </div>
+                          <div className="flex gap-3 mt-auto pt-2">
+                            <button 
+                              onClick={() => setEditingStudentId(s.id)}
+                              className="flex-1 bg-gray-100 text-gray-700 hover:bg-gray-200 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
+                            >
+                              View Profile
+                            </button>
+                            <button 
+                              onClick={() => setStudentToRemove(s)}
+                              className="w-[20%] bg-red-50 text-red-600 hover:bg-red-100 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
+                              title="Remove Student"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                           </div>
                         </div>
-                        <div className="p-6 flex flex-col flex-grow">
-                          <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
-                          {s.classLevel && <p><strong className="text-gray-700">Class:</strong> {s.classLevel}</p>}
-                          {s.board && <p><strong className="text-gray-700">Board:</strong> {s.board}</p>}
-                          {s.subjects && s.subjects.length > 0 && <p><strong className="text-gray-700">Subjects:</strong> {s.subjects.join(', ')}</p>}
-                          {s.technologies && s.technologies.length > 0 && <p><strong className="text-gray-700">Technologies:</strong> {s.technologies.join(', ')}</p>}
-                          {s.languages && s.languages.length > 0 && <p><strong className="text-gray-700">Languages:</strong> {s.languages.join(', ')}</p>}
-                          <p><strong className="text-gray-700">Budget:</strong> ₹{s.budget}/mo</p>
-                        </div>
-                        <div className="flex gap-3 mt-auto pt-2">
-                          <button 
-                            onClick={() => setActiveStudentId(s.id)}
-                            className={`w-[45%] py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
-                              activeStudentId === s.id || (activeStudentId === '' && activeStudent?.id === s.id) 
-                                ? 'bg-emerald-100 text-emerald-800' 
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {activeStudentId === s.id || (activeStudentId === '' && activeStudent?.id === s.id) ? (
-                              <><CheckCircle2 className="w-4 h-4" /> Active</>
-                            ) : (
-                              'Select'
-                            )}
-                          </button>
-                          <button 
-                            onClick={() => setEditingStudentId(s.id)}
-                            className="w-[35%] bg-gray-100 text-gray-700 hover:bg-gray-200 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
-                          >
-                            View
-                          </button>
-                          <button 
-                            onClick={() => setStudentToRemove(s)}
-                            className="w-[20%] bg-red-50 text-red-600 hover:bg-red-100 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
-                            title="Remove Student"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -1717,7 +1802,50 @@ export default function StudentDashboard() {
           </motion.div>
         </div>
 
-      {/* Modals End */}
+      {/* Modals and Overlays */}
+      {showGroupManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl my-8">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                <Users className="w-6 h-6 text-[#00a992]" /> Manage Groups
+              </h2>
+              <button 
+                onClick={() => setShowGroupManager(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="h-[600px] overflow-hidden">
+              <GroupManager 
+                isModal={true}
+                students={allStudents}
+                onSave={async (groupedStudents) => {
+                  try {
+                    const { db } = await import('@/utils/firebase/client');
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    
+                    for (const student of groupedStudents) {
+                      await updateDoc(doc(db, 'students', student.id), {
+                        groupId: student.groupId
+                      });
+                    }
+                    
+                    toast.success("Groups updated successfully!");
+                    setShowGroupManager(false);
+                    mutate(); // Refresh data
+                  } catch (e: any) {
+                    toast.error("Failed to update groups: " + e.message);
+                  }
+                }}
+                onCancel={() => setShowGroupManager(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Teacher Profile Modal */}
       {selectedViewUser && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
@@ -1774,8 +1902,9 @@ export default function StudentDashboard() {
               const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['negotiating'].includes(app.status));
               const isPending = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
               const isHired = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              const cooldownApp = data?.applications?.find((app: any) => app.tutorId === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending || hasNegotiation) return null;
+              if (isHired || isPending || hasNegotiation || cooldownApp) return null;
               
               return (
                 <div className="mt-6 pt-6 border-t border-gray-100">
@@ -1784,8 +1913,10 @@ export default function StudentDashboard() {
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                       <input 
                         type="number"
+                        min={getTutorBasePrice(selectedViewUser) ? Math.ceil(getTutorBasePrice(selectedViewUser) * 0.6) : 0}
+                        max={getTutorBasePrice(selectedViewUser) || undefined}
                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                        placeholder="e.g. 500"
+                        placeholder={getTutorBasePrice(selectedViewUser) ? `e.g. ${getTutorBasePrice(selectedViewUser)}` : "e.g. 500"}
                         value={negotiationOffer[selectedViewUser.id] || ''}
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />

@@ -11,6 +11,8 @@ interface ActionModalProps {
   placeholder: string;
   type: "price" | "timing";
   initialValue?: string;
+  min?: number;
+  max?: number;
 }
 
 export default function ActionModal({
@@ -22,6 +24,8 @@ export default function ActionModal({
   placeholder,
   type,
   initialValue = "",
+  min,
+  max,
 }: ActionModalProps) {
   const [value, setValue] = useState(initialValue);
   const [dateValue, setDateValue] = useState("");
@@ -105,7 +109,8 @@ export default function ActionModal({
                     {type === "price" ? (
                       <input
                         type="number"
-                        min="0"
+                        min={min !== undefined ? min : "0"}
+                        max={max}
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         placeholder={placeholder}

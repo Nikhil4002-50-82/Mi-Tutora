@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
+import MessageModal from '@/components/MessageModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { generateReferralCode } from '@/utils/referral';
 import { toast } from 'sonner';
@@ -29,7 +30,8 @@ export default function TeacherDashboard() {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isNotificationsDropdownOpen, setIsNotificationsDropdownOpen] = useState(false);
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', min: undefined as number | undefined, max: undefined as number | undefined, onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -92,74 +94,103 @@ export default function TeacherDashboard() {
 
     const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
     
-    const matchedStudents = availableStudents?.filter((student: any) => {
+    // Group students first
+    const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
+      const gId = student.groupId || `indv_${student.id}`;
+      if (!acc[gId]) {
+        acc[gId] = { 
+          id: gId, 
+          students: [], 
+          totalBudget: 0,
+          parentId: student.parentId,
+          categories: []
+        };
+      }
+      acc[gId].students.push(student);
+      acc[gId].totalBudget += (parseInt(student.budget) || 0);
+      if (student.category) acc[gId].categories.push(student.category);
+      return acc;
+    }, {});
+
+    const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
+      ...g,
+      name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
+      category: g.categories[0] || 'school',
+      budget: g.totalBudget
+    }));
+    
+    const matchedGroups = availableGroupsRaw.filter((group: any) => {
       if (!tutorData) return true;
       
-      const studentCat = (student.category || '').toLowerCase().trim();
-      const teacherCats = teacherCategories.map((c:string) => c.toLowerCase().trim());
-      
-      if (!teacherCats.includes(studentCat)) return false;
-      
-      if (studentCat === 'school') {
-        const studentBoard = (student.board || '').toLowerCase().trim();
-        const teacherBoards = (tutorData.boards || []).map((b:string) => b.toLowerCase().trim());
-        const boardMatch = !studentBoard || teacherBoards.includes(studentBoard);
+      // A group matches if any student inside it matches the teacher's profile
+      return group.students.some((student: any) => {
+        const studentCat = (student.category || '').toLowerCase().trim();
+        const teacherCats = teacherCategories.map((c:string) => c.toLowerCase().trim());
         
-        const studentClass = (student.classLevel || '').toLowerCase().trim();
-        const teacherClasses = (tutorData.classes || []).map((c:string) => c.toLowerCase().trim());
-        const classMatch = !studentClass || teacherClasses.includes(studentClass);
+        if (!teacherCats.includes(studentCat)) return false;
         
-        const teacherSubjects = tutorData.subjects || [];
-        const studentSubjects = student.subjects || [];
-        let subjectMatch = false;
-        if (studentSubjects.length > 0 && teacherSubjects.length > 0) {
-          subjectMatch = studentSubjects.some((sub: string) => {
-            const normalizedSub = sub.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return teacherSubjects.some((ts: string) => {
-              const normalizedTs = ts.toLowerCase().replace(/[^a-z0-9]/g, '');
-              // Match if one contains the other, ignoring non-alphanumeric
-              if (!normalizedSub || !normalizedTs) return false;
-              return normalizedSub.includes(normalizedTs) || normalizedTs.includes(normalizedSub);
+        if (studentCat === 'school') {
+          const studentBoard = (student.board || '').toLowerCase().trim();
+          const teacherBoards = (tutorData.boards || []).map((b:string) => b.toLowerCase().trim());
+          const boardMatch = !studentBoard || teacherBoards.includes(studentBoard);
+          
+          const studentClass = (student.classLevel || '').toLowerCase().trim();
+          const teacherClasses = (tutorData.classes || []).map((c:string) => c.toLowerCase().trim());
+          const classMatch = !studentClass || teacherClasses.includes(studentClass);
+          
+          const teacherSubjects = tutorData.subjects || [];
+          const studentSubjects = student.subjects || [];
+          let subjectMatch = false;
+          if (studentSubjects.length > 0 && teacherSubjects.length > 0) {
+            subjectMatch = studentSubjects.some((sub: string) => {
+              const normalizedSub = sub.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return teacherSubjects.some((ts: string) => {
+                const normalizedTs = ts.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!normalizedSub || !normalizedTs) return false;
+                return normalizedSub.includes(normalizedTs) || normalizedTs.includes(normalizedSub);
+              });
             });
-          });
-        } else {
-          subjectMatch = studentSubjects.length === 0 || teacherSubjects.length === 0; 
+          } else {
+            subjectMatch = studentSubjects.length === 0 || teacherSubjects.length === 0; 
+          }
+          
+          return boardMatch || classMatch || subjectMatch;
+        }
+
+        if (studentCat === 'programming') {
+          const teacherTech = tutorData.technologies || [];
+          const studentTech = student.technologies || [];
+          let techMatch = false;
+          if (studentTech.length > 0 && teacherTech.length > 0) {
+            techMatch = studentTech.some((tech: string) => teacherTech.includes(tech));
+          } else {
+            techMatch = studentTech.length === 0;
+          }
+          return techMatch;
+        }
+
+        if (studentCat === 'languages') {
+          const teacherLang = tutorData.languagesTaught || tutorData.languages || [];
+          const studentLang = student.languages || [];
+          let langMatch = false;
+          if (studentLang.length > 0 && teacherLang.length > 0) {
+            langMatch = studentLang.some((lang: string) => teacherLang.includes(lang));
+          } else {
+            langMatch = studentLang.length === 0;
+          }
+          return langMatch;
         }
         
-        return boardMatch || classMatch || subjectMatch;
-      }
-
-      if (studentCat === 'programming') {
-        const teacherTech = tutorData.technologies || [];
-        const studentTech = student.technologies || [];
-        let techMatch = false;
-        if (studentTech.length > 0 && teacherTech.length > 0) {
-          techMatch = studentTech.some((tech: string) => teacherTech.includes(tech));
-        } else {
-          techMatch = studentTech.length === 0;
-        }
-        return techMatch;
-      }
-
-      if (studentCat === 'languages') {
-        const teacherLang = tutorData.languagesTaught || tutorData.languages || [];
-        const studentLang = student.languages || [];
-        let langMatch = false;
-        if (studentLang.length > 0 && teacherLang.length > 0) {
-          langMatch = studentLang.some((lang: string) => teacherLang.includes(lang));
-        } else {
-          langMatch = studentLang.length === 0;
-        }
-        return langMatch;
-      }
-      
-      return true;
-    }) || [];
+        return true;
+      });
+    });
 
     const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
     const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
-    const studentIds = applications.map((app: any) => app.studentId).filter(Boolean);
+    const groupIds = applications.map((app: any) => app.groupId || app.studentId).filter(Boolean);
+    const studentIds = applications.flatMap((app: any) => app.studentIds || [app.studentId]).filter(Boolean);
+
     let studentsInfo: any[] = [];
     if (studentIds.length > 0) {
       const { documentId } = await import('firebase/firestore');
@@ -183,16 +214,16 @@ export default function TeacherDashboard() {
     const allNotifications = applicationsWithSubjects
       .filter((app: any) => ['negotiating', 'demo_pending_payment', 'declined', 'tuition_started'].includes(app.status))
       .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-    const recommendedNegotiations = allNegotiations.filter(app => matchedStudents.some((s:any) => s.id === app.studentId));
+    const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupId || app.studentId)));
 
     return {
       user,
       userData,
       profile: tutorData,
       teacherCategories,
-      availableStudents: matchedStudents,
-      allStudents: availableStudentsRaw,
-      recommendedStudents: matchedStudents,
+      availableStudents: matchedGroups,
+      allStudents: availableGroupsRaw,
+      recommendedStudents: matchedGroups,
       applications: applicationsWithSubjects,
       referrals,
       negotiations: allNegotiations,
@@ -361,6 +392,15 @@ export default function TeacherDashboard() {
     const offerPrice = parseInt(negotiationOffer[student.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid offer price.");
 
+    if (student.budget && offerPrice < student.budget) {
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum you can offer is Rs. ${student.budget}. Please adjust your offer.` });
+      return;
+    }
+    if (student.budget && offerPrice > student.budget * 1.2) {
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since it is a 20% rule, you can only increase the price to Rs. ${Math.floor(student.budget * 1.2)}. Please adjust your offer.` });
+      return;
+    }
+
     if (!hasProfile) {
       toast.error("Please complete your profile first.");
       setActiveTab('profile');
@@ -379,15 +419,19 @@ export default function TeacherDashboard() {
         requestId: '',
         parentId: student.parentId,
         studentId: student.id,
+        groupId: student.id,
+        studentIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
         currentOffer: offerPrice,
         initialBudget: student.budget,
+        absoluteMin: student.budget > 0 ? student.budget : offerPrice,
+        absoluteMax: student.budget > 0 ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
         category: student.category,
-        mode: student.preferredMode || 'flexible',
-        demoHours: student.hoursPerDay || student.preferredTimeRange || 'Flexible',
+        mode: student.students ? student.students[0].preferredMode : (student.preferredMode || 'flexible'),
+        demoHours: student.students ? student.students[0].hoursPerDay : (student.hoursPerDay || student.preferredTimeRange || 'Flexible'),
         createdAt: Date.now()
       });
 
@@ -400,7 +444,20 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, date?: string, time?: string) => {
+  const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
+    if (action === 'counter_price' && newOffer && neg) {
+      const minAllowed = neg.currentOffer;
+      const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || neg.currentOffer) * 1.2);
+      if (newOffer < minAllowed) {
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum offer allowed is Rs. ${minAllowed}. Please adjust your offer.` });
+        return;
+      }
+      if (newOffer > maxAllowed) {
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
+        return;
+      }
+    }
+    
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc } = await import('firebase/firestore');
@@ -414,6 +471,7 @@ export default function TeacherDashboard() {
         updateData.lastUpdatedBy = 'tutor';
       } else if (action === 'decline') {
         updateData.status = 'declined';
+        updateData.declinedAt = Date.now();
       }
       updateData.updatedAt = Date.now();
 
@@ -691,6 +749,7 @@ export default function TeacherDashboard() {
         </header>
 
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
+        <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12 w-full flex-1">
           <motion.div
             key={activeTab}
@@ -896,103 +955,112 @@ export default function TeacherDashboard() {
                           return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
                         }) || [];
 
-                        const grouped = studentsList.reduce((acc: any, student: any) => {
-                          const hasNegotiation = data?.applications?.some((app: any) => app.studentId === student.id && ['negotiating'].includes(app.status));
-                          if (hasNegotiation) return acc;
-                          if (!acc[student.parentId]) {
-                            acc[student.parentId] = {
-                              parentId: student.parentId,
-                              parentName: student.guardianName || student.parentName || student.name || 'Household / Parent',
-                              address: student.preferredMode?.toLowerCase() === 'online' 
+                        return studentsList.map((group: any) => {
+                          const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating'].includes(app.status));
+                          if (hasNegotiation) return null;
+
+                          const firstStudent = group.students?.[0] || {};
+                          const parentName = firstStudent.guardianName || firstStudent.parentName || 'Parent';
+                          const address = firstStudent.preferredMode?.toLowerCase() === 'online' 
                                 ? 'Online' 
-                                : `Offline • ${student.area || student.address || 'Location Hidden'}`,
-                              students: []
-                            };
-                          }
-                          acc[student.parentId].students.push(student);
-                          return acc;
-                        }, {});
+                                : `Offline • ${firstStudent.area || firstStudent.address || 'Location Hidden'}`;
+                          const numStudents = group.students?.length || 1;
 
-                        const households = Object.values(grouped) as any[];
+                          const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+                          const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
+                                
+                          const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+                          const isCooldown = !!cooldownApp;
+                          const isLocked = isPending || isHired || isCooldown;
 
-                        return households.map((household: any) => (
-                          <div key={household.parentId} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
-                            <div className="bg-[#00a992] p-6 flex justify-between items-center">
-                              <div>
-                                <h3 className="text-xl font-black text-white">{household.parentName || 'Household / Parent'}</h3>
-                                <p className="text-sm font-medium text-emerald-100">{household.students.length} Student(s) • {household.address}</p>
+                          return (
+                            <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden relative">
+                              {isLocked && (
+                                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 text-center">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isCooldown ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                    <Lock className={`w-5 h-5 ${isCooldown ? 'text-red-600' : 'text-emerald-600'}`} />
+                                  </div>
+                                  <h4 className="font-bold text-gray-900 text-sm mb-1">{isCooldown ? 'Locked' : 'Offer Sent'}</h4>
+                                  {isCooldown && (
+                                    <p className="text-xs text-gray-600 font-medium">
+                                      {`Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days`}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              
+                              <div className="bg-[#00a992] p-6 flex justify-between items-center">
+                                <div>
+                                  <h3 className="text-xl font-black text-white">{parentName}</h3>
+                                  <p className="text-sm font-medium text-emerald-100">{numStudents} Student(s) • {address}</p>
+                                </div>
+                              </div>
+                              
+                              <div className="p-6 flex flex-col flex-grow">
+                                <div className="mb-6">
+                                  <h4 className="font-bold text-gray-900 text-lg">{group.name || 'Group'} <span className="text-sm text-gray-500 font-normal capitalize">({group.category})</span></h4>
+                                  <div className="text-sm text-gray-600 mt-2 grid grid-cols-1 gap-y-1">
+                                    {firstStudent.classLevel && <span><strong className="text-gray-400">Class:</strong> {firstStudent.classLevel}</span>}
+                                    {(!group.category || group.category === 'school') && (firstStudent.subjects?.length ?? 0) > 0 && <span><strong className="text-gray-400">Sub:</strong> {firstStudent.subjects[0]}{firstStudent.subjects.length > 1 ? '...' : ''}</span>}
+                                    {group.category === 'programming' && (firstStudent.technologies?.length ?? 0) > 0 && <span><strong className="text-gray-400">Tech:</strong> {firstStudent.technologies[0]}{firstStudent.technologies.length > 1 ? '...' : ''}</span>}
+                                    {group.category === 'languages' && (firstStudent.languages?.length ?? 0) > 0 && <span><strong className="text-gray-400">Lang:</strong> {firstStudent.languages[0]}{firstStudent.languages.length > 1 ? '...' : ''}</span>}
+                                    <span className="mt-1 pt-2 border-t border-gray-100"><strong className="text-gray-400">Budget:</strong> <span className="text-emerald-600 font-bold text-lg">₹{group.budget}<span className="text-sm">/mo</span></span></span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-auto space-y-3">
+                                  {!hasProfile ? (
+                                    <button 
+                                      onClick={() => setActiveTab('profile')}
+                                      className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm"
+                                    >
+                                      Unlock to View
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <div className="mb-3">
+                                        <input 
+                                          type="number"
+                                          min={group.budget || 0}
+                                          max={group.budget ? Math.floor(group.budget * 1.2) : undefined}
+                                          className="w-full px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50 text-sm"
+                                          placeholder={group.budget ? `e.g. ${group.budget}` : "Your Offer (₹/mo)"}
+                                          value={negotiationOffer[group.id] || ''}
+                                          onChange={(e) => setNegotiationOffer({...negotiationOffer, [group.id]: e.target.value})}
+                                        />
+                                      </div>
+                                      {isHired ? (
+                                        <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
+                                          Active Student
+                                        </button>
+                                      ) : isPending ? (
+                                        <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
+                                          Pending
+                                        </button>
+                                      ) : (
+                                        <div className="flex gap-2">
+                                          <button 
+                                            onClick={() => setSelectedViewUser(group)}
+                                            className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-2 rounded-lg transition-colors text-sm"
+                                          >
+                                            View
+                                          </button>
+                                          <button 
+                                            onClick={() => handleSendOffer(group)}
+                                            disabled={offerLoading}
+                                            className="w-2/3 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            {offerLoading ? 'Sending...' : 'Send Offer'}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            
-                            <div className="p-4 space-y-4 flex-grow">
-                              {household.students.map((student: any) => {
-                                const isPending = data?.applications?.some((app: any) => app.studentId === student.id && ['demo_pending_payment', 'demo_booked'].includes(app.status));
-                                const isHired = data?.applications?.some((app: any) => app.studentId === student.id && ['tuition_started'].includes(app.status));
-                                
-                                return (
-                                  <div key={student.id} className="border border-gray-100 rounded-xl p-4 bg-white relative">
-                                    <div className="mb-3">
-                                      <h4 className="font-bold text-gray-900 text-lg">{student.name || 'Student'} <span className="text-sm text-gray-500 font-normal capitalize">({student.category})</span></h4>
-                                      <div className="text-sm text-gray-600 mt-1 grid grid-cols-2 gap-y-1">
-                                        {student.classLevel && <span><strong className="text-gray-400">Class:</strong> {student.classLevel}</span>}
-                                        {(!student.category || student.category === 'school') && (student.subjects?.length ?? 0) > 0 && <span><strong className="text-gray-400">Sub:</strong> {student.subjects[0]}...</span>}
-                                        {student.category === 'programming' && (student.technologies?.length ?? 0) > 0 && <span><strong className="text-gray-400">Tech:</strong> {student.technologies[0]}...</span>}
-                                        {student.category === 'languages' && (student.languages?.length ?? 0) > 0 && <span><strong className="text-gray-400">Lang:</strong> {student.languages[0]}...</span>}
-                                        <span className="col-span-2"><strong className="text-gray-400">Budget:</strong> <span className="text-emerald-600 font-bold">₹{student.budget}/mo</span></span>
-                                      </div>
-                                    </div>
-
-                                    {!hasProfile ? (
-                                      <button 
-                                        onClick={() => setActiveTab('profile')}
-                                        className="w-full bg-[#063831] hover:bg-[#04241f] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm"
-                                      >
-                                        Unlock to View
-                                      </button>
-                                    ) : (
-                                      <>
-                                        <div className="mb-3">
-                                          <input 
-                                            type="number"
-                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50 text-sm"
-                                            placeholder="Your Offer (₹/hr)"
-                                            value={negotiationOffer[student.id] || ''}
-                                            onChange={(e) => setNegotiationOffer({...negotiationOffer, [student.id]: e.target.value})}
-                                          />
-                                        </div>
-                                        {isHired ? (
-                                          <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
-                                            Active Student
-                                          </button>
-                                        ) : isPending ? (
-                                          <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
-                                            Pending
-                                          </button>
-                                        ) : (
-                                          <div className="flex gap-2">
-                                            <button 
-                                              onClick={() => setSelectedViewUser(student)}
-                                              className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-2 rounded-lg transition-colors text-sm"
-                                            >
-                                              View
-                                            </button>
-                                            <button 
-                                              onClick={() => handleSendOffer(student)}
-                                              disabled={offerLoading}
-                                              className="w-2/3 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                              {offerLoading ? 'Sending...' : 'Send Offer'}
-                                            </button>
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ));
+                          );
+                        });
                       })()}
                       {(!((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
                         if (!hasProfile && selectedCategory) return s.category === selectedCategory;
@@ -1117,9 +1185,11 @@ export default function TeacherDashboard() {
                                           description: 'Propose a new monthly fee for this student.',
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
+                                          min: neg.currentOffer,
+                                          max: neg.absoluteMax || Math.floor((neg.initialBudget || neg.currentOffer) * 1.2),
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val));
+                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
                                           }
                                         });
                                       }}
@@ -1205,7 +1275,7 @@ export default function TeacherDashboard() {
                                 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 text-emerald-700 border-emerald-200/50' 
                                 : 'bg-gradient-to-r from-orange-50 to-orange-100/50 text-orange-700 border-orange-200/50'
                             }`}>
-                              {cls.status === 'confirmed' ? 'Active' : cls.status.replace('_', ' ')}
+                              {cls.status === 'confirmed' || cls.status === 'tuition_started' ? 'Active' : cls.status === 'demo_pending_payment' ? 'Payment Pending' : cls.status.replace(/_/g, ' ')}
                             </span>
                           </div>
 
@@ -1280,7 +1350,7 @@ export default function TeacherDashboard() {
                 <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Refer & Earn</h2>
                 <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden mb-8">
                   <div className="absolute top-0 right-0 p-8 opacity-10">
-                    <Gift className="w-48 h-48" />
+                    <Gift className="w-4 h-48" />
                   </div>
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
                     <div className="max-w-md">
@@ -1355,7 +1425,13 @@ export default function TeacherDashboard() {
                       <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
                     </div>
                   )}
-                  <TeacherForm isDashboard={true} hasProfile={hasProfile} category={selectedCategory} initialData={data?.profile} onSuccess={() => mutate()} />
+                  <TeacherForm 
+                    isDashboard={true} 
+                    hasProfile={hasProfile} 
+                    category={selectedCategory} 
+                    initialData={data?.profile || { name: data?.user?.displayName || '', email: data?.user?.email || '' }} 
+                    onSuccess={() => mutate()} 
+                  />
                 </div>
                 
                 <div className="mt-12 pt-8 border-t border-red-100">
@@ -1426,57 +1502,114 @@ export default function TeacherDashboard() {
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
               onClick={() => setSelectedViewUser(null)}
-              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
+              className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
             >
-              ✕
+              <X className="w-5 h-5" />
             </button>
-            <div className="bg-[#00a992] p-6 md:p-8 flex items-center gap-4">
-              <div className="w-16 h-16 bg-white text-[#00a992] rounded-full flex items-center justify-center text-2xl font-black uppercase shadow-sm">
-                {(selectedViewUser.guardianName || selectedViewUser.parentName) ? (selectedViewUser.guardianName || selectedViewUser.parentName).charAt(0) : 'S'}
-              </div>
-              <div>
-                <h3 className="text-2xl font-black text-white">{selectedViewUser.guardianName || selectedViewUser.parentName || 'Parent'}</h3>
-                <p className="text-emerald-100 font-bold capitalize">Looking for a {selectedViewUser.category || 'Tutor'}</p>
-              </div>
-            </div>
-            <div className="p-6 md:p-8 pt-6">
             
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-gray-50 p-4 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Class/Grade</p>
-                <p className="text-lg font-bold text-gray-900">{selectedViewUser.classLevel || 'Not specified'}</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Budget</p>
-                <p className="text-lg font-bold text-emerald-600">₹{selectedViewUser.budget || 'Negotiable'}</p>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-5 rounded-2xl mb-6">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Requirements</p>
-              {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Technologies:</strong> {selectedViewUser.technologies.join(', ')}</p>}
-              {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
-              {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
-              <p className="mb-2"><strong>Preferred Days:</strong> {selectedViewUser.daysPerWeek || 'Not specified'} {selectedViewUser.specificDays?.length > 0 ? `(${selectedViewUser.specificDays.join(', ')})` : ''}</p>
-              <p className="mb-2"><strong>Preferred Duration:</strong> {selectedViewUser.hoursPerDay || 'Not specified'}</p>
-              <p className="mb-2"><strong>Mode:</strong> {selectedViewUser.preferredMode || 'Online'}</p>
-            </div>
-            
-            {selectedViewUser.preferredMode?.toLowerCase() !== 'online' && selectedViewUser.address && (
-              <div className="bg-gray-50 p-5 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
-                <div className="mt-2">
-                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Preferred Location:</strong> {selectedViewUser.address}</p>
+            <div className="bg-[#00a992] p-8 sm:p-10 text-white flex-shrink-0 relative overflow-hidden">
+              <div className="relative z-10 flex items-start gap-6">
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl font-black backdrop-blur-md shadow-inner border border-white/30">
+                  {((selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.guardianName || selectedViewUser.parentName || selectedViewUser.name)?.charAt(0) || 'S')}
+                </div>
+                <div>
+                  <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
+                  <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
+                    <Users className="w-4 h-4" /> {selectedViewUser.students?.length || 1} Student(s)
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
 
+            <div className="p-8 sm:p-10 overflow-y-auto">
+              <div className="space-y-8">
+                {(selectedViewUser.students && selectedViewUser.students.length > 0 ? selectedViewUser.students : [selectedViewUser]).map((studentDetail: any, index: number) => (
+                  <div key={studentDetail.id || index} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                      {studentDetail.name || 'Student'} <span className="text-sm font-medium text-gray-500">({studentDetail.category})</span>
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {studentDetail.classLevel && (
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Class</p>
+                          <p className="font-bold text-gray-800">{studentDetail.classLevel} {studentDetail.board && `(${studentDetail.board})`}</p>
+                        </div>
+                      )}
+                      
+                      {studentDetail.category === 'programming' && (studentDetail.technologies?.length ?? 0) > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Technologies</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {studentDetail.technologies.map((t: string) => (
+                              <span key={t} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {studentDetail.category === 'languages' && (studentDetail.languages?.length ?? 0) > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Languages</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {studentDetail.languages.map((l: string) => (
+                              <span key={l} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{l}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {(!studentDetail.category || studentDetail.category === 'school') && (studentDetail.subjects?.length ?? 0) > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Subjects</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {studentDetail.subjects.map((s: string) => (
+                              <span key={s} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Preferred Days</p>
+                        <p className="font-bold text-gray-800">
+                          {studentDetail.daysPerWeek || 'Flexible'}
+                          {studentDetail.specificDays?.length > 0 && ` (${studentDetail.specificDays.join(', ')})`}
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Daily Duration</p>
+                        <p className="font-bold text-gray-800">{studentDetail.hoursPerDay || 'Flexible'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Budget</p>
+                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewUser.budget || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
+                    <p className="font-bold text-emerald-800 capitalize">{selectedViewUser.students?.[0]?.preferredMode || selectedViewUser.preferredMode || 'Online'}</p>
+                    {(selectedViewUser.students?.[0]?.preferredMode || selectedViewUser.preferredMode)?.toLowerCase() !== 'online' && (
+                      <p className="text-sm font-medium text-emerald-700 mt-1 max-w-[200px] truncate" title={selectedViewUser.students?.[0]?.area || selectedViewUser.address}>
+                        {selectedViewUser.students?.[0]?.area || selectedViewUser.address || 'Address hidden'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            
             {/* Actions */}
             {(() => {
-              const isPending = data?.applications?.some((app: any) => app.studentId === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted', 'negotiating'].includes(app.status));
-              const isHired = data?.applications?.some((app: any) => app.studentId === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+              const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending) return null;
+              if (isHired || isPending || cooldownApp) return null;
               
               return (
                 <div className="mt-6 pt-6 border-t border-gray-100">
@@ -1485,8 +1618,10 @@ export default function TeacherDashboard() {
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                       <input 
                         type="number"
+                        min={selectedViewUser.budget || 0}
+                        max={selectedViewUser.budget ? Math.floor(selectedViewUser.budget * 1.2) : undefined}
                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                        placeholder="e.g. 500"
+                        placeholder={selectedViewUser.budget ? `e.g. ${selectedViewUser.budget}` : "e.g. 500"}
                         value={negotiationOffer[selectedViewUser.id] || ''}
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />

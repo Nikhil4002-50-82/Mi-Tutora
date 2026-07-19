@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateReferralCode } from '@/utils/referral';
+import GroupManager from '@/components/GroupManager';
 
 interface Props {
   category?: string;
@@ -15,7 +16,7 @@ interface Props {
   parentOnly?: boolean;
 }
 
-const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
+export const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
 const CBSE_SUBJECTS = ["English","Mathematics","EVS","Hindi/Regional Language","Hindi","Sanskrit/Third Language","Science","Social Science","Computer","Artificial Intelligence/Information Technology","Health & Physical Education","Skill Subjects","Art","Physical Education"];
 const STATE_BOARD_SUBJECTS = ["Kannada","English","Hindi/Third Language","Mathematics","EVS","Science","Social Science","Computer","Art","Physical Education"];
 
@@ -292,12 +293,22 @@ export default function DemoForm({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, skipGroupingCheck = false) => {
+    if (e) e.preventDefault();
     
-    if (!parentOnly && formData.step < formData.numberOfStudents + 1) {
-      setFormData(prev => ({ ...prev, step: prev.step + 1 }));
-      return;
+    if (!parentOnly && !skipGroupingCheck) {
+      if (formData.numberOfStudents > 1 && formData.step < formData.numberOfStudents + 1) {
+        setFormData(prev => ({ ...prev, step: prev.step + 1 }));
+        return;
+      }
+      if (formData.numberOfStudents > 1 && formData.step === formData.numberOfStudents + 1) {
+        setFormData(prev => ({ ...prev, step: prev.step + 1 })); // Move to grouping step
+        return;
+      }
+      if (formData.numberOfStudents === 1 && formData.step < formData.numberOfStudents + 1) {
+        setFormData(prev => ({ ...prev, step: prev.step + 1 }));
+        return;
+      }
     }
     
     setLoading(true);
@@ -398,6 +409,7 @@ export default function DemoForm({
           daysPerWeek: formData.days || '',
           specificDays: formData.specificDays || [],
           budget: parseInt(s.budget) || 0,
+          groupId: (s as any).groupId || `indv_${activeStudentId}`,
         });
 
         const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
@@ -451,6 +463,7 @@ export default function DemoForm({
             hoursPerDay: formData.hours || '',
             daysPerWeek: formData.days || '',
             specificDays: formData.specificDays || [],
+            groupId: (s as any).groupId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : ((s as any).groupId || `indv_${newStudentRef.id}`),
             createdAt: Date.now()
           });
 
@@ -1058,6 +1071,39 @@ export default function DemoForm({
     );
   };
 
+  const isGroupingStep = formData.numberOfStudents > 1 && !parentOnly && formData.step === formData.numberOfStudents + 2;
+
+  if (isGroupingStep) {
+    const tempStudents = formData.students.slice(0, formData.numberOfStudents).map((s: any, index: number) => ({
+      id: s.id || `temp_${index}`,
+      name: s.fullName || s.name || `Student ${index + 1}`,
+      category: formData.category || category,
+      groupId: s.groupId || 'unassigned',
+      ...s
+    }));
+    
+    return (
+      <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto min-h-[600px]">
+        <GroupManager 
+          students={tempStudents}
+          onSave={(groupedStudents) => {
+            const newStudents = [...formData.students];
+            groupedStudents.forEach((gs) => {
+              const originalIndex = tempStudents.findIndex(ts => ts.id === gs.id);
+              if (originalIndex !== -1) {
+                newStudents[originalIndex] = { ...(newStudents[originalIndex] as any), groupId: gs.groupId };
+              }
+            });
+            setFormData(prev => ({ ...prev, students: newStudents }));
+            // We use setTimeout to ensure state updates before submitting
+            setTimeout(() => handleSubmit(undefined, true), 100);
+          }}
+          onCancel={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto">
       {hasProfile && !isEditing ? (
@@ -1110,7 +1156,7 @@ export default function DemoForm({
                 disabled={loading}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg text-lg"
               >
-                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < formData.numberOfStudents + 1 ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
+                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < formData.numberOfStudents + (formData.numberOfStudents > 1 ? 1 : 1) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
               </button>
             </div>
           </form>
