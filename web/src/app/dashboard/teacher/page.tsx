@@ -874,23 +874,37 @@ export default function TeacherDashboard() {
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-50">
-                            {computedRecommendedStudents.slice(0, 4).map((student: any, index: number) => (
-                              <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
-                                  #{index + 1}
+                            {computedRecommendedStudents.slice(0, 4).map((student: any, index: number) => {
+                              const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+                              const isCooldown = !!cooldownApp;
+                              const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const isLocked = isCooldown || hasNegotiation;
+
+                              return (
+                                <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
+                                  {isLocked && (
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCooldown ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                            {isCooldown ? 'Locked' : 'Offer Sent'}
+                                        </span>
+                                    </div>
+                                  )}
+                                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
+                                    #{index + 1}
+                                  </div>
+                                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
+                                    {student.name?.charAt(0) || 'S'}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                    <h4 className="font-bold text-gray-900 text-sm truncate">{student.name || 'Student'}</h4>
+                                    <p className="text-xs text-gray-500 truncate">{student.subjects ? student.subjects.join(', ') : student.category}</p>
+                                  </div>
+                                  <button onClick={() => setSelectedViewUser(student)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
+                                    View
+                                  </button>
                                 </div>
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
-                                  {student.name?.charAt(0) || 'S'}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                  <h4 className="font-bold text-gray-900 text-sm truncate">{student.name || 'Student'}</h4>
-                                  <p className="text-xs text-gray-500 truncate">{student.subjects ? student.subjects.join(', ') : student.category}</p>
-                                </div>
-                                <button onClick={() => setSelectedViewUser(student)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
-                                  View
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                             {computedRecommendedStudents.length > 4 && (
                               <div className="pt-4 mt-2">
                                 <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">

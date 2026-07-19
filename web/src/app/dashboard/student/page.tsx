@@ -227,7 +227,7 @@ export default function StudentDashboard() {
   const activeGroup = studentGroups.find(g => g.id === activeGroupId) || studentGroups[0] || null;
   const activeStudent = allStudents.find((s:any) => s.id === activeStudentId) || data?.myStudent || allStudents[0] || null;
   
-  const computedRecommendedTutors = data?.allTutors?.filter((tutor: any) => {
+  const computedRecommendedTutors = (data?.allTutors?.filter((tutor: any) => {
       if (!activeStudent) return true;
       const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
       if (!tutorCategories.includes(activeStudent.category)) return false;
@@ -252,7 +252,15 @@ export default function StudentDashboard() {
          return studentLangs.length === 0 || tutorLangs.length === 0 || studentLangs.some((l: string) => tutorLangs.includes(l));
       }
       return true;
-  }) || [];
+  }) || []).sort((a: any, b: any) => {
+      const getStatus = (tutorId: string) => data?.allNegotiations?.find((app: any) => app.tutorId === tutorId && (app.studentId === activeStudent?.id || app.groupId === activeGroup?.id))?.status || '';
+      const getScore = (status: string) => {
+          if (status === 'locked' || status === 'declined') return -1;
+          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1;
+          return 0;
+      };
+      return getScore(getStatus(b.id)) - getScore(getStatus(a.id));
+  });
 
   const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorId)) || [];
 
@@ -959,23 +967,37 @@ export default function StudentDashboard() {
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-50">
-                            {computedRecommendedTutors.slice(0, 4).map((tutor: any, index: number) => (
-                              <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
-                                  #{index + 1}
+                            {computedRecommendedTutors.slice(0, 4).map((tutor: any, index: number) => {
+                              const cooldownApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+                              const isCooldown = !!cooldownApp;
+                              const hasNegotiation = data?.allNegotiations?.some((app: any) => app.tutorId === tutor.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const isLocked = isCooldown || hasNegotiation;
+
+                              return (
+                                <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
+                                  {isLocked && (
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCooldown ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                            {isCooldown ? 'Locked' : 'Offer Sent'}
+                                        </span>
+                                    </div>
+                                  )}
+                                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
+                                    #{index + 1}
+                                  </div>
+                                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
+                                    {tutor.name?.charAt(0) || 'T'}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                    <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
+                                    <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
+                                  </div>
+                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
+                                    View
+                                  </button>
                                 </div>
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
-                                  {tutor.name?.charAt(0) || 'T'}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                  <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
-                                  <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
-                                </div>
-                                <button onClick={() => setSelectedViewUser(tutor)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
-                                  View
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                             {computedRecommendedTutors.length > 4 && (
                               <div className="pt-4 mt-2">
                                 <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
@@ -1852,50 +1874,104 @@ export default function StudentDashboard() {
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
               onClick={() => setSelectedViewUser(null)}
-              className="absolute top-4 right-4 text-white hover:text-gray-200 bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors z-10"
+              className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
             >
-              ✕
+              <X className="w-5 h-5" />
             </button>
-            <div className="bg-[#00a992] p-6 md:p-8 flex items-center gap-4">
-              <div className="w-16 h-16 bg-white text-[#00a992] rounded-full flex items-center justify-center text-2xl font-black uppercase shadow-sm">
-                {selectedViewUser.name.charAt(0)}
-              </div>
-              <div>
-                <h3 className="text-2xl font-black text-white">{selectedViewUser.name}</h3>
-                <p className="text-emerald-100 font-bold capitalize">{selectedViewUser.category || 'Tutor'}</p>
-              </div>
-            </div>
-            <div className="p-6 md:p-8 pt-6">
             
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-gray-50 p-4 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Experience</p>
-                <p className="text-lg font-bold text-gray-900">{selectedViewUser.experience || 'Not specified'}</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Highest Qualification</p>
-                <p className="text-lg font-bold text-gray-900">{selectedViewUser.qualification || 'Not specified'}</p>
+            <div className="bg-[#00a992] p-8 sm:p-10 text-white flex-shrink-0 relative overflow-hidden">
+              <div className="relative z-10 flex items-start gap-6">
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl font-black backdrop-blur-md shadow-inner border border-white/30">
+                  {selectedViewUser.name?.charAt(0) || 'T'}
+                </div>
+                <div>
+                  <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
+                  <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
+                    <User className="w-4 h-4" /> {selectedViewUser.category || 'Tutor'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="bg-gray-50 p-5 rounded-2xl mb-6">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Teaching Expertise</p>
-              {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Technologies:</strong> {selectedViewUser.technologies.join(', ')}</p>}
-              {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Languages:</strong> {selectedViewUser.languagesTaught.join(', ')}</p>}
-              {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && <p className="mb-2"><strong className="text-gray-700">Subjects:</strong> {selectedViewUser.subjects.join(', ')}</p>}
-              <p className="mb-2"><strong className="text-gray-700">Teaching Approach:</strong> {selectedViewUser.teachingApproach || 'Not specified'}</p>
-              <p className="mb-2"><strong className="text-gray-700">Mode:</strong> {selectedViewUser.mode || 'Online'}</p>
-              <p><strong className="text-gray-700">Fee Range:</strong> {selectedViewUser.feeRange || 'Negotiable'}</p>
-            </div>
-            
-            {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
-              <div className="bg-gray-50 p-5 rounded-2xl">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Residential Address</p>
-                <div className="mt-2">
-                  <p className="text-sm text-gray-600"><strong className="text-gray-700">Address:</strong> {selectedViewUser.address}</p>
+            <div className="p-8 sm:p-10 overflow-y-auto">
+              <div className="space-y-8">
+                
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                    Professional Details
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Experience</p>
+                      <p className="font-bold text-gray-800">{selectedViewUser.experience || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Highest Qualification</p>
+                      <p className="font-bold text-gray-800">{selectedViewUser.qualification || 'Not specified'}</p>
+                    </div>
+                  </div>
                 </div>
+
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                    Teaching Expertise
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    {selectedViewUser.category === 'programming' && (selectedViewUser.technologies?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Technologies</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedViewUser.technologies.map((t: string) => (
+                            <span key={t} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedViewUser.category === 'languages' && (selectedViewUser.languagesTaught?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Languages</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedViewUser.languagesTaught.map((l: string) => (
+                            <span key={l} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{l}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(!selectedViewUser.category || selectedViewUser.category === 'school') && (selectedViewUser.subjects?.length ?? 0) > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Subjects</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedViewUser.subjects.map((s: string) => (
+                            <span key={s} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Teaching Approach</p>
+                        <p className="font-bold text-gray-800">{selectedViewUser.teachingApproach || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Mode & Fee Range</p>
+                        <p className="font-bold text-gray-800">{selectedViewUser.mode || 'Online'} • {selectedViewUser.feeRange || 'Negotiable'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
+                  <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                      Residential Address
+                    </h4>
+                    <p className="font-bold text-gray-800">{selectedViewUser.address}</p>
+                  </div>
+                )}
               </div>
-            )}
 
             {/* Actions */}
             {(() => {
