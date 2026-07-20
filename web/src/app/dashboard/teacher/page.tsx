@@ -11,6 +11,7 @@ import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { generateReferralCode } from '@/utils/referral';
+import { calculateSuitabilityScore } from '@/utils/matching';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -548,6 +549,35 @@ export default function TeacherDashboard() {
     { id: 'referrals', label: 'Referrals', icon: Gift },
   ];
 
+  const activeTeacher = data?.profile || data?.user || null;
+  const allStudentsWithScores = (data?.allStudents || []).map((student: any) => ({
+    ...student,
+    suitabilityScore: calculateSuitabilityScore(student, activeTeacher)
+  })).sort((a: any, b: any) => {
+      const getStatus = (studentId: string) => {
+          const app = data?.applications?.find((app: any) => app.studentId === studentId || app.groupId === studentId);
+          if (!app) return '';
+          if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
+              return 'locked';
+          }
+          return app.status;
+      };
+      const getScore = (status: string) => {
+          if (status === 'locked' || status === 'declined') return -1000;
+          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1000;
+          return 0;
+      };
+      const statusDiff = getScore(getStatus(b.id)) - getScore(getStatus(a.id));
+      if (statusDiff !== 0) return statusDiff;
+      
+      return b.suitabilityScore - a.suitabilityScore;
+  }).map((student: any, index: number) => ({
+      ...student,
+      rank: index + 1
+  }));
+
+  const computedRecommendedStudents = allStudentsWithScores.filter((student: any) => student.suitabilityScore >= 40);
+
   if (loading && !data) {
     return <LoadingScreen />;
   }
@@ -797,7 +827,6 @@ export default function TeacherDashboard() {
               })();
               
               const myActiveStudents = data?.upcomingClasses || [];
-              const computedRecommendedStudents = data?.recommendedStudents || [];
 
               return (
                 <div className="flex flex-col gap-8 h-full pb-10">
@@ -897,8 +926,8 @@ export default function TeacherDashboard() {
                             }).slice(0, 4).map((student: any, index: number) => {
                               const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
-                              const isLocked = !!offerApp; // We filtered out declines, so only offerApp can lock it here (for "Offer Sent" badge)
-                              const isRed = false; // Never red because declined ones are hidden
+                              const isLocked = !!offerApp;
+                              const isRed = false; 
                               const labelText = offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received';
 
                               return (
@@ -911,7 +940,7 @@ export default function TeacherDashboard() {
                                     </div>
                                   )}
                                   <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
-                                    #{index + 1}
+                                    #{student.rank}
                                   </div>
                                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
                                     {student.name?.charAt(0) || 'S'}
@@ -948,19 +977,15 @@ export default function TeacherDashboard() {
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
                     {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
                   </h2>
-                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
-                    <button 
-                      onClick={() => setTuitionSubTab('all')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                  <div className="flex-1 sm:flex-none">
+                    <select 
+                      value={tuitionSubTab}
+                      onChange={(e) => setTuitionSubTab(e.target.value as any)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#00a992]/50"
                     >
-                      All
-                    </button>
-                    <button 
-                      onClick={() => setTuitionSubTab('recommendation')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#063831] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                      Recommendation
-                    </button>
+                      <option value="recommendation">Recommended Students</option>
+                      <option value="all">All Students</option>
+                    </select>
                   </div>
                 </div>
 
@@ -984,8 +1009,7 @@ export default function TeacherDashboard() {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(() => {
-                        const studentsList = ((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                      {((tuitionSubTab === 'all' ? allStudentsWithScores : computedRecommendedStudents)?.filter((s:any) => {
                           if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                           return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
                         }) || []).sort((a: any, b: any) => {
@@ -1003,9 +1027,7 @@ export default function TeacherDashboard() {
                               return 0;
                           };
                           return getScore(getStatus(b.id)) - getScore(getStatus(a.id));
-                        });
-
-                        return studentsList.map((group: any) => {
+                        }).map((group: any) => {
                           const firstStudent = group.students?.[0] || {};
                           const parentName = firstStudent.guardianName || firstStudent.parentName || 'Parent';
                           const address = firstStudent.preferredMode?.toLowerCase() === 'online' 
@@ -1038,16 +1060,23 @@ export default function TeacherDashboard() {
                                 </div>
                               )}
                               
-                              <div className="bg-[#00a992] p-6 flex justify-between items-center">
-                                <div>
-                                  <h3 className="text-xl font-black text-white">{parentName}</h3>
-                                  <p className="text-sm font-medium text-emerald-100">{numStudents} Student(s) • {address}</p>
+                              <div className="bg-[#00a992] p-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {group.rank && (
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${group.rank === 1 ? 'bg-yellow-400 text-yellow-900' : group.rank === 2 ? 'bg-gray-300 text-gray-800' : group.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white'}`}>
+                                      #{group.rank}
+                                    </div>
+                                  )}
+                                  <h3 className="text-lg font-bold text-white truncate">{parentName}</h3>
                                 </div>
+                                <span className="px-2 py-1 bg-white/20 text-white text-[10px] font-bold rounded border border-white/30 uppercase tracking-wider flex-shrink-0">
+                                  {group.category || 'Student'}
+                                </span>
                               </div>
                               
                               <div className="p-6 flex flex-col flex-grow">
                                 <div className="mb-6">
-                                  <h4 className="font-bold text-gray-900 text-lg">{group.name || 'Group'} <span className="text-sm text-gray-500 font-normal capitalize">({group.category})</span></h4>
+                                  <h4 className="font-bold text-gray-900 text-lg">{group.name || 'Group'}</h4>
                                   <div className="text-sm text-gray-600 mt-2 grid grid-cols-1 gap-y-1">
                                     {firstStudent.classLevel && <span><strong className="text-gray-400">Class:</strong> {firstStudent.classLevel}</span>}
                                     {(!group.category || group.category === 'school') && (firstStudent.subjects?.length ?? 0) > 0 && <span><strong className="text-gray-400">Sub:</strong> {firstStudent.subjects[0]}{firstStudent.subjects.length > 1 ? '...' : ''}</span>}
@@ -1109,12 +1138,11 @@ export default function TeacherDashboard() {
                               </div>
                             </div>
                           );
-                        });
-                      })()}
-                      {(!((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        })}
+                      {(!((tuitionSubTab === 'all' ? allStudentsWithScores : computedRecommendedStudents)?.filter((s:any) => {
                         if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                         return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-                      })) || ((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                      })) || ((tuitionSubTab === 'all' ? allStudentsWithScores : computedRecommendedStudents)?.filter((s:any) => {
                         if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                         return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
                       }).length === 0)) && (

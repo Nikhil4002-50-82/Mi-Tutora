@@ -13,6 +13,7 @@ import LoadingScreen from '@/components/ui/LoadingScreen';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
 import { generateReferralCode } from '@/utils/referral';
+import { calculateSuitabilityScore } from '@/utils/matching';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -229,32 +230,10 @@ export default function StudentDashboard() {
   const activeGroup = studentGroups.find(g => g.id === activeGroupId) || studentGroups[0] || null;
   const activeStudent = allStudents.find((s:any) => s.id === activeStudentId) || data?.myStudent || allStudents[0] || null;
   
-  const computedRecommendedTutors = (data?.allTutors?.filter((tutor: any) => {
-      if (!activeStudent) return true;
-      const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
-      if (!tutorCategories.includes(activeStudent.category)) return false;
-      
-      if (activeStudent.category === 'school') {
-        const boardMatch = !tutor.boards || tutor.boards.length === 0 || tutor.boards.includes(activeStudent.board);
-        const classMatch = !tutor.classes || tutor.classes.length === 0 || tutor.classes.includes(activeStudent.classLevel);
-        const studentSubjects = activeStudent.subjects || [];
-        const tutorSubjects = tutor.subjects || [];
-        const subjectMatch = studentSubjects.length === 0 || tutorSubjects.length === 0 || 
-                             studentSubjects.some((s: string) => tutorSubjects.some((ts: string) => ts.toLowerCase() === s.toLowerCase()));
-        return (boardMatch || classMatch) && subjectMatch;
-      }
-      if (activeStudent.category === 'programming') {
-         const studentTechs = activeStudent.technologies || [];
-         const tutorTechs = tutor.technologies || [];
-         return studentTechs.length === 0 || tutorTechs.length === 0 || studentTechs.some((t: string) => tutorTechs.includes(t));
-      }
-      if (activeStudent.category === 'languages') {
-         const studentLangs = activeStudent.languages || [];
-         const tutorLangs = tutor.languagesTaught || [];
-         return studentLangs.length === 0 || tutorLangs.length === 0 || studentLangs.some((l: string) => tutorLangs.includes(l));
-      }
-      return true;
-  }) || []).sort((a: any, b: any) => {
+  const allTutorsWithScores = (data?.allTutors || []).map((tutor: any) => ({
+    ...tutor,
+    suitabilityScore: calculateSuitabilityScore(activeStudent, tutor)
+  })).sort((a: any, b: any) => {
       const getStatus = (tutorId: string) => {
           const matchGroup = (app: any) => {
               if (app.groupId) return app.groupId === activeGroup?.id;
@@ -268,12 +247,20 @@ export default function StudentDashboard() {
           return app.status;
       };
       const getScore = (status: string) => {
-          if (status === 'locked' || status === 'declined') return -1;
-          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1;
+          if (status === 'locked' || status === 'declined') return -1000;
+          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1000;
           return 0;
       };
-      return getScore(getStatus(b.id)) - getScore(getStatus(a.id));
-  });
+      const statusDiff = getScore(getStatus(b.id)) - getScore(getStatus(a.id));
+      if (statusDiff !== 0) return statusDiff;
+      
+      return b.suitabilityScore - a.suitabilityScore;
+  }).map((tutor: any, index: number) => ({
+      ...tutor,
+      rank: index + 1
+  }));
+
+  const computedRecommendedTutors = allTutorsWithScores.filter((tutor: any) => tutor.suitabilityScore >= 40);
 
   const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorId)) || [];
 
@@ -1136,7 +1123,7 @@ export default function StudentDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
+                    {(tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                       const matchGroup = (app: any) => {
                         if (app.groupId) return app.groupId === activeGroup?.id;
                         return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
@@ -1166,7 +1153,14 @@ export default function StudentDashboard() {
                             </div>
                           )}
                           <div className="bg-[#00a992] p-6 flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-white">{teacher.name}</h3>
+                            <div className="flex items-center gap-3">
+                              {teacher.rank && (
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-300 text-gray-800' : teacher.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white'}`}>
+                                  #{teacher.rank}
+                                </div>
+                              )}
+                              <h3 className="text-xl font-bold text-white truncate">{teacher.name}</h3>
+                            </div>
                             <span className="px-3 py-1 bg-white/20 text-white text-xs font-bold rounded-full border border-white/30">
                               {teacher.mode || 'Online'}
                             </span>
@@ -1240,7 +1234,7 @@ export default function StudentDashboard() {
                         </div>
                       );
                     })}
-                    {(!((tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory)))) || ((tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0)) && (
+                    {(!((tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory)))) || ((tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0)) && (
                       <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
                         <Users className="w-12 h-12 text-gray-300 mb-3" />
                         <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>
