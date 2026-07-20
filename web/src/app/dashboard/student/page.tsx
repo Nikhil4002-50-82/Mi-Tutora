@@ -290,7 +290,7 @@ export default function StudentDashboard() {
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setIsNotificationsDropdownOpen(false);
       }
@@ -299,8 +299,10 @@ export default function StudentDashboard() {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
 
