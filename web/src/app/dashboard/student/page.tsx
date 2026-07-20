@@ -253,7 +253,18 @@ export default function StudentDashboard() {
       }
       return true;
   }) || []).sort((a: any, b: any) => {
-      const getStatus = (tutorId: string) => data?.allNegotiations?.find((app: any) => app.tutorId === tutorId && (app.studentId === activeStudent?.id || app.groupId === activeGroup?.id))?.status || '';
+      const getStatus = (tutorId: string) => {
+          const matchGroup = (app: any) => {
+              if (app.groupId) return app.groupId === activeGroup?.id;
+              return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+          };
+          const app = data?.applications?.find((app: any) => app.tutorId === tutorId && matchGroup(app));
+          if (!app) return '';
+          if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
+              return 'locked';
+          }
+          return app.status;
+      };
       const getScore = (status: string) => {
           if (status === 'locked' || status === 'declined') return -1;
           if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1;
@@ -985,8 +996,23 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Right: Recommended Teachers */}
-                    <div className="space-y-4">
-                      <h2 className="text-xl font-bold text-gray-900">Recommended Teachers</h2>
+                    <div className="space-y-3">
+                        <h2 className="text-xl font-bold text-gray-900">Recommended Teachers</h2>
+                        {studentGroups.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-bold text-gray-500 whitespace-nowrap">Finding tutors for:</label>
+                            <select 
+                              className="w-32 sm:w-48 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-[#00a992] focus:outline-none focus:ring-1 focus:ring-[#00a992] truncate"
+                              value={activeGroupId || activeGroup?.id || ''}
+                              onChange={(e) => setActiveGroupId(e.target.value)}
+                            >
+                              {studentGroups.map((g:any) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      
                       <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
                         {computedRecommendedTutors.length === 0 ? (
                           <div className="text-center py-10">
@@ -994,18 +1020,28 @@ export default function StudentDashboard() {
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-50">
-                            {computedRecommendedTutors.slice(0, 4).map((tutor: any, index: number) => {
-                              const lockedApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                              const offerApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                            {computedRecommendedTutors.filter((tutor: any) => {
+                               const matchGroup = (app: any) => {
+                                 if (app.groupId) return app.groupId === activeGroup?.id;
+                                 return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                               };
+                               const isLocked = !!data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                               return !isLocked;
+                            }).slice(0, 4).map((tutor: any, index: number) => {
+                              const matchGroup = (app: any) => {
+                                if (app.groupId) return app.groupId === activeGroup?.id;
+                                return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                              };
+                              const offerApp = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
-                              const isLocked = !!lockedApp || !!offerApp;
-                              const isRed = !!lockedApp;
-                              const labelText = isRed ? 'Locked' : 'Offer Sent';
+                              const isLocked = !!offerApp; // We filtered out declines, so only offerApp can lock it here (for "Offer Sent" badge)
+                              const isRed = false; // Never red because declined ones are hidden
+                              const labelText = offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent';
 
                               return (
                                 <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
                                   {isLocked && (
-                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg">
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg pointer-events-none">
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                             {labelText}
                                         </span>
@@ -1021,16 +1057,16 @@ export default function StudentDashboard() {
                                     <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
                                     <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
                                   </div>
-                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex-shrink-0">
+                                  <button onClick={() => { if(tutor.tutorDetails) setSelectedViewUser(tutor.tutorDetails); else setActiveTab('my_teachers'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 z-0">
                                     View
                                   </button>
                                 </div>
                               );
                             })}
-                            {computedRecommendedTutors.length > 4 && (
-                              <div className="pt-4 mt-2 border-t border-gray-100">
-                                <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
-                                  View all {computedRecommendedTutors.length} recommendations →
+                            {computedRecommendedTutors.length > 3 && (
+                              <div className="pt-4 mt-2">
+                                <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
+                                  See more recommendations
                                 </button>
                               </div>
                             )}
@@ -1053,9 +1089,9 @@ export default function StudentDashboard() {
                     </h2>
                     {tuitionSubTab === 'recommendation' && studentGroups.length > 0 && (
                       <div className="mt-4 flex items-center gap-3">
-                        <label className="text-sm font-bold text-gray-600">Shopping for:</label>
+                        <label className="text-sm font-bold text-gray-600">Finding tutors for:</label>
                         <select 
-                          className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-[#00a992] focus:outline-none focus:ring-2 focus:ring-[#00a992]/50"
+                          className="w-48 sm:w-64 bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-[#00a992] focus:outline-none focus:ring-2 focus:ring-[#00a992]/50 truncate"
                           value={activeGroupId || activeGroup?.id || ''}
                           onChange={(e) => setActiveGroupId(e.target.value)}
                         >
@@ -1084,16 +1120,20 @@ export default function StudentDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
-                      const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                      const offerApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                      const matchGroup = (app: any) => {
+                        if (app.groupId) return app.groupId === activeGroup?.id;
+                        return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                      };
+                      const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                      const offerApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                       
                       const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                       const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
                       
                       const isLocked = !!lockedApp || !!offerApp;
                       const isRed = !!lockedApp;
-                      const labelText = isRed ? 'Locked' : 'Offer Sent';
-                      const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : 'Waiting for response...';
+                      const labelText = isRed ? 'Locked' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
+                      const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...');
                       
                       return (
                         <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full relative overflow-hidden">

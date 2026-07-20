@@ -874,13 +874,15 @@ export default function TeacherDashboard() {
                           </div>
                         ) : (
                           <div className="divide-y divide-gray-50">
-                            {computedRecommendedStudents.slice(0, 4).map((student: any, index: number) => {
+                            {computedRecommendedStudents.filter((student: any) => {
                               const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                              return !lockedApp;
+                            }).slice(0, 4).map((student: any, index: number) => {
                               const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
-                              const isLocked = !!lockedApp || !!offerApp;
-                              const isRed = !!lockedApp;
-                              const labelText = isRed ? 'Locked' : 'Offer Sent';
+                              const isLocked = !!offerApp; // We filtered out declines, so only offerApp can lock it here (for "Offer Sent" badge)
+                              const isRed = false; // Never red because declined ones are hidden
+                              const labelText = offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received';
 
                               return (
                                 <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
@@ -966,10 +968,25 @@ export default function TeacherDashboard() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {(() => {
-                        const studentsList = (tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
+                        const studentsList = ((tuitionSubTab === 'all' ? data?.allStudents : data?.recommendedStudents)?.filter((s:any) => {
                           if (!hasProfile && selectedCategory) return s.category === selectedCategory;
                           return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
-                        }) || [];
+                        }) || []).sort((a: any, b: any) => {
+                          const getStatus = (groupId: string) => {
+                              const app = data?.applications?.find((app: any) => (app.groupId || app.studentId) === groupId);
+                              if (!app) return '';
+                              if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
+                                  return 'locked';
+                              }
+                              return app.status;
+                          };
+                          const getScore = (status: string) => {
+                              if (status === 'locked' || status === 'declined') return -1;
+                              if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1;
+                              return 0;
+                          };
+                          return getScore(getStatus(b.id)) - getScore(getStatus(a.id));
+                        });
 
                         return studentsList.map((group: any) => {
                           const firstStudent = group.students?.[0] || {};
@@ -987,8 +1004,8 @@ export default function TeacherDashboard() {
                           
                           const isLocked = !!lockedApp || !!offerApp;
                           const isRed = !!lockedApp;
-                          const labelText = isRed ? 'Locked' : 'Offer Sent';
-                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : 'Waiting for response...';
+                          const labelText = isRed ? 'Locked' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received');
+                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting for response...' : 'Waiting to analyze...');
 
                           return (
                             <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden relative">

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateReferralCode } from '@/utils/referral';
 import GroupManager from '@/components/GroupManager';
+import { MapPin, Loader2 } from 'lucide-react';
 
 interface Props {
   category?: string;
@@ -201,7 +202,42 @@ export default function DemoForm({
 
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
   const router = useRouter();
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const data = await res.json();
+        
+        const street = data.address?.road || data.address?.suburb || data.address?.neighbourhood || '';
+        const city = data.address?.city || data.address?.town || data.address?.state_district || '';
+        const pincode = data.address?.postcode || '';
+        
+        setFormData((prev: any) => ({
+          ...prev,
+          addressStreet: `${street}${street && city ? ', ' : ''}${city}` || prev.addressStreet,
+          addressPincode: pincode || prev.addressPincode
+        }));
+      } catch (err) {
+        console.error('Error fetching location details:', err);
+        alert('Failed to automatically detect your address. Please enter it manually.');
+      } finally {
+        setLocationLoading(false);
+      }
+    }, (error) => {
+      console.warn('Geolocation error:', error.message);
+      alert('Failed to get location. Please ensure location permissions are granted.');
+      setLocationLoading(false);
+    }, { timeout: 10000 });
+  };
 
   const handleCommonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const val = e.target.value;
@@ -780,7 +816,22 @@ export default function DemoForm({
 
           {(formData.demoMode !== 'Online' && formData.category !== 'programming') && (
             <div>
-              <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <label className="block text-sm font-semibold">🏠 Residential Address *</label>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={locationLoading}
+                  className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors border border-emerald-200 shadow-sm w-max"
+                >
+                  {locationLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MapPin className="w-4 h-4" />
+                  )}
+                  {locationLoading ? 'Detecting...' : 'Auto-Detect Location'}
+                </button>
+              </div>
               <div className="space-y-3">
                 <input
                   type="text"

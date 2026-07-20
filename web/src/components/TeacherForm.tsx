@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateReferralCode } from '@/utils/referral';
+import { MapPin, Loader2 } from 'lucide-react';
 
 
 interface Props {
@@ -28,6 +29,7 @@ export default function TeacherForm({
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: initialData?.name || (typeof window !== 'undefined' ? localStorage.getItem('signup_name') || '' : ''),
     gender: initialData?.gender || '',
@@ -128,6 +130,41 @@ export default function TeacherForm({
     if (checked) {
       setFormData(prev => ({ ...prev, whatsapp: prev.phone }));
     }
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const data = await res.json();
+        
+        const street = data.address?.road || data.address?.suburb || data.address?.neighbourhood || '';
+        const city = data.address?.city || data.address?.town || data.address?.state_district || '';
+        const pincode = data.address?.postcode || '';
+        
+        setFormData((prev: any) => ({
+          ...prev,
+          street: street || prev.street,
+          city: city || prev.city,
+          pincode: pincode || prev.pincode
+        }));
+      } catch (err) {
+        console.error('Error fetching location details:', err);
+        alert('Failed to automatically detect your address. Please enter it manually.');
+      } finally {
+        setLocationLoading(false);
+      }
+    }, (error) => {
+      console.warn('Geolocation error:', error.message);
+      alert('Failed to get location. Please ensure location permissions are granted.');
+      setLocationLoading(false);
+    }, { timeout: 10000 });
   };
 
   const handleSubmit = async (
@@ -275,7 +312,7 @@ export default function TeacherForm({
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Experience</p>
-              <p className="text-lg font-bold text-slate-800">{formData.experience ? `${formData.experience} Years` : '-'}</p>
+              <p className="text-lg font-bold text-slate-800">{formData.experience || '-'}</p>
             </div>
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Occupation</p>
@@ -575,7 +612,22 @@ export default function TeacherForm({
 
           {(formData.mode !== 'Online' && formData.category !== 'programming' && formData.category !== 'languages') && (
             <div className="space-y-4">
-              <label className="block text-sm font-semibold mb-2">🏠 Residential Address *</label>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <label className="block text-sm font-semibold">🏠 Residential Address *</label>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={locationLoading}
+                  className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors border border-emerald-200 shadow-sm"
+                >
+                  {locationLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MapPin className="w-4 h-4" />
+                  )}
+                  {locationLoading ? 'Detecting...' : 'Auto-Detect Location'}
+                </button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-1 md:col-span-2">
                   <input
@@ -658,14 +710,20 @@ export default function TeacherForm({
               📖 Total Teaching Experience
             </label>
 
-            <input
-              type="text"
+            <select
               name="experience"
-              placeholder="Years of experience"
-              value={formData.experience}
+              value={formData.experience || ''}
               onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+            >
+              <option value="" disabled>Select your experience</option>
+              <option value="Fresher (No experience)">Fresher (No experience)</option>
+              <option value="Less than 1 Year">Less than 1 Year</option>
+              <option value="1-3 Years">1-3 Years</option>
+              <option value="4-6 Years">4-6 Years</option>
+              <option value="7-10 Years">7-10 Years</option>
+              <option value="10+ Years">10+ Years</option>
+            </select>
           </div>
 
         </div>
