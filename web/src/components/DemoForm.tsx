@@ -102,6 +102,7 @@ export default function DemoForm({
   const [isEditing, setIsEditing] = useState(!hasProfile || !initialData || activeStudentId === 'new');
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [formData, setFormData] = useState(getInitialFormData());
+  const [shouldSubmitGroup, setShouldSubmitGroup] = useState(false);
 
   useEffect(() => {
     if (isDashboard && !initialData) {
@@ -506,6 +507,14 @@ export default function DemoForm({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (shouldSubmitGroup) {
+      setShouldSubmitGroup(false);
+      handleSubmit(undefined, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldSubmitGroup]);
 
   const getAvailableSubjects = (board: string, classGrade: string) => {
     let availableSubjects = new Set<string>();
@@ -1095,8 +1104,8 @@ export default function DemoForm({
               }
             });
             setFormData(prev => ({ ...prev, students: newStudents }));
-            // We use setTimeout to ensure state updates before submitting
-            setTimeout(() => handleSubmit(undefined, true), 100);
+            // Trigger submission via useEffect to avoid stale closure
+            setShouldSubmitGroup(true);
           }}
           onCancel={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
         />

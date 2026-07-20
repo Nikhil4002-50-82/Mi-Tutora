@@ -337,50 +337,77 @@ export default function StudentDashboard() {
           const userDocRef = doc(db, 'users', user.uid);
           const userDocSnap = await getDoc(userDocRef);
           const existingCode = userDocSnap.exists() && userDocSnap.data().referralCode;
-          const newCode = existingCode || generateReferralCode(formData.fullName, user.uid);
+          const fallbackName = formData.students?.[0]?.fullName || formData.students?.[0]?.name || 'Unknown Parent';
+          const newCode = existingCode || generateReferralCode(formData.parentName || fallbackName, user.uid);
           await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
           const parentDocRef = doc(db, 'parents', user.uid);
           const parentDocSnap = await getDoc(parentDocRef);
           if (!parentDocSnap.exists()) {
-            await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || formData.fullName });
+            await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || fallbackName });
           }
 
-          const newStudentRef = await addDoc(collection(db, 'students'), {
-            parentId: user.uid,
-            category: formData.category || '',
-            name: formData.fullName,
-            gender: formData.gender,
-            phoneNumber: formData.phone,
-            whatsappNumber: formData.whatsapp,
-            email: formData.email,
-            address: formData.address,
-            studentType: formData.studentType,
-            classLevel: formData.classGrade,
-            board: formData.board,
-            subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
-            budget: parseInt(formData.budget) || 0,
-            preferredMode: formData.demoMode,
-            learningGoal: formData.goal,
-            specialRequirements: formData.requirements,
-            createdAt: Date.now()
-          });
+          const isOnline = formData.demoMode?.toLowerCase() === 'online';
+          const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
-          await addDoc(collection(db, 'tuition_requests'), {
-            parentId: user.uid,
-            studentId: newStudentRef.id,
-            category: formData.category || '',
-            studentName: formData.fullName,
-            classLevel: formData.classGrade,
-            board: formData.board,
-            subjects: formData.subjects ? formData.subjects.split(',').map((s: string) => s.trim()) : [],
-            budget: parseInt(formData.budget) || 0,
-            mode: formData.demoMode,
-            preferredTimeRange: formData.hours,
-            area: formData.address,
-            status: 'open',
-            createdAt: Date.now()
-          });
+          const numStudents = formData.numberOfStudents || 1;
+          for (let i = 0; i < numStudents; i++) {
+            const s = formData.students && formData.students[i] ? formData.students[i] : formData;
+            const newStudentRef = doc(collection(db, 'students'));
+            
+            await setDoc(newStudentRef, {
+              id: newStudentRef.id,
+              guardianName: formData.parentName || '',
+              dob: '',
+              parentId: user.uid,
+              category: formData.category || '',
+              name: s.fullName || s.name || '',
+              gender: s.gender || '',
+              phoneNumber: formData.phone || '',
+              whatsappNumber: formData.whatsapp || '',
+              email: formData.email || '',
+              address: combinedAddress,
+              studentType: s.studentType || '',
+              classLevel: s.classGrade || s.classLevel || '',
+              board: s.board || '',
+              subjects: Array.isArray(s.subjects) ? s.subjects : (s.subjects ? s.subjects.split(',').map((subj: string) => subj.trim()) : []),
+              technologies: s.technologies || [],
+              languages: s.languages || [],
+              budget: parseInt(s.budget) || 0,
+              preferredMode: formData.demoMode || '',
+              learningGoal: formData.goal || '',
+              specialRequirements: formData.requirements || '',
+              hoursPerDay: formData.hours || '',
+              daysPerWeek: formData.days || '',
+              specificDays: formData.specificDays || [],
+              groupId: s.groupId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : (s.groupId || `indv_${newStudentRef.id}`),
+              createdAt: Date.now()
+            });
+
+            const newRequestRef = doc(collection(db, 'tuition_requests'));
+            await setDoc(newRequestRef, {
+              id: newRequestRef.id,
+              city: '',
+              latitude: 0.0,
+              longitude: 0.0,
+              acceptedTutorId: '',
+              parentId: user.uid,
+              studentId: newStudentRef.id,
+              category: formData.category || '',
+              studentName: s.fullName || s.name || '',
+              classLevel: s.classGrade || s.classLevel || '',
+              board: s.board || '',
+              subjects: Array.isArray(s.subjects) ? s.subjects : (s.subjects ? s.subjects.split(',').map((subj: string) => subj.trim()) : []),
+              technologies: s.technologies || [],
+              languages: s.languages || [],
+              mode: formData.demoMode || '',
+              preferredTimeRange: formData.hours || '',
+              area: combinedAddress,
+              budget: parseInt(s.budget) || 0,
+              status: 'open',
+              createdAt: Date.now()
+            });
+          }
 
           localStorage.removeItem('demoFormData');
           mutate();
@@ -473,7 +500,7 @@ export default function StudentDashboard() {
         studentName: groupToUse.name,
         currentOffer: offerPrice,
         initialBudget: groupToUse.totalBudget || offerPrice,
-        absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
+        absoluteMax: tutorPrice > 0 ? Math.floor(tutorPrice * 1.2) : Math.floor(offerPrice * 1.2),
         absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
         lastUpdatedBy: 'student',
         status: 'negotiating',
@@ -968,17 +995,19 @@ export default function StudentDashboard() {
                         ) : (
                           <div className="divide-y divide-gray-50">
                             {computedRecommendedTutors.slice(0, 4).map((tutor: any, index: number) => {
-                              const cooldownApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
-                              const isCooldown = !!cooldownApp;
-                              const hasNegotiation = data?.allNegotiations?.some((app: any) => app.tutorId === tutor.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
-                              const isLocked = isCooldown || hasNegotiation;
+                              const lockedApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                              const offerApp = data?.allNegotiations?.find((app: any) => app.tutorId === tutor.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              
+                              const isLocked = !!lockedApp || !!offerApp;
+                              const isRed = !!lockedApp;
+                              const labelText = isRed ? 'Locked' : 'Offer Sent';
 
                               return (
                                 <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
                                   {isLocked && (
                                     <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCooldown ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                            {isCooldown ? 'Locked' : 'Offer Sent'}
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                            {labelText}
                                         </span>
                                     </div>
                                   )}
@@ -999,9 +1028,9 @@ export default function StudentDashboard() {
                               );
                             })}
                             {computedRecommendedTutors.length > 4 && (
-                              <div className="pt-4 mt-2">
+                              <div className="pt-4 mt-2 border-t border-gray-100">
                                 <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
-                                  See more recommendations
+                                  View all {computedRecommendedTutors.length} recommendations →
                                 </button>
                               </div>
                             )}
@@ -1055,26 +1084,27 @@ export default function StudentDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? data?.allTutors : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
-                      const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['negotiating'].includes(app.status));
+                      const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                      const offerApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                      
                       const isPending = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                       const isHired = data?.applications?.some((app: any) => app.tutorId === teacher.id && ['tuition_started'].includes(app.status));
                       
-                      const cooldownApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
-                      const isCooldown = !!cooldownApp;
-                      const isLocked = hasNegotiation || isPending || isHired || isCooldown;
+                      const isLocked = !!lockedApp || !!offerApp;
+                      const isRed = !!lockedApp;
+                      const labelText = isRed ? 'Locked' : 'Offer Sent';
+                      const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : 'Waiting for response...';
                       
                       return (
                         <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full relative overflow-hidden">
                           {isLocked && (
                             <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-6 text-center">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isCooldown ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                                <Lock className={`w-6 h-6 ${isCooldown ? 'text-red-600' : 'text-emerald-600'}`} />
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isRed ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                <Lock className={`w-6 h-6 ${isRed ? 'text-red-600' : 'text-emerald-600'}`} />
                               </div>
-                              <h4 className="font-bold text-gray-900 mb-1">{isCooldown ? 'Locked' : 'Offer Sent'}</h4>
+                              <h4 className="font-bold text-gray-900 mb-1">{labelText}</h4>
                               <p className="text-sm text-gray-600 font-medium">
-                                {isCooldown 
-                                  ? `Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` 
-                                  : 'Waiting for response...'}
+                                {subText}
                               </p>
                             </div>
                           )}
@@ -1591,14 +1621,6 @@ export default function StudentDashboard() {
                   <h2 className="text-2xl font-black text-gray-900">Registered Students</h2>
                   {hasProfile && (
                     <div className="flex gap-3">
-                      {allStudents.length > 1 && (
-                        <button 
-                          onClick={() => setShowGroupManager(true)}
-                          className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 border border-emerald-200"
-                        >
-                          <Users className="w-4 h-4" /> Manage Groups
-                        </button>
-                      )}
                       <button 
                         onClick={() => {
                           setActiveStudentId('new');
@@ -1693,6 +1715,35 @@ export default function StudentDashboard() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {allStudents.length > 1 && !editingStudentId && activeStudentId !== 'new' && (
+                  <div className="mt-12">
+                    <div className="bg-white rounded-3xl shadow-xl overflow-hidden min-h-[600px] border border-gray-100">
+                      <GroupManager 
+                        students={allStudents}
+                        title="Manage Groups"
+                        subtitle="Drag and drop students to change their group assignments. Click save when you are done."
+                        onSave={async (groupedStudents) => {
+                          try {
+                            const { db } = await import('@/utils/firebase/client');
+                            const { doc, updateDoc } = await import('firebase/firestore');
+                            
+                            for (const student of groupedStudents) {
+                              await updateDoc(doc(db, 'students', student.id), {
+                                groupId: student.groupId
+                              });
+                            }
+                            
+                            toast.success("Groups updated successfully!");
+                            mutate(); // Refresh data
+                          } catch (e: any) {
+                            toast.error("Failed to update groups: " + e.message);
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -1825,49 +1876,6 @@ export default function StudentDashboard() {
         </div>
 
       {/* Modals and Overlays */}
-      {showGroupManager && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl my-8">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                <Users className="w-6 h-6 text-[#00a992]" /> Manage Groups
-              </h2>
-              <button 
-                onClick={() => setShowGroupManager(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="h-[600px] overflow-hidden">
-              <GroupManager 
-                isModal={true}
-                students={allStudents}
-                onSave={async (groupedStudents) => {
-                  try {
-                    const { db } = await import('@/utils/firebase/client');
-                    const { doc, updateDoc } = await import('firebase/firestore');
-                    
-                    for (const student of groupedStudents) {
-                      await updateDoc(doc(db, 'students', student.id), {
-                        groupId: student.groupId
-                      });
-                    }
-                    
-                    toast.success("Groups updated successfully!");
-                    setShowGroupManager(false);
-                    mutate(); // Refresh data
-                  } catch (e: any) {
-                    toast.error("Failed to update groups: " + e.message);
-                  }
-                }}
-                onCancel={() => setShowGroupManager(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* View Teacher Profile Modal */}
       {selectedViewUser && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
@@ -1950,16 +1958,26 @@ export default function StudentDashboard() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Teaching Approach</p>
-                        <p className="font-bold text-gray-800">{selectedViewUser.teachingApproach || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Mode & Fee Range</p>
-                        <p className="font-bold text-gray-800">{selectedViewUser.mode || 'Online'} • {selectedViewUser.feeRange || 'Negotiable'}</p>
-                      </div>
+                    <div className="mt-2">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Teaching Approach</p>
+                      <p className="font-bold text-gray-800">{selectedViewUser.teachingApproach || 'Not specified'}</p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Budget</p>
+                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewUser.feeRange || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
+                    <p className="font-bold text-emerald-800 capitalize">{selectedViewUser.mode || 'Online'}</p>
+                    {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.locations && (
+                      <p className="text-sm font-medium text-emerald-700 mt-1 max-w-[200px] truncate" title={selectedViewUser.locations}>
+                        {selectedViewUser.locations || 'Location hidden'}
+                      </p>
+                    )}
                   </div>
                 </div>
                 

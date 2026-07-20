@@ -15,13 +15,15 @@ interface GroupManagerProps {
   onSave: (updatedStudents: Student[]) => void;
   onCancel?: () => void;
   isModal?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
 interface GroupState {
   [key: string]: Student[];
 }
 
-export default function GroupManager({ students, onSave, onCancel, isModal = false }: GroupManagerProps) {
+export default function GroupManager({ students, onSave, onCancel, isModal = false, title = "Group Your Students", subtitle = "Organize your students into groups. Teachers will send a single offer covering all students in a group." }: GroupManagerProps) {
   const [groups, setGroups] = useState<GroupState>({ unassigned: [] });
   const [groupNames, setGroupNames] = useState<{ [key: string]: string }>({});
   const [selectionMode, setSelectionMode] = useState<string | null>(null); // groupId that is currently in 'choose' mode
@@ -174,10 +176,10 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
       {!isModal && (
         <div className="bg-[#00a992] p-6 text-white">
           <h2 className="text-2xl font-black mb-2 flex items-center gap-2">
-            <Users className="w-6 h-6" /> Group Your Students
+            <Users className="w-6 h-6" /> {title}
           </h2>
           <p className="text-emerald-100 font-medium text-sm">
-            Organize your students into groups. Teachers will send a single offer covering all students in a group.
+            {subtitle}
           </p>
         </div>
       )}

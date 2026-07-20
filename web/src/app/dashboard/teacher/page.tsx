@@ -424,8 +424,8 @@ export default function TeacherDashboard() {
         studentName: student.name,
         currentOffer: offerPrice,
         initialBudget: student.budget,
-        absoluteMin: student.budget > 0 ? student.budget : offerPrice,
-        absoluteMax: student.budget > 0 ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
+        absoluteMin: Math.ceil(offerPrice * 0.6),
+        absoluteMax: Math.floor(offerPrice * 1.2),
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
@@ -875,17 +875,19 @@ export default function TeacherDashboard() {
                         ) : (
                           <div className="divide-y divide-gray-50">
                             {computedRecommendedStudents.slice(0, 4).map((student: any, index: number) => {
-                              const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
-                              const isCooldown = !!cooldownApp;
-                              const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
-                              const isLocked = isCooldown || hasNegotiation;
+                              const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              
+                              const isLocked = !!lockedApp || !!offerApp;
+                              const isRed = !!lockedApp;
+                              const labelText = isRed ? 'Locked' : 'Offer Sent';
 
                               return (
                                 <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
                                   {isLocked && (
                                     <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCooldown ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                            {isCooldown ? 'Locked' : 'Offer Sent'}
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                            {labelText}
                                         </span>
                                     </div>
                                   )}
@@ -970,9 +972,6 @@ export default function TeacherDashboard() {
                         }) || [];
 
                         return studentsList.map((group: any) => {
-                          const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating'].includes(app.status));
-                          if (hasNegotiation) return null;
-
                           const firstStudent = group.students?.[0] || {};
                           const parentName = firstStudent.guardianName || firstStudent.parentName || 'Parent';
                           const address = firstStudent.preferredMode?.toLowerCase() === 'online' 
@@ -980,26 +979,28 @@ export default function TeacherDashboard() {
                                 : `Offline • ${firstStudent.area || firstStudent.address || 'Location Hidden'}`;
                           const numStudents = group.students?.length || 1;
 
+                          const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                          
                           const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                           const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
-                                
-                          const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
-                          const isCooldown = !!cooldownApp;
-                          const isLocked = isPending || isHired || isCooldown;
+                          
+                          const isLocked = !!lockedApp || !!offerApp;
+                          const isRed = !!lockedApp;
+                          const labelText = isRed ? 'Locked' : 'Offer Sent';
+                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : 'Waiting for response...';
 
                           return (
                             <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden relative">
                               {isLocked && (
                                 <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 text-center">
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isCooldown ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                                    <Lock className={`w-5 h-5 ${isCooldown ? 'text-red-600' : 'text-emerald-600'}`} />
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isRed ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                    <Lock className={`w-5 h-5 ${isRed ? 'text-red-600' : 'text-emerald-600'}`} />
                                   </div>
-                                  <h4 className="font-bold text-gray-900 text-sm mb-1">{isCooldown ? 'Locked' : 'Offer Sent'}</h4>
-                                  {isCooldown && (
-                                    <p className="text-xs text-gray-600 font-medium">
-                                      {`Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days`}
-                                    </p>
-                                  )}
+                                  <h4 className="font-bold text-gray-900 text-sm mb-1">{labelText}</h4>
+                                  <p className="text-xs text-gray-600 font-medium">
+                                    {subText}
+                                  </p>
                                 </div>
                               )}
                               
