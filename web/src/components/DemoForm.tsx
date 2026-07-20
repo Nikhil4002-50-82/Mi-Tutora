@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateReferralCode } from '@/utils/referral';
+import { toast } from 'sonner';
 import GroupManager from '@/components/GroupManager';
 import { MapPin, Loader2 } from 'lucide-react';
 
@@ -414,6 +415,7 @@ export default function DemoForm({
         }
 
         setSuccessMsg('Parent profile updated successfully!');
+        toast.success("Profile saved successfully!", { description: "Your parent profile has been updated." });
         sessionStorage.removeItem('demoFormData');
         if (onSuccess) onSuccess();
         return;
@@ -471,6 +473,7 @@ export default function DemoForm({
           });
         }
         setSuccessMsg('Profile updated successfully!');
+        toast.success("Profile saved successfully!", { description: "Student profile has been updated." });
       } else {
         for (let i = 0; i < formData.numberOfStudents; i++) {
           const s = formData.students[i];
@@ -529,6 +532,7 @@ export default function DemoForm({
           });
         }
         setSuccessMsg('Student(s) added successfully!');
+        toast.success("Student(s) added successfully!", { description: "New students have been registered." });
       }
 
       sessionStorage.removeItem('demoFormData');
@@ -538,6 +542,7 @@ export default function DemoForm({
         setTimeout(() => router.push('/dashboard/student'), 2000);
       }
     } catch (err: any) {
+      toast.error('Submission failed', { description: err.message });
       alert(err.message || 'Failed to submit demo request');
     } finally {
       setLoading(false);
@@ -757,11 +762,12 @@ export default function DemoForm({
               <input
                 type="tel"
                 name="phone"
-                placeholder="Enter phone number"
+                placeholder="Enter 10-digit phone number"
                 value={formData.phone}
                 onChange={handleCommonChange}
                 required
-                pattern="[0-9]{10,15}"
+                maxLength={10}
+                pattern="[0-9]{10}"
                 className="w-full border border-slate-300 rounded-xl px-4 py-4"
               />
             </div>
@@ -776,12 +782,13 @@ export default function DemoForm({
               <input
                 type="tel"
                 name="whatsapp"
-                placeholder="Enter WhatsApp number"
+                placeholder="Enter 10-digit WhatsApp number"
                 value={formData.whatsapp}
                 onChange={handleCommonChange}
                 disabled={sameAsPhone}
                 required={!sameAsPhone}
-                pattern="[0-9]{10,15}"
+                maxLength={10}
+                pattern="[0-9]{10}"
                 className={`w-full border border-slate-300 rounded-xl px-4 py-4 ${sameAsPhone ? 'bg-slate-100' : ''}`}
               />
             </div>
@@ -795,7 +802,7 @@ export default function DemoForm({
                 <span className="font-semibold text-purple-700">Online Only (For Programming)</span>
               </div>
             ) : (
-              <div className="flex gap-6 pt-1">
+              <div className="flex flex-wrap gap-4 sm:gap-6 pt-1">
                 {['Online', 'Offline'].map((item) => (
                   <label key={item} className="flex items-center gap-2 font-medium cursor-pointer">
                     <input
@@ -958,7 +965,7 @@ export default function DemoForm({
           </div>
           <div>
             <label className="block text-sm font-semibold mb-3">🚻 Gender *</label>
-            <div className="flex gap-6 pt-3">
+            <div className="flex flex-wrap gap-4 sm:gap-6 pt-3">
               {['Female', 'Male', 'Other'].map((item) => (
                 <label key={item} className="flex items-center gap-2 font-medium">
                   <input
@@ -979,7 +986,7 @@ export default function DemoForm({
 
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
           <label className="block text-sm font-semibold mb-2 flex justify-between">
-            <span>💰 Expected Budget / Monthly Fee</span>
+            <span>💰 Expected Budget / Monthly Fee *</span>
             <span className="text-emerald-600 font-bold">₹{student.budget}</span>
           </label>
           <input
@@ -1143,7 +1150,7 @@ export default function DemoForm({
     }));
     
     return (
-      <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto min-h-[600px]">
+      <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto min-h-[600px]">
         <GroupManager 
           students={tempStudents}
           onSave={(groupedStudents) => {
@@ -1165,7 +1172,7 @@ export default function DemoForm({
   }
 
   return (
-    <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto">
+    <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto">
       {hasProfile && !isEditing ? (
         renderProfileView()
       ) : (

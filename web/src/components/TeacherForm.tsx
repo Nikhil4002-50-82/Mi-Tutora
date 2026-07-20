@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateReferralCode } from '@/utils/referral';
 import { MapPin, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 
 interface Props {
@@ -249,6 +250,7 @@ export default function TeacherForm({
 
       localStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
+      toast.success("Profile saved successfully!", { description: "Your teacher profile has been updated." });
       setIsEditing(false);
       if (onSuccess) onSuccess();
       
@@ -256,6 +258,7 @@ export default function TeacherForm({
         setTimeout(() => router.push('/dashboard/teacher'), 1500);
       }
     } catch (error: any) {
+      toast.error('Failed to update profile', { description: error.message });
       alert(error.message || 'Failed to update profile');
     } finally {
       setLoading(false);
@@ -264,7 +267,7 @@ export default function TeacherForm({
 
   return (
 
-    <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-6xl mx-auto">
+    <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto">
 
       {hasProfile && !isEditing ? (
         <div className="space-y-8 animate-in fade-in duration-300">
@@ -412,7 +415,7 @@ export default function TeacherForm({
 
         {/* CATEGORY */}
         <div>
-          <label className="block text-sm font-semibold mb-2">📚 Selected Category</label>
+          <label className="block text-sm font-semibold mb-2">📚 Selected Category *</label>
           <select
             name="category"
             value={formData.category}
@@ -450,10 +453,10 @@ export default function TeacherForm({
           {/* GENDER */}
           <div>
             <label className="block text-sm font-semibold mb-3">
-              🚻 Gender
+              🚻 Gender *
             </label>
 
-            <div className="flex gap-6 pt-3">
+            <div className="flex flex-wrap gap-4 sm:gap-6 pt-3">
 
               {[
                 'Female',
@@ -490,13 +493,15 @@ export default function TeacherForm({
 
           <div>
             <label className="block text-sm font-semibold mb-2">
-              📞 Phone Number
+              📞 Phone Number *
             </label>
 
             <input
               type="tel"
               name="phone"
-              placeholder="Enter phone number"
+              maxLength={10}
+              pattern="[0-9]{10}"
+              placeholder="Enter 10-digit phone number"
               value={formData.phone}
               onChange={handleChange}
               required
@@ -507,23 +512,22 @@ export default function TeacherForm({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-semibold">
-                💬 WhatsApp No.
+                💬 WhatsApp No. *
               </label>
               <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-                <input type="checkbox" onChange={(e) => {
-                  if (e.target.checked && formData.phone) {
-                    setFormData({ ...formData, whatsapp: formData.phone });
-                  }
-                }} /> Same as Phone
+                <input type="checkbox" checked={sameAsPhone} onChange={handleSameAsPhone} /> Same as Phone
               </label>
             </div>
 
             <input
               type="tel"
               name="whatsapp"
-              placeholder="Enter WhatsApp number"
+              maxLength={10}
+              pattern="[0-9]{10}"
+              placeholder="Enter 10-digit WhatsApp number"
               value={formData.whatsapp}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4"
             />
           </div>
@@ -535,7 +539,7 @@ export default function TeacherForm({
 
           <div>
             <label className="block text-sm font-semibold mb-2">
-              📧 Email ID
+              📧 Email ID *
             </label>
 
             <input
@@ -554,7 +558,7 @@ export default function TeacherForm({
         {/* MODE */}
         <div>
           <label className="block text-sm font-semibold mb-3">
-            🌐 Preferred Mode
+            🌐 Preferred Mode *
           </label>
 
           {(formData.category ===('programming') ||
@@ -672,8 +676,22 @@ export default function TeacherForm({
 
           <input
             type="file"
-            className="w-full border border-slate-300 rounded-xl px-4 py-4"
+            accept=".pdf,.doc,.docx"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                  alert("File size exceeds the 5MB limit. Please upload a smaller file.");
+                  e.target.value = '';
+                } else if (!file.name.match(/\.(pdf|doc|docx)$/i)) {
+                  alert("Invalid file format. Only PDF and Word documents are allowed.");
+                  e.target.value = '';
+                }
+              }
+            }}
+            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#00a992]/10 file:text-[#00a992] hover:file:bg-[#00a992]/20 transition-all cursor-pointer"
           />
+          <p className="text-xs text-slate-500 mt-2 font-medium">Max size: 5MB. Formats allowed: PDF, DOCX.</p>
         </div>
 
         {/* QUALIFICATION + EXPERIENCE */}
@@ -707,13 +725,14 @@ export default function TeacherForm({
 
           <div>
             <label className="block text-sm font-semibold mb-2">
-              📖 Total Teaching Experience
+              📖 Total Teaching Experience *
             </label>
 
             <select
               name="experience"
               value={formData.experience || ''}
               onChange={handleChange}
+              required
               className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
             >
               <option value="" disabled>Select your experience</option>
@@ -752,7 +771,7 @@ export default function TeacherForm({
             {/* CLASSES */}
             <div>
               <label className="block text-sm font-semibold mb-3">
-                🏫 Classes you Teach
+                🏫 Classes you Teach *
               </label>
 
               <div className="grid md:grid-cols-2 gap-3">
@@ -790,7 +809,7 @@ export default function TeacherForm({
             {/* BOARD */}
             <div>
               <label className="block text-sm font-semibold mb-3">
-                📚 Preferred Teaching Board
+                📚 Preferred Teaching Board *
               </label>
 
               <div className="grid md:grid-cols-2 gap-3">
@@ -825,7 +844,7 @@ export default function TeacherForm({
           {/* SUBJECTS */}
             <div>
               <label className="block text-sm font-semibold mb-2">
-                📘 Subjects you Teach
+                📘 Subjects you Teach *
               </label>
 
               {formData.boards.length === 0 || formData.classes.length === 0 ? (
@@ -1054,7 +1073,7 @@ export default function TeacherForm({
         {/* FEES */}
         <div>
           <label className="block text-sm font-semibold mb-2">
-            💰 Expected Fee Range
+            💰 Expected Fee Range *
           </label>
 
           <div className="flex justify-between items-center mb-2">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Users, User, Plus, X, Info, CheckSquare, Square, Save } from 'lucide-react';
+import { Users, User, Plus, X, Info, CheckSquare, Square, Save, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Student {
   id: string;
@@ -29,8 +30,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
   const [selectionMode, setSelectionMode] = useState<string | null>(null); // groupId that is currently in 'choose' mode
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
-  useEffect(() => {
-    // Initialize groups based on existing student.groupId
+  const resetGroups = (isManual = false) => {
     const initialGroups: GroupState = { unassigned: [] };
     const names: { [key: string]: string } = {};
     
@@ -49,7 +49,6 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     });
 
     if (Object.keys(initialGroups).length === 1 && initialGroups['unassigned'].length > 0) {
-      // If no groups exist yet, create Group 1
       const defaultGroupId = `group_${Date.now()}`;
       initialGroups[defaultGroupId] = [];
       names[defaultGroupId] = 'Group 1';
@@ -57,6 +56,16 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
 
     setGroups(initialGroups);
     setGroupNames(names);
+    setSelectionMode(null);
+    setSelectedStudents([]);
+    
+    if (isManual) {
+        toast.info("Changes undone!", { description: "Groups have been reverted to their original state." });
+    }
+  };
+
+  useEffect(() => {
+    resetGroups();
   }, [students]);
 
   const handleDragEnd = (result: DropResult) => {
@@ -168,6 +177,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
       });
     });
     
+    toast.success("Groups saved successfully!", { description: "Your students have been organized." });
     onSave(updatedStudents);
   };
 
@@ -383,6 +393,12 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
             Cancel
           </button>
         )}
+        <button 
+          onClick={() => resetGroups(true)}
+          className="px-6 py-3 font-bold text-amber-700 bg-amber-50 rounded-xl hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-2"
+        >
+          <RotateCcw className="w-5 h-5" /> Undo Changes
+        </button>
         <button 
           onClick={handleSave}
           className="px-8 py-3 font-bold text-white bg-[#00a992] rounded-xl shadow-md hover:bg-emerald-600 transition-colors flex items-center gap-2"

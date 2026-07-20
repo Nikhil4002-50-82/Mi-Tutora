@@ -611,7 +611,7 @@ export default function TeacherDashboard() {
           <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-lg shadow-inner">
             {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <p className="font-bold text-sm truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
             <p className="text-xs text-emerald-400 font-medium">Teacher Account</p>
           </div>
@@ -621,7 +621,7 @@ export default function TeacherDashboard() {
       {/* MAIN CONTENT */}
       {showCategoryPopup && !hasProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-lg w-full text-center">
+          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-lg w-full text-center">
             <h2 className="text-3xl font-black text-slate-900 mb-4">What do you teach?</h2>
             <p className="text-slate-500 mb-8">Select a category to discover students looking for your expertise.</p>
             <div className="space-y-4">
@@ -635,7 +635,7 @@ export default function TeacherDashboard() {
       {/* Profile Completion Reminder Modal */}
       {showProfileReminder && !hasProfile && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-8 md:p-10 shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-md w-full text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-32 bg-[#00a992] -z-10"></div>
             <button 
               onClick={() => { setShowProfileReminder(false); setHasDismissedReminder(true); }}
@@ -817,14 +817,14 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Split Layout */}
-                  <div className="grid lg:grid-cols-3 gap-8 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                     
                     {/* Left: My Students */}
                     <div className="lg:col-span-2 space-y-4">
                       <h2 className="text-xl font-bold text-gray-900">My Students</h2>
                       
                       {myActiveStudents.length === 0 ? (
-                        <div className="bg-white border border-gray-100 rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
+                        <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
                           <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
                             <Users className="w-10 h-10 text-emerald-500" />
                           </div>
@@ -841,16 +841,16 @@ export default function TeacherDashboard() {
                         <div className="grid gap-4">
                           {myActiveStudents.slice(0, 3).map((cls: any) => (
                             <div key={cls.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg">
+                              <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0">
                                   {cls.student?.charAt(0) || 'S'}
                                 </div>
-                                <div>
-                                  <h4 className="font-bold text-gray-900">{cls.student}</h4>
-                                  <p className="text-sm text-gray-500">{cls.subject}</p>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-gray-900 truncate">{cls.student}</h4>
+                                  <p className="text-sm text-gray-500 truncate">{cls.subject}</p>
                                 </div>
                               </div>
-                              <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200">
+                              <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 flex-shrink-0">
                                 View
                               </button>
                             </div>
@@ -899,7 +899,7 @@ export default function TeacherDashboard() {
                                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
                                     {student.name?.charAt(0) || 'S'}
                                   </div>
-                                  <div className="flex-1 overflow-hidden">
+                                  <div className="flex-1 min-w-0 overflow-hidden">
                                     <h4 className="font-bold text-gray-900 text-sm truncate">{student.name || 'Student'}</h4>
                                     <p className="text-xs text-gray-500 truncate">{student.subjects ? student.subjects.join(', ') : student.category}</p>
                                   </div>
