@@ -29,6 +29,8 @@ export default function TeacherDashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isNotificationsDropdownOpen, setIsNotificationsDropdownOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', min: undefined as number | undefined, max: undefined as number | undefined, onSubmit: (val: string, date?: string, time?: string) => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
@@ -268,6 +270,21 @@ export default function TeacherDashboard() {
   };
 
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsDropdownOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (data && !hasProfile && !showCategoryPopup && !hasDismissedReminder && activeTab === 'new_tuition') {
@@ -665,7 +682,7 @@ export default function TeacherDashboard() {
         {/* TOP NAVIGATION BAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
           <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" onClick={() => setIsNotificationsDropdownOpen(!isNotificationsDropdownOpen)}>
+            <div className="relative group cursor-pointer" ref={notificationsRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsNotificationsDropdownOpen(!isNotificationsDropdownOpen) }}>
               <button className="text-gray-400 hover:text-emerald-600 transition-colors relative mt-1">
                 <Bell className="w-5 h-5" />
                 {((data?.allNotifications)?.length ?? 0) > 0 && (
@@ -716,7 +733,7 @@ export default function TeacherDashboard() {
               </div>
             </div>
             
-            <div className="relative group cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
+            <div className="relative group cursor-pointer" ref={profileRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsProfileDropdownOpen(!isProfileDropdownOpen) }}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
                   {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
