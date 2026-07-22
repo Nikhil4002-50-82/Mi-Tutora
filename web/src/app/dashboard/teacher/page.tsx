@@ -42,6 +42,8 @@ export default function TeacherDashboard() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [payingClass, setPayingClass] = useState<any>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -407,6 +409,20 @@ export default function TeacherDashboard() {
     window.location.href = '/login';
   };
 
+  const handlePaymentSubmit = async () => {
+    setPaymentLoading(true);
+    try {
+      // Mock payment submission as requested for UI-only
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      toast.success("Payment completed successfully!");
+      setPayingClass(null);
+    } catch (e: any) {
+      toast.error(e.message || "Payment failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const handleSendOffer = async (student: any) => {
     if (offerLoading) return;
     const offerPrice = parseInt(negotiationOffer[student.id]);
@@ -445,7 +461,7 @@ export default function TeacherDashboard() {
         currentOffer: offerPrice,
         initialBudget: student.budget,
         absoluteMin: Math.ceil(offerPrice * 0.6),
-        absoluteMax: Math.floor(offerPrice * 1.2),
+        absoluteMax: student.budget ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
@@ -467,7 +483,7 @@ export default function TeacherDashboard() {
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
     if (action === 'counter_price' && newOffer && neg) {
       const minAllowed = neg.currentOffer;
-      const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || neg.currentOffer) * 1.2);
+      const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.2);
       if (newOffer < minAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum offer allowed is Rs. ${minAllowed}. Please adjust your offer.` });
         return;
@@ -1118,19 +1134,30 @@ export default function TeacherDashboard() {
                                           Pending
                                         </button>
                                       ) : (
-                                        <div className="flex gap-2">
-                                          <button 
-                                            onClick={() => setSelectedViewUser(group)}
-                                            className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-2 rounded-lg transition-colors text-sm"
+                                        <div className="flex flex-col gap-2">
+                                          <div className="flex gap-2">
+                                            <button 
+                                              onClick={() => setSelectedViewUser(group)}
+                                              className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-2 rounded-lg transition-colors text-sm"
+                                            >
+                                              View
+                                            </button>
+                                            <button 
+                                              onClick={() => handleSendOffer(group)}
+                                              disabled={offerLoading}
+                                              className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                              {offerLoading ? 'Sending...' : 'Send Offer'}
+                                            </button>
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              const displayNames = group.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || group.name || group.studentName || 'Student';
+                                              setPayingClass({ id: 'mock-id', studentName: displayNames, finalPrice: 500 }); 
+                                            }}
+                                            className="w-full py-2 px-3 bg-[#00a992] text-white rounded-lg text-sm font-bold hover:bg-[#008f7b] transition-colors"
                                           >
-                                            View
-                                          </button>
-                                          <button 
-                                            onClick={() => handleSendOffer(group)}
-                                            disabled={offerLoading}
-                                            className="w-2/3 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                          >
-                                            {offerLoading ? 'Sending...' : 'Send Offer'}
+                                            Accept & Book Demo
                                           </button>
                                         </div>
                                       )}
@@ -1249,12 +1276,18 @@ export default function TeacherDashboard() {
                               ) : neg.status === 'negotiating' && (
                                 neg.lastUpdatedBy === 'student' ? (
                                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                    <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
-                                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-                                    >
-                                      Accept Price
-                                    </button>
+                                     <button 
+                                       onClick={() => {
+                                         setPayingClass({
+                                           id: neg.id,
+                                           studentName: neg.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || neg.studentName || neg.name || 'Student',
+                                           finalPrice: 500
+                                         });
+                                       }}
+                                       className="w-full sm:w-auto bg-[#00a992] hover:bg-[#008f7b] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                     >
+                                       Accept & Book Demo
+                                     </button>
                                     <button 
                                       onClick={() => {
                                         setModalConfig({
@@ -1265,7 +1298,7 @@ export default function TeacherDashboard() {
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
                                           min: neg.currentOffer,
-                                          max: neg.absoluteMax || Math.floor((neg.initialBudget || neg.currentOffer) * 1.2),
+                                          max: neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.2),
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
                                             handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
@@ -1705,13 +1738,25 @@ export default function TeacherDashboard() {
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />
                     </div>
-                    <button 
-                      onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
-                      disabled={offerLoading}
-                      className="w-full bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
+                        disabled={offerLoading}
+                        className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const displayNames = selectedViewUser.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || selectedViewUser.name || selectedViewUser.studentName || 'Student';
+                          setPayingClass({ id: 'mock-id', studentName: displayNames, finalPrice: 500 }); 
+                          setSelectedViewUser(null); 
+                        }}
+                        className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1807,6 +1852,52 @@ export default function TeacherDashboard() {
                 disabled={isDeletingAccount || deleteAccountConfirm !== 'DELETE'}
               >
                 {isDeletingAccount ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT MODAL */}
+      {payingClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
+            <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
+            <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to book a demo with <span className="font-bold text-gray-900">{payingClass.studentName || 'Student'}</span>.</p>
+            
+            <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
+              <div className="flex justify-between items-center mb-4 text-sm font-bold text-gray-500">
+                <span>Demo Fee</span>
+                <span className="text-gray-900">₹{payingClass.finalPrice || 500}</span>
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
+                <span>Total to Pay</span>
+                <span className="text-[#00a992]">
+                  ₹{payingClass.finalPrice || 500}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex gap-4 relative z-10">
+              <button
+                onClick={() => { setPayingClass(null); }}
+                className="flex-1 py-3.5 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={paymentLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePaymentSubmit}
+                disabled={paymentLoading}
+                className="flex-1 py-3.5 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {paymentLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  'Pay Securely'
+                )}
               </button>
             </div>
           </div>

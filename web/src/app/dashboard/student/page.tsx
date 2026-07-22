@@ -517,7 +517,7 @@ export default function StudentDashboard() {
         studentName: groupToUse.name,
         currentOffer: offerPrice,
         initialBudget: groupToUse.totalBudget || offerPrice,
-        absoluteMax: tutorPrice > 0 ? Math.floor(tutorPrice * 1.2) : Math.floor(offerPrice * 1.2),
+        absoluteMax: groupToUse.totalBudget ? Math.floor(groupToUse.totalBudget * 1.2) : Math.floor(offerPrice * 1.2),
         absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
         lastUpdatedBy: 'student',
         status: 'negotiating',
@@ -540,7 +540,7 @@ export default function StudentDashboard() {
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
     if (action === 'counter_price' && newOffer && neg) {
       const maxAllowed = neg.currentOffer;
-      const minAllowed = neg.absoluteMin || Math.ceil((neg.initialBudget || neg.currentOffer) * 0.6);
+      const minAllowed = neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6);
       if (newOffer > maxAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot increase the price, the maximum offer allowed is Rs. ${maxAllowed}. Please adjust your offer.` });
         return;
@@ -1063,7 +1063,7 @@ export default function StudentDashboard() {
                                     <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
                                     <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
                                   </div>
-                                  <button onClick={() => { if(tutor.tutorDetails) setSelectedViewUser(tutor.tutorDetails); else setActiveTab('my_teachers'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 z-0 flex-shrink-0">
+                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 z-0 flex-shrink-0">
                                     View
                                   </button>
                                 </div>
@@ -1213,19 +1213,27 @@ export default function StudentDashboard() {
                                     Pending
                                   </button>
                                 ) : (
-                                  <div className="flex gap-2 mt-auto">
-                                    <button 
-                                      onClick={() => setSelectedViewUser(teacher)}
-                                      className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center"
+                                  <div className="flex flex-col gap-2 mt-auto">
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => setSelectedViewUser(teacher)}
+                                        className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center"
+                                      >
+                                        View
+                                      </button>
+                                      <button
+                                        disabled={requestLoading}
+                                        onClick={() => handleRequestTutor(teacher)}
+                                        className="flex-1 py-2 px-3 bg-[#00a992] text-white rounded-lg text-sm font-bold hover:bg-[#008f7b] disabled:opacity-50 transition-colors"
+                                      >
+                                        {requestLoading ? 'Requesting...' : 'Request & Offer'}
+                                      </button>
+                                    </div>
+                                    <button
+                                      onClick={() => { setPayingClass({ id: 'mock-id', teacher: teacher.name || 'Tutor', finalPrice: 500 }); }}
+                                      className="w-full py-3 px-3 bg-[#00a992] text-white rounded-xl text-sm font-bold hover:bg-[#008f7b] transition-colors"
                                     >
-                                      View
-                                    </button>
-                                    <button 
-                                      onClick={() => handleRequestTutor(teacher)}
-                                      disabled={requestLoading}
-                                      className="w-2/3 bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                      {requestLoading ? 'Requesting...' : 'Request & Offer'}
+                                      Accept & Book Demo
                                     </button>
                                   </div>
                                 )}
@@ -1344,10 +1352,16 @@ export default function StudentDashboard() {
                                 neg.lastUpdatedBy === 'tutor' ? (
                                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'accept_price', neg.currentOffer)}
+                                      onClick={() => {
+                                        setPayingClass({
+                                          id: neg.id,
+                                          teacher: neg.tutorName || 'Tutor',
+                                          finalPrice: 500
+                                        });
+                                      }}
                                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                                     >
-                                      Accept Price
+                                      Accept & Book Demo
                                     </button>
                                     <button 
                                       onClick={() => {
@@ -1358,7 +1372,7 @@ export default function StudentDashboard() {
                                           description: 'Propose a new monthly fee for this tutor.',
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
-                                          min: neg.absoluteMin || Math.ceil((neg.initialBudget || neg.currentOffer) * 0.6),
+                                          min: neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6),
                                           max: neg.currentOffer,
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -1823,11 +1837,11 @@ export default function StudentDashboard() {
                 <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
                   <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
-                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to start tuition with <span className="font-bold text-gray-900">{payingClass.teacher}</span>.</p>
+                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to book a demo with <span className="font-bold text-gray-900">{payingClass.teacher}</span>.</p>
                   
                   <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
                     <div className="flex justify-between items-center mb-4 text-sm font-bold text-gray-500">
-                      <span>Course Fee</span>
+                      <span>Demo Fee</span>
                       <span className="text-gray-900">₹{payingClass.finalPrice || 4000}</span>
                     </div>
                     
@@ -2068,12 +2082,20 @@ export default function StudentDashboard() {
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />
                     </div>
-                    <button 
-                      onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
-                      className="w-full bg-[#00a992] text-white hover:bg-[#008f7b] font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Send Request
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                          onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
+                          className="flex-1 py-3 px-6 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#00a992]/20 transition-all"
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Send Request
+                        </button>
+                        <button 
+                          onClick={() => { setPayingClass({ id: 'mock-id', teacher: selectedViewUser.name || 'Tutor', finalPrice: 500 }); setSelectedViewUser(null); }}
+                          className="flex-1 py-3 px-6 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#00a992]/20 transition-all"
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                        </button>
+                    </div>
                   </div>
                 </div>
               );
