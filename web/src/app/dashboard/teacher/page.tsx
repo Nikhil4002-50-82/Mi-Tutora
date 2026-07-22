@@ -17,6 +17,44 @@ const logo = '/imports/logo.png';
 
 import useSWR from 'swr';
 
+export const getStudentDemoFee = (student: any, pricingData: any[]) => {
+  if (!student || !pricingData) return { price: 100, name: 'General Tuition' };
+  
+  let targetId = 'general';
+  const cat = student.category || '';
+  
+  if (cat === 'school') {
+    const cl = (student.classLevel || '').toLowerCase();
+    if (cl.includes('lkg')) targetId = 'school_lkg';
+    else if (cl.includes('ukg')) targetId = 'school_ukg';
+    else {
+      const match = cl.match(/\d+/);
+      if (match) targetId = `school_class_${match[0]}`;
+    }
+  } else if (cat === 'competitive') {
+    const goal = (student.learningGoal || student.board || '').toLowerCase();
+    if (goal.includes('neet')) targetId = 'competitive_neet';
+    else if (goal.includes('jee')) targetId = 'competitive_jee';
+    else if (goal.includes('ssc')) targetId = 'competitive_ssc';
+    else if (goal.includes('upsc')) targetId = 'competitive_upsc';
+    else if (goal.includes('cat')) targetId = 'competitive_cat';
+    else if (goal.includes('gate')) targetId = 'competitive_gate';
+    else if (goal.includes('bank')) targetId = 'competitive_banking';
+  } else if (cat === 'programming') {
+    targetId = 'programming_intermediate';
+  } else if (cat === 'languages') {
+    targetId = 'languages_general';
+  }
+
+  const found = pricingData.find(p => p.id === targetId);
+  if (found) {
+    let name = found.displayName;
+    name = name.replace(/School Tuition/i, 'demo fee').replace(/Preparation/i, 'demo fee').replace(/Tuition/i, 'demo fee');
+    return { price: found.price, name };
+  }
+  return { price: 100, name: 'General demo fee' };
+};
+
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
@@ -193,31 +231,40 @@ export default function TeacherDashboard() {
     const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
     const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
+    const pricingSnap = await getDocs(collection(db, 'marketplace_pricing'));
+    const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+
     const groupIds = applications.map((app: any) => app.groupId || app.studentId).filter(Boolean);
     const studentIds = applications.flatMap((app: any) => app.studentIds || [app.studentId]).filter(Boolean);
 
     let studentsInfo: any[] = [];
     if (studentIds.length > 0) {
       const { documentId } = await import('firebase/firestore');
-      const studentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 10)));
-      const sSnap = await getDocs(studentsQuery);
-      studentsInfo = sSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      const uniqueStudentIds = Array.from(new Set(studentIds));
+      for (let i = 0; i < uniqueStudentIds.length; i += 10) {
+        const chunk = uniqueStudentIds.slice(i, i + 10);
+        const studentsQuery = query(collection(db, 'students'), where(documentId(), 'in', chunk));
+        const sSnap = await getDocs(studentsQuery);
+        studentsInfo = [...studentsInfo, ...sSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))];
+      }
     }
 
     const applicationsWithSubjects = applications.map((app: any) => {
       const student = studentsInfo.find(s => s.id === app.studentId);
+      const appStudentsList = studentsInfo.filter(s => (app.studentIds || []).includes(s.id) || s.id === app.studentId);
       return { 
         ...app, 
         studentDetails: student,
+        studentsList: appStudentsList,
         subjects: student?.subjects || [],
         technologies: student?.technologies || [],
         languages: student?.languages || []
       };
     }) || [];
 
-    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_pending_payment'].includes(app.status));
+    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment'].includes(app.status));
     const allNotifications = applicationsWithSubjects
-      .filter((app: any) => ['negotiating', 'demo_pending_payment', 'declined', 'tuition_started'].includes(app.status))
+      .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'declined', 'tuition_started'].includes(app.status))
       .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
     const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupId || app.studentId)));
 
@@ -230,12 +277,14 @@ export default function TeacherDashboard() {
       allStudents: availableGroupsRaw,
       recommendedStudents: matchedGroups,
       applications: applicationsWithSubjects,
+      marketplacePricing,
+      notifications: allNotifications,
       referrals,
       negotiations: allNegotiations,
       allNegotiations,
       allNotifications,
       recommendedNegotiations,
-      upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked', 'demo_pending_payment'].includes(app.status)).map((app: any) => ({
+      upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked'].includes(app.status)).map((app: any) => ({
         id: app.id,
         student: app.studentName || 'Assigned Student',
         subject: app.category || 'General',
@@ -412,10 +461,23 @@ export default function TeacherDashboard() {
   const handlePaymentSubmit = async () => {
     setPaymentLoading(true);
     try {
-      // Mock payment submission as requested for UI-only
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      
+      // Update application directly to tuition_started
+      if (payingClass?.id && payingClass.id !== 'mock-id') {
+        await updateDoc(doc(db, 'applications', payingClass.id), { 
+          status: 'tuition_started', 
+          demoPaymentPaid: true,
+          startDate: new Date().toLocaleDateString('en-GB'),
+          updatedAt: Date.now()
+        });
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 1500));
-      toast.success("Payment completed successfully!");
+      toast.success("Payment completed successfully! Demo Booked.");
       setPayingClass(null);
+      mutate();
     } catch (e: any) {
       toast.error(e.message || "Payment failed");
     } finally {
@@ -480,6 +542,54 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleDirectRequestDemo = async (student: any) => {
+    if (offerLoading) return;
+    if (!hasProfile) {
+      toast.error("Please complete your profile first.");
+      setActiveTab('profile');
+      return;
+    }
+
+    try {
+      setOfferLoading(true);
+      const { db, auth } = await import('@/utils/firebase/client');
+      const { collection, addDoc } = await import('firebase/firestore');
+      const user = auth.currentUser;
+
+      const offerPrice = student.budget || 500;
+
+      await addDoc(collection(db, 'applications'), {
+        tutorId: user?.uid,
+        tutorName: data?.profile?.name,
+        requestId: '',
+        parentId: student.parentId,
+        studentId: student.id,
+        groupId: student.id,
+        studentIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
+        studentName: student.name,
+        currentOffer: offerPrice,
+        finalPrice: offerPrice,
+        initialBudget: student.budget,
+        absoluteMin: Math.ceil(offerPrice * 0.6),
+        absoluteMax: student.budget ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
+        lastUpdatedBy: 'tutor',
+        status: 'demo_requested_by_teacher',
+        source: 'direct',
+        category: student.category,
+        mode: student.students ? student.students[0].preferredMode : (student.preferredMode || 'flexible'),
+        demoHours: student.students ? student.students[0].hoursPerDay : (student.hoursPerDay || student.preferredTimeRange || 'Flexible'),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+
+      toast.success("Demo requested successfully!");
+      mutate();
+    } catch (e: any) {
+      toast.error("Error requesting demo: " + e.message);
+    } finally {
+      setOfferLoading(false);
+    }
+  };
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
     if (action === 'counter_price' && newOffer && neg) {
       const minAllowed = neg.currentOffer;
@@ -499,9 +609,10 @@ export default function TeacherDashboard() {
       const { doc, updateDoc } = await import('firebase/firestore');
       
       const updateData: any = {};
-      if (action === 'accept_price') {
-        updateData.status = 'demo_pending_payment';
-        updateData.finalPrice = newOffer;
+      if (action === 'accept_price' || action === 'request_demo') {
+        updateData.status = 'demo_requested_by_teacher';
+        if (newOffer) updateData.finalPrice = newOffer;
+        updateData.lastUpdatedBy = 'tutor';
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'tutor';
@@ -582,7 +693,7 @@ export default function TeacherDashboard() {
       };
       const getScore = (status: string) => {
           if (status === 'locked' || status === 'declined') return -1000;
-          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1000;
+          if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment'].includes(status)) return 1000;
           return 0;
       };
       const statusDiff = getScore(getStatus(b.id)) - getScore(getStatus(a.id));
@@ -942,7 +1053,7 @@ export default function TeacherDashboard() {
                               const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                               return !lockedApp;
                             }).slice(0, 4).map((student: any, index: number) => {
-                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
                               const isLocked = !!offerApp;
                               const isRed = false; 
@@ -1041,7 +1152,7 @@ export default function TeacherDashboard() {
                           };
                           const getScore = (status: string) => {
                               if (status === 'locked' || status === 'declined') return -1;
-                              if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_pending_payment'].includes(status)) return 1;
+                              if (['pending', 'negotiating', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment'].includes(status)) return 1;
                               return 0;
                           };
                           return getScore(getStatus(b.id)) - getScore(getStatus(a.id));
@@ -1054,9 +1165,9 @@ export default function TeacherDashboard() {
                           const numStudents = group.students?.length || 1;
 
                           const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                           
-                          const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+                          const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                           const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
                           
                           const isLocked = !!lockedApp || !!offerApp;
@@ -1152,12 +1263,11 @@ export default function TeacherDashboard() {
                                           </div>
                                           <button
                                             onClick={() => {
-                                              const displayNames = group.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || group.name || group.studentName || 'Student';
-                                              setPayingClass({ id: 'mock-id', studentName: displayNames, finalPrice: 500 }); 
+                                              handleDirectRequestDemo(group);
                                             }}
                                             className="w-full py-2 px-3 bg-[#00a992] text-white rounded-lg text-sm font-bold hover:bg-[#008f7b] transition-colors"
                                           >
-                                            Accept & Book Demo
+                                            Accept & Request Demo
                                           </button>
                                         </div>
                                       )}
@@ -1277,16 +1387,10 @@ export default function TeacherDashboard() {
                                 neg.lastUpdatedBy === 'student' ? (
                                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                      <button 
-                                       onClick={() => {
-                                         setPayingClass({
-                                           id: neg.id,
-                                           studentName: neg.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || neg.studentName || neg.name || 'Student',
-                                           finalPrice: 500
-                                         });
-                                       }}
-                                       className="w-full sm:w-auto bg-[#00a992] hover:bg-[#008f7b] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                                       onClick={() => handleNegotiationAction(neg.id, 'request_demo', neg.currentOffer)}
+                                       className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                                      >
-                                       Accept & Book Demo
+                                       Accept & Request Demo
                                      </button>
                                     <button 
                                       onClick={() => {
@@ -1331,10 +1435,36 @@ export default function TeacherDashboard() {
                                 )
                               )}
 
-                              {/* Direct Payment Waiting */}
+                              {/* Demo Workflow States */}
+                              {neg.status === 'demo_requested_by_teacher' && (
+                                <div className="w-full sm:w-auto bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 text-center">
+                                  <p className="text-sm font-semibold text-blue-600">Waiting for student to accept...</p>
+                                </div>
+                              )}
+                              {neg.status === 'demo_requested_by_student' && (
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                  <button 
+                                    onClick={() => {
+                                      const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                      setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) });
+                                    }}
+                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                                  </button>
+                                </div>
+                              )}
                               {neg.status === 'demo_pending_payment' && (
-                                <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                  <p className="text-sm font-semibold text-emerald-600">Waiting for student to complete payment...</p>
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                  <button 
+                                    onClick={() => {
+                                      const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                      setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) });
+                                    }}
+                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                  >
+                                    <Lock className="w-4 h-4" /> Pay Fee
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -1717,7 +1847,7 @@ export default function TeacherDashboard() {
             
             {/* Actions */}
             {(() => {
-              const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+              const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
               const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
               const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
@@ -1747,14 +1877,10 @@ export default function TeacherDashboard() {
                         <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
                       </button>
                       <button 
-                        onClick={() => {
-                          const displayNames = selectedViewUser.students?.map((s:any) => s.name || s.studentName).filter(Boolean).join(' & ') || selectedViewUser.name || selectedViewUser.studentName || 'Student';
-                          setPayingClass({ id: 'mock-id', studentName: displayNames, finalPrice: 500 }); 
-                          setSelectedViewUser(null); 
-                        }}
-                        className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm"
+                        onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
+                        className="flex-1 py-3 px-6 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#00a992]/20 transition-all"
                       >
-                        <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                        <CheckCircle2 className="w-4 h-4" /> Accept & Request Demo
                       </button>
                     </div>
                   </div>
@@ -1859,7 +1985,13 @@ export default function TeacherDashboard() {
       )}
 
       {/* PAYMENT MODAL */}
-      {payingClass && (
+      {payingClass && (() => {
+        const payingStudents = payingClass.studentsList || (payingClass.studentDetails ? [payingClass.studentDetails] : []);
+        const demoFees = payingStudents.map((s:any) => ({ student: s, feeData: getStudentDemoFee(s, data?.marketplacePricing || []) }));
+        const totalDemoFee = demoFees.reduce((sum: number, curr: any) => sum + curr.feeData.price, 0) || 100;
+        const coursePrice = totalDemoFee;
+        
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
@@ -1867,15 +1999,22 @@ export default function TeacherDashboard() {
             <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to book a demo with <span className="font-bold text-gray-900">{payingClass.studentName || 'Student'}</span>.</p>
             
             <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
-              <div className="flex justify-between items-center mb-4 text-sm font-bold text-gray-500">
-                <span>Demo Fee</span>
-                <span className="text-gray-900">₹{payingClass.finalPrice || 500}</span>
+              <div className="space-y-3 mb-4">
+                {demoFees.map((fee: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center text-sm font-bold text-gray-500">
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">{fee.feeData.name}</span>
+                      <span className="text-xs font-medium">For {fee.student?.name || 'Student'}</span>
+                    </div>
+                    <span className="text-gray-900">₹{fee.feeData.price}</span>
+                  </div>
+                ))}
               </div>
               
               <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
                 <span>Total to Pay</span>
                 <span className="text-[#00a992]">
-                  ₹{payingClass.finalPrice || 500}
+                  ₹{coursePrice}
                 </span>
               </div>
             </div>
@@ -1902,7 +2041,8 @@ export default function TeacherDashboard() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       </main>
     </div>
