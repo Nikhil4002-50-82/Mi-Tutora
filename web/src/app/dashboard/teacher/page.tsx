@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -485,7 +485,16 @@ export default function TeacherDashboard() {
     }
   };
 
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'teacher' && app.createdAt >= todayStart.getTime()).length || 0;
+
   const handleSendOffer = async (student: any) => {
+    if (dailyRequestsCount >= 5) {
+      toast.error("You have reached your daily limit of 5 requests. Upgrade to a subscription to send more!");
+      setActiveTab('subscriptions');
+      return;
+    }
     if (offerLoading) return;
     const offerPrice = parseInt(negotiationOffer[student.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid offer price.");
@@ -544,6 +553,11 @@ export default function TeacherDashboard() {
   };
 
   const handleDirectRequestDemo = async (student: any) => {
+    if (dailyRequestsCount >= 5) {
+      toast.error("You have reached your daily limit of 5 requests. Upgrade to a subscription to send more!");
+      setActiveTab('subscriptions');
+      return;
+    }
     if (offerLoading) return;
     if (!hasProfile) {
       toast.error("Please complete your profile first.");
@@ -913,7 +927,10 @@ export default function TeacherDashboard() {
                      <User className="w-4 h-4" /> Profile Settings
                    </button>
                    <button onClick={() => { setActiveTab('my_students'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
-                     <Users className="w-4 h-4" /> My Students
+                     <BookOpen className="w-4 h-4" /> My Students
+                   </button>
+                   <button onClick={() => { setActiveTab('subscriptions'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
+                     <CreditCard className="w-4 h-4" /> Subscriptions
                    </button>
                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
                    <button onClick={() => { handleLogout(); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors">
@@ -1260,7 +1277,7 @@ export default function TeacherDashboard() {
                                             <button 
                                               onClick={() => handleSendOffer(group)}
                                               disabled={offerLoading}
-                                              className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                              className={`flex-1 font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white disabled:cursor-not-allowed'}`}
                                             >
                                               {offerLoading ? 'Sending...' : 'Send Offer'}
                                             </button>
@@ -1269,7 +1286,7 @@ export default function TeacherDashboard() {
                                             onClick={() => {
                                               handleDirectRequestDemo(group);
                                             }}
-                                            className="w-full py-2 px-3 bg-[#00a992] text-white rounded-lg text-sm font-bold hover:bg-[#008f7b] transition-colors"
+                                            className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
                                           >
                                             Accept & Request Demo
                                           </button>
@@ -1590,6 +1607,23 @@ export default function TeacherDashboard() {
               </div>
             )}
 
+            {/* TAB: SUBSCRIPTIONS */}
+            {activeTab === 'subscriptions' && (
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Subscriptions</h2>
+                <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 text-center">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <CreditCard className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Upgrade Your Plan</h3>
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">Increase your daily request limit from 5 to 15, and unlock premium features to grow your teaching business faster.</p>
+                  <button className="bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-[#00a992]/20">
+                    View Pricing (Coming Soon)
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* TAB: REFERRALS */}
             {activeTab === 'referrals' && (
               <div>
@@ -1879,13 +1913,13 @@ export default function TeacherDashboard() {
                       <button 
                         onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
                         disabled={offerLoading}
-                        className="flex-1 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                        className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
                       >
                         <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
                       </button>
                       <button 
                         onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
-                        className="flex-1 py-3 px-6 bg-[#00a992] hover:bg-[#008f7b] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#00a992]/20 transition-all"
+                        className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                       >
                         <CheckCircle2 className="w-4 h-4" /> Accept & Request Demo
                       </button>
