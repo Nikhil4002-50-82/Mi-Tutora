@@ -524,11 +524,11 @@ export default function StudentDashboard() {
     
     const tutorPrice = getTutorBasePrice(tutor);
     if (tutorPrice > 0 && offerPrice > tutorPrice) {
-      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot increase the price, the maximum you can offer is Rs. ${tutorPrice}. Please adjust your offer.` });
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The maximum you can offer is Rs. ${tutorPrice} (100% of the teacher's base fee). Please adjust your offer.` });
       return;
     }
     if (tutorPrice > 0 && offerPrice < tutorPrice * 0.6) {
-      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since it is a 40% rule, you can only decrease the price to Rs. ${Math.ceil(tutorPrice * 0.6)}. Please adjust your offer.` });
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The minimum you can offer is Rs. ${Math.ceil(tutorPrice * 0.6)} (60% of the teacher's base fee). Please adjust your offer.` });
       return;
     }
     
@@ -560,9 +560,10 @@ export default function StudentDashboard() {
         studentIds: groupToUse.students.map((s: any) => s.id),
         studentName: groupToUse.name,
         currentOffer: offerPrice,
-        initialBudget: groupToUse.totalBudget || offerPrice,
-        absoluteMax: groupToUse.totalBudget ? Math.floor(groupToUse.totalBudget * 1.2) : Math.floor(offerPrice * 1.2),
+        initialBudget: tutorPrice > 0 ? tutorPrice : offerPrice,
         absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
+        absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
+        initiator: 'student',
         lastUpdatedBy: 'student',
         status: 'negotiating',
         source: 'direct',
@@ -607,9 +608,10 @@ export default function StudentDashboard() {
         studentName: groupToUse.name,
         currentOffer: tutorPrice,
         finalPrice: tutorPrice,
-        initialBudget: groupToUse.totalBudget || tutorPrice,
-        absoluteMax: groupToUse.totalBudget ? Math.floor(groupToUse.totalBudget * 1.2) : Math.floor(tutorPrice * 1.2),
-        absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(tutorPrice * 0.6),
+        initialBudget: tutorPrice > 0 ? tutorPrice : 500,
+        absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : 300,
+        absoluteMax: tutorPrice > 0 ? tutorPrice : 500,
+        initiator: 'student',
         lastUpdatedBy: 'student',
         status: 'demo_requested_by_student',
         source: 'direct',
@@ -631,10 +633,10 @@ export default function StudentDashboard() {
 
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
     if (action === 'counter_price' && newOffer && neg) {
-      const maxAllowed = neg.currentOffer;
+      const maxAllowed = neg.absoluteMax || (neg.initialBudget || 0);
       const minAllowed = neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6);
       if (newOffer > maxAllowed) {
-        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot increase the price, the maximum offer allowed is Rs. ${maxAllowed}. Please adjust your offer.` });
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
         return;
       }
       if (newOffer < minAllowed) {
@@ -1302,6 +1304,9 @@ export default function StudentDashboard() {
                                     value={negotiationOffer[teacher.id] || ''}
                                     onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
                                   />
+                                  {getTutorBasePrice(teacher) > 0 && negotiationOffer[teacher.id] && parseInt(negotiationOffer[teacher.id]) >= getTutorBasePrice(teacher) * 0.6 && parseInt(negotiationOffer[teacher.id]) <= getTutorBasePrice(teacher) * 0.7 && (
+                                      <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite low. The teacher is highly likely to reject it.</p>
+                                  )}
                                 </div>
                                 {isHired ? (
                                   <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
@@ -1468,7 +1473,7 @@ export default function StudentDashboard() {
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
                                           min: neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6),
-                                          max: neg.currentOffer,
+                                          max: neg.absoluteMax || (neg.initialBudget || 0),
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
                                           handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
@@ -2214,6 +2219,9 @@ export default function StudentDashboard() {
                         value={negotiationOffer[selectedViewUser.id] || ''}
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />
+                      {getTutorBasePrice(selectedViewUser) > 0 && negotiationOffer[selectedViewUser.id] && parseInt(negotiationOffer[selectedViewUser.id]) >= getTutorBasePrice(selectedViewUser) * 0.6 && parseInt(negotiationOffer[selectedViewUser.id]) <= getTutorBasePrice(selectedViewUser) * 0.7 && (
+                        <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite low. The teacher is highly likely to reject it.</p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                         <button 

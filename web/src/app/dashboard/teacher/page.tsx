@@ -494,8 +494,8 @@ export default function TeacherDashboard() {
       setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum you can offer is Rs. ${student.budget}. Please adjust your offer.` });
       return;
     }
-    if (student.budget && offerPrice > student.budget * 1.2) {
-      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since it is a 20% rule, you can only increase the price to Rs. ${Math.floor(student.budget * 1.2)}. Please adjust your offer.` });
+    if (student.budget && offerPrice > student.budget * 1.4) {
+      setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The maximum you can offer is Rs. ${Math.floor(student.budget * 1.4)} (140% of the student's budget). Please adjust your offer.` });
       return;
     }
 
@@ -521,9 +521,10 @@ export default function TeacherDashboard() {
         studentIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
         currentOffer: offerPrice,
-        initialBudget: student.budget,
-        absoluteMin: Math.ceil(offerPrice * 0.6),
-        absoluteMax: student.budget ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
+        initialBudget: student.budget || offerPrice,
+        absoluteMin: student.budget || offerPrice,
+        absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
+        initiator: 'teacher',
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
@@ -592,10 +593,10 @@ export default function TeacherDashboard() {
   };
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
     if (action === 'counter_price' && newOffer && neg) {
-      const minAllowed = neg.currentOffer;
-      const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.2);
+      const minAllowed = neg.absoluteMin || (neg.initialBudget || 0);
+      const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.4);
       if (newOffer < minAllowed) {
-        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum offer allowed is Rs. ${minAllowed}. Please adjust your offer.` });
+        setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
         return;
       }
       if (newOffer > maxAllowed) {
@@ -1229,12 +1230,15 @@ export default function TeacherDashboard() {
                                         <input 
                                           type="number"
                                           min={group.budget || 0}
-                                          max={group.budget ? Math.floor(group.budget * 1.2) : undefined}
+                                          max={group.budget ? Math.floor(group.budget * 1.4) : undefined}
                                           className="w-full px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50 text-sm"
                                           placeholder={group.budget ? `e.g. ${group.budget}` : "Your Offer (₹/mo)"}
                                           value={negotiationOffer[group.id] || ''}
                                           onChange={(e) => setNegotiationOffer({...negotiationOffer, [group.id]: e.target.value})}
                                         />
+                                        {group.budget && negotiationOffer[group.id] && parseInt(negotiationOffer[group.id]) >= group.budget * 1.3 && parseInt(negotiationOffer[group.id]) <= group.budget * 1.4 && (
+                                          <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite high compared to the student's budget. They might reject it.</p>
+                                        )}
                                       </div>
                                       {isHired ? (
                                         <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-2 rounded-lg shadow-none text-sm cursor-not-allowed">
@@ -1401,8 +1405,8 @@ export default function TeacherDashboard() {
                                           description: 'Propose a new monthly fee for this student.',
                                           placeholder: 'e.g. 500',
                                           initialValue: neg.currentOffer?.toString() || '',
-                                          min: neg.currentOffer,
-                                          max: neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.2),
+                                          min: neg.absoluteMin || (neg.initialBudget || 0),
+                                          max: neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.4),
                                           onSubmit: (val: string) => {
                                             setModalConfig(prev => ({ ...prev, isOpen: false }));
                                             handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
@@ -1861,12 +1865,15 @@ export default function TeacherDashboard() {
                       <input 
                         type="number"
                         min={selectedViewUser.budget || 0}
-                        max={selectedViewUser.budget ? Math.floor(selectedViewUser.budget * 1.2) : undefined}
+                        max={selectedViewUser.budget ? Math.floor(selectedViewUser.budget * 1.4) : undefined}
                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
                         placeholder={selectedViewUser.budget ? `e.g. ${selectedViewUser.budget}` : "e.g. 500"}
                         value={negotiationOffer[selectedViewUser.id] || ''}
                         onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
                       />
+                      {selectedViewUser.budget && negotiationOffer[selectedViewUser.id] && parseInt(negotiationOffer[selectedViewUser.id]) >= selectedViewUser.budget * 1.3 && parseInt(negotiationOffer[selectedViewUser.id]) <= selectedViewUser.budget * 1.4 && (
+                        <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite high compared to the student's budget. They might reject it.</p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button 
