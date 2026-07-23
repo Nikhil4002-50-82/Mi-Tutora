@@ -1124,15 +1124,19 @@ export default function TeacherDashboard() {
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
                     {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
                   </h2>
-                  <div className="flex-1 sm:flex-none">
-                    <select 
-                      value={tuitionSubTab}
-                      onChange={(e) => setTuitionSubTab(e.target.value as any)}
-                      className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#00a992]/50"
+                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
+                    <button 
+                      onClick={() => setTuitionSubTab('all')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
-                      <option value="recommendation">Recommended Students</option>
-                      <option value="all">All Students</option>
-                    </select>
+                      All
+                    </button>
+                    <button 
+                      onClick={() => setTuitionSubTab('recommendation')} 
+                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                      Recommendation
+                    </button>
                   </div>
                 </div>
 
