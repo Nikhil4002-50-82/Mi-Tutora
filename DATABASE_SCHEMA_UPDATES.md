@@ -24,3 +24,13 @@ This document tracks schema additions and modifications that build upon the orig
 *   `parentId` (string): The parent who owns this group.
 *   `name` (string): e.g., "Group 1" or "Math Study Group".
 *   `studentIds` (array of strings): Easy reference to all students in the group.
+
+## 4. Pending Request Limits (Queue Arrays)
+**Purpose:** Enforce limits on how many pending requests a student or tutor can have at one time.
+
+### `tutors` Collection New Fields
+*   `pendingRequests` (array of strings): Stores the `applicationId` of all currently pending requests for this tutor. Max limit is 5, or 15 if subscribed. When the queue is full, the teacher is marked as "Locked / Unavailable".
+*   `isSubscribed` (boolean): Whether the tutor has an active premium subscription (increases limit to 15).
+
+### `students` Collection New Fields
+*   `pendingRequests` (array of strings): Stores the `applicationId` of all currently pending requests for this student. Max limit is 5. When the queue is full, the student is marked as "Locked / Unavailable" to teachers.

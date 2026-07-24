@@ -239,8 +239,8 @@ export default function TeacherForm({
         preferredTimeRange: '',
         price: 0,
         rating: 0.0,
-        area: formData.street || '',
-        city: formData.city || '',
+        area: (actualMode?.toLowerCase() === 'online') ? '' : (formData.street || ''),
+        city: (actualMode?.toLowerCase() === 'online') ? '' : (formData.city || ''),
         latitude: 0.0,
         longitude: 0.0,
         hasProfile: true

@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-07-22T19:32:31.224Z
+Generated on: 2026-07-24T12:44:29.247Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 2*
@@ -19,7 +19,7 @@ Generated on: 2026-07-22T19:32:31.224Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 3*
+*Documents sampled: 1*
 
 | Field Path | Data Type |
 |---|---|
@@ -29,16 +29,17 @@ Generated on: 2026-07-22T19:32:31.224Z
 | `createdAt` | `number` |
 | `currentOffer` | `number` |
 | `demoHours` | `string` |
+| `demoPaymentPaid` | `boolean` |
 | `finalPrice` | `number` |
 | `groupId` | `string` |
 | `initialBudget` | `number` |
+| `initiator` | `string` |
 | `lastUpdatedBy` | `string` |
 | `mode` | `string` |
 | `parentId` | `string` |
-| `requestId` | `string` |
 | `source` | `string` |
+| `startDate` | `string` |
 | `status` | `string` |
-| `studentId` | `string` |
 | `studentIds` | `array of string` |
 | `studentName` | `string` |
 | `tutorId` | `string` |
@@ -122,7 +123,7 @@ Generated on: 2026-07-22T19:32:31.224Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 11*
+*Documents sampled: 12*
 
 | Field Path | Data Type |
 |---|---|
@@ -144,10 +145,11 @@ Generated on: 2026-07-22T19:32:31.224Z
 | `learningGoal` | `string` |
 | `name` | `string` |
 | `parentId` | `string` |
+| `pendingRequests` | `array of string | array` |
 | `phoneNumber` | `string` |
 | `preferredMode` | `string` |
 | `specialRequirements` | `string` |
-| `specificDays` | `array of string` |
+| `specificDays` | `array | array of string` |
 | `studentType` | `string` |
 | `subjects` | `array of string` |
 | `technologies` | `array` |
@@ -156,7 +158,7 @@ Generated on: 2026-07-22T19:32:31.224Z
 ---
 
 ## Collection: `tuition_requests`
-*Documents sampled: 1*
+*Documents sampled: 3*
 
 | Field Path | Data Type |
 |---|---|
@@ -184,10 +186,11 @@ Generated on: 2026-07-22T19:32:31.224Z
 ---
 
 ## Collection: `tutors`
-*Documents sampled: 7*
+*Documents sampled: 8*
 
 | Field Path | Data Type |
 |---|---|
+| `accountStatus` | `string` |
 | `address` | `string` |
 | `area` | `string` |
 | `boards` | `array of string` |
@@ -207,28 +210,32 @@ Generated on: 2026-07-22T19:32:31.224Z
 | `mode` | `string` |
 | `name` | `string` |
 | `occupation` | `string` |
+| `pendingRequests` | `array | array of string` |
 | `phone` | `string` |
 | `preferredLocations` | `string` |
 | `preferredTimeRange` | `string` |
 | `price` | `number` |
 | `qualification` | `string` |
 | `rating` | `number` |
+| `role` | `string` |
 | `schoolNames` | `string` |
 | `studentCount` | `string` |
 | `subjects` | `array of string` |
 | `teachingApproach` | `string` |
 | `technologies` | `array` |
 | `travelDistance` | `string` |
+| `verificationStatus` | `string` |
 | `whatsapp` | `string` |
 
 ---
 
 ## Collection: `users`
-*Documents sampled: 13*
+*Documents sampled: 14*
 
 | Field Path | Data Type |
 |---|---|
 | `email` | `string` |
+| `fcmToken` | `string` |
 | `hasProfile` | `boolean` |
 | `id` | `string` |
 | `name` | `string` |

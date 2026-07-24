@@ -408,9 +408,9 @@ export default function DemoForm({
         const requestsSnap = await getDocs(requestsQuery);
         for (const rDoc of requestsSnap.docs) {
           await updateDoc(rDoc.ref, {
-            address: combinedAddress,
+            area: combinedAddress,
             city: formData.demoMode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-            preferredMode: formData.demoMode || ''
+            mode: formData.demoMode || ''
           });
         }
 

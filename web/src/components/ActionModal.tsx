@@ -9,10 +9,11 @@ interface ActionModalProps {
   title: string;
   description: string;
   placeholder: string;
-  type: "price" | "timing";
+  type: "price" | "timing" | "demo_booking";
   initialValue?: string;
   min?: number;
   max?: number;
+  isOnline?: boolean;
 }
 
 export default function ActionModal({
@@ -26,10 +27,13 @@ export default function ActionModal({
   initialValue = "",
   min,
   max,
+  isOnline = false,
 }: ActionModalProps) {
   const [value, setValue] = useState(initialValue);
   const [dateValue, setDateValue] = useState("");
   const [timeValue, setTimeValue] = useState("");
+  const [platform, setPlatform] = useState("Google Meet");
+  const [linkValue, setLinkValue] = useState("");
 
   // Reset value when modal opens
   useEffect(() => {
@@ -50,6 +54,23 @@ export default function ActionModal({
     if (type === "timing") {
       if (!dateValue || !timeValue) return;
       onSubmit(value, dateValue, timeValue);
+    } else if (type === "demo_booking") {
+      if (!dateValue || !timeValue) return;
+      if (isOnline) {
+        if (!linkValue.trim()) {
+          alert("Please provide a meeting link.");
+          return;
+        }
+        try {
+          new URL(linkValue);
+        } catch {
+          alert("Please enter a valid URL (e.g., https://meet.google.com/...)");
+          return;
+        }
+        onSubmit(value, dateValue, `${timeValue}||${platform}||${linkValue}`);
+      } else {
+        onSubmit(value, dateValue, timeValue);
+      }
     } else {
       onSubmit(value);
     }
@@ -140,6 +161,34 @@ export default function ActionModal({
                             required
                           />
                         </div>
+                        {type === "demo_booking" && isOnline && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Platform</label>
+                              <select
+                                value={platform}
+                                onChange={(e) => setPlatform(e.target.value)}
+                                className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 px-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
+                              >
+                                <option value="Google Meet">Google Meet</option>
+                                <option value="Zoom">Zoom</option>
+                                <option value="Microsoft Teams">Microsoft Teams</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Link</label>
+                              <input
+                                type="url"
+                                value={linkValue}
+                                onChange={(e) => setLinkValue(e.target.value)}
+                                placeholder="https://..."
+                                className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 px-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                required
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

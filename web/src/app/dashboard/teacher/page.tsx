@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -82,6 +82,7 @@ export default function TeacherDashboard() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [payingClass, setPayingClass] = useState<any>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [postPaymentPopup, setPostPaymentPopup] = useState<any>(null);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -249,22 +250,85 @@ export default function TeacherDashboard() {
       }
     }
 
-    const applicationsWithSubjects = applications.map((app: any) => {
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+    const applicationsWithSubjects = await Promise.all(applications.map(async (app: any) => {
       const student = studentsInfo.find(s => s.id === app.studentId);
       const appStudentsList = studentsInfo.filter(s => (app.studentIds || []).includes(s.id) || s.id === app.studentId);
+      
+      let currentStatus = app.status;
+      // Auto-expire if teacher hasn't paid demo fee within 7 days
+      if (currentStatus === 'demo_pending_payment' && (now - (app.updatedAt || app.createdAt || now)) > SEVEN_DAYS) {
+        currentStatus = 'declined';
+        try {
+          const { updateDoc, doc, arrayRemove } = await import('firebase/firestore');
+          await updateDoc(doc(db, 'applications', app.id), {
+            status: 'declined',
+            declinedAt: now,
+            updatedAt: now,
+            reason: 'auto_expired_demo_fee'
+          });
+          if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
+          if (app.studentIds) {
+            for (const sid of app.studentIds) {
+              await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
+            }
+          }
+        } catch (e) {
+          console.error('Failed to auto-expire application:', e);
+        }
+      }
+      // Auto-expire if demo finished and 24 hours passed
+      if (['demo_scheduled', 'waiting_for_parent_decision'].includes(currentStatus) && app.demoDate && app.demoTime) {
+        const demoDateObj = new Date(app.demoDate);
+        const timeParts = app.demoTime.split('||')[0].split(':');
+        if (timeParts.length >= 2) {
+          demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+          const demoEndTime = demoDateObj.getTime() + 60 * 60 * 1000; // 1 hour demo
+          if (now > demoEndTime + 24 * 60 * 60 * 1000) {
+            currentStatus = 'declined';
+            try {
+              const { updateDoc, doc, arrayRemove } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'applications', app.id), {
+                status: 'declined',
+                declinedAt: now,
+                updatedAt: now,
+                reason: 'auto_expired_demo_decision'
+              });
+              if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
+              if (app.studentIds) {
+                for (const sid of app.studentIds) {
+                  await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
+                }
+              }
+            } catch (e) {
+              console.error('Failed to auto-expire application:', e);
+            }
+          } else if (now > demoEndTime && currentStatus === 'demo_scheduled') {
+            currentStatus = 'waiting_for_parent_decision';
+            try {
+              const { updateDoc, doc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'applications', app.id), { status: 'waiting_for_parent_decision', updatedAt: now });
+            } catch (e) { }
+          }
+        }
+      }
+
       return { 
         ...app, 
+        status: currentStatus,
         studentDetails: student,
         studentsList: appStudentsList,
         subjects: student?.subjects || [],
         technologies: student?.technologies || [],
         languages: student?.languages || []
       };
-    }) || [];
+    })) || [];
 
-    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment'].includes(app.status));
+    const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status));
     const allNotifications = applicationsWithSubjects
-      .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'declined', 'tuition_started'].includes(app.status))
+      .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
       .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
     const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupId || app.studentId)));
 
@@ -284,7 +348,16 @@ export default function TeacherDashboard() {
       allNegotiations,
       allNotifications,
       recommendedNegotiations,
-      upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started', 'demo_booked'].includes(app.status)).map((app: any) => ({
+      demoClasses: applicationsWithSubjects.filter((app: any) => ['demo_booking_phase', 'demo_scheduled'].includes(app.status)).map((app: any) => ({
+        id: app.id,
+        app: app,
+        student: app.studentName || (app.studentIds?.length > 1 ? 'Group' : 'Student'),
+        subject: app.category || 'General',
+        date: app.demoDate || 'TBD',
+        status: app.status,
+        studentDetails: app.studentDetails
+      })),
+      upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => ({
         id: app.id,
         student: app.studentName || 'Assigned Student',
         subject: app.category || 'General',
@@ -396,13 +469,19 @@ export default function TeacherDashboard() {
           const newCode = existingCode || generateReferralCode(parsedData.fullName, user.uid);
           await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
+          const isOnlineOnlyCategory = parsedData.category === 'programming' || parsedData.category === 'languages';
+          const actualMode = isOnlineOnlyCategory ? 'Online' : parsedData.mode;
+          const combinedAddress = (actualMode?.toLowerCase() === 'online') ? '' : [parsedData.street, parsedData.city, parsedData.pincode].filter(Boolean).join(', ');
+
           await updateDoc(doc(db, 'tutors', user.uid), {
             category: parsedData.category || '',
             name: parsedData.fullName,
             gender: parsedData.gender,
             phone: parsedData.phone,
             whatsapp: parsedData.whatsapp,
-            address: parsedData.address,
+            address: combinedAddress,
+            area: (actualMode?.toLowerCase() === 'online') ? '' : (parsedData.street || ''),
+            city: (actualMode?.toLowerCase() === 'online') ? '' : (parsedData.city || ''),
             qualification: parsedData.qualification,
             experience: parsedData.experience,
             occupation: parsedData.occupation,
@@ -411,7 +490,7 @@ export default function TeacherDashboard() {
             boards: parsedData.boards || [],
             technologies: parsedData.technologies || [],
             languagesTaught: parsedData.languages || [],
-            mode: parsedData.mode,
+            mode: actualMode,
             teachingApproach: parsedData.description,
             studentCount: parsedData.studentsCount,
             schoolNames: parsedData.schoolNames,
@@ -462,20 +541,28 @@ export default function TeacherDashboard() {
     setPaymentLoading(true);
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
       
-      // Update application directly to tuition_started
+      // Update application directly to demo_booking_phase
       if (payingClass?.id && payingClass.id !== 'mock-id') {
         await updateDoc(doc(db, 'applications', payingClass.id), { 
-          status: 'tuition_started', 
+          status: 'demo_booking_phase', 
           demoPaymentPaid: true,
-          startDate: new Date().toLocaleDateString('en-GB'),
           updatedAt: Date.now()
         });
+        await updateDoc(doc(db, 'tutors', data?.user?.uid as string), { pendingRequests: arrayRemove(payingClass.id) });
+        if (payingClass.studentsList) {
+          for (const student of payingClass.studentsList) {
+            if (student.id) {
+              await updateDoc(doc(db, 'students', student.id), { pendingRequests: arrayRemove(payingClass.id) });
+            }
+          }
+        }
       }
       
       await new Promise(resolve => setTimeout(resolve, 1500));
-      toast.success("Payment completed successfully! Demo Booked.");
+      toast.success("Payment completed successfully!");
+      setPostPaymentPopup(payingClass);
       setPayingClass(null);
       mutate();
     } catch (e: any) {
@@ -491,8 +578,18 @@ export default function TeacherDashboard() {
 
   const handleSendOffer = async (student: any) => {
     if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests. Upgrade to a subscription to send more!");
-      setActiveTab('subscriptions');
+      toast.error("You have reached your daily limit of 5 requests.");
+      return;
+    }
+    const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
+    const teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    if (teacherPendingCount >= teacherLimit) {
+      toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
+      return;
+    }
+    const studentPendingCount = student.pendingRequests?.length || 0;
+    if (studentPendingCount >= 5) {
+      toast.error("This student already has the maximum number of pending offers.");
       return;
     }
     if (offerLoading) return;
@@ -517,10 +614,10 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc } = await import('firebase/firestore');
+      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
       const user = auth.currentUser;
 
-      await addDoc(collection(db, 'applications'), {
+      const appRef = await addDoc(collection(db, 'applications'), {
         tutorId: user?.uid,
         tutorName: data?.profile?.name,
         requestId: '',
@@ -543,6 +640,18 @@ export default function TeacherDashboard() {
         createdAt: Date.now()
       });
 
+      // Update the teacher's pending request queue
+      await updateDoc(doc(db, 'tutors', user?.uid as string), {
+        pendingRequests: arrayUnion(appRef.id)
+      });
+      // Update the students' pending request queue
+      const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
+      for (const sid of studentIdsToUpdate) {
+        await updateDoc(doc(db, 'students', sid), {
+          pendingRequests: arrayUnion(appRef.id)
+        });
+      }
+
       toast.success("Offer sent successfully!");
       mutate();
     } catch (e: any) {
@@ -554,8 +663,18 @@ export default function TeacherDashboard() {
 
   const handleDirectRequestDemo = async (student: any) => {
     if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests. Upgrade to a subscription to send more!");
-      setActiveTab('subscriptions');
+      toast.error("You have reached your daily limit of 5 requests.");
+      return;
+    }
+    const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
+    const teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    if (teacherPendingCount >= teacherLimit) {
+      toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
+      return;
+    }
+    const studentPendingCount = student.pendingRequests?.length || 0;
+    if (studentPendingCount >= 5) {
+      toast.error("This student already has the maximum number of pending offers.");
       return;
     }
     if (offerLoading) return;
@@ -568,12 +687,12 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc } = await import('firebase/firestore');
+      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
       const user = auth.currentUser;
 
       const offerPrice = student.budget || 500;
 
-      await addDoc(collection(db, 'applications'), {
+      const appRef = await addDoc(collection(db, 'applications'), {
         tutorId: user?.uid,
         tutorName: data?.profile?.name,
         requestId: '',
@@ -596,6 +715,18 @@ export default function TeacherDashboard() {
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
+
+      // Update the teacher's pending request queue
+      await updateDoc(doc(db, 'tutors', user?.uid as string), {
+        pendingRequests: arrayUnion(appRef.id)
+      });
+      // Update the students' pending request queue
+      const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
+      for (const sid of studentIdsToUpdate) {
+        await updateDoc(doc(db, 'students', sid), {
+          pendingRequests: arrayUnion(appRef.id)
+        });
+      }
 
       toast.success("Demo requested successfully!");
       mutate();
@@ -621,23 +752,47 @@ export default function TeacherDashboard() {
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
       
       const updateData: any = {};
+      let isFinalState = false;
       if (action === 'accept_price' || action === 'request_demo') {
         updateData.status = 'demo_requested_by_teacher';
         if (newOffer) updateData.finalPrice = newOffer;
         updateData.lastUpdatedBy = 'tutor';
+      } else if (action === 'propose_demo_date') {
+        updateData.proposedDate = neg?.proposedDate;
+        updateData.proposedTime = neg?.proposedTime;
+        updateData.lastUpdatedBy = 'teacher';
+      } else if (action === 'accept_demo_date') {
+        updateData.status = 'demo_scheduled';
+        updateData.demoDate = neg?.proposedDate || data?.applications?.find((a:any)=>a.id===appId)?.proposedDate;
+        updateData.demoTime = neg?.proposedTime || data?.applications?.find((a:any)=>a.id===appId)?.proposedTime;
+        updateData.lastUpdatedBy = 'teacher';
       } else if (action === 'counter_price') {
         updateData.currentOffer = newOffer;
         updateData.lastUpdatedBy = 'tutor';
       } else if (action === 'decline') {
         updateData.status = 'declined';
         updateData.declinedAt = Date.now();
+        isFinalState = true;
       }
       updateData.updatedAt = Date.now();
 
       await updateDoc(doc(db, 'applications', appId), updateData);
+      
+      if (isFinalState) {
+        const app = data?.applications?.find((a: any) => a.id === appId);
+        if (app) {
+          if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(appId) });
+          if (app.studentIds) {
+            for (const sid of app.studentIds) {
+              await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+            }
+          }
+        }
+      }
+      
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
@@ -1389,11 +1544,33 @@ export default function TeacherDashboard() {
                               {neg.category === 'languages' && neg.languages && neg.languages.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languages.join(', ')}</p>}
                               {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
-                              <div className="text-center w-full sm:w-auto">
-                                <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                                <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
-                              </div>
+                              <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
+                                {['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(neg.status) && (neg.proposedDate || neg.demoDate) ? (
+                                  <div className="text-left w-full sm:w-auto bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Proposed Schedule</p>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                                      <span className="text-sm font-semibold text-gray-800">{new Date(neg.demoDate || neg.proposedDate).toLocaleDateString()} at {(neg.demoTime || neg.proposedTime)?.split('||')[0] || (neg.demoTime || neg.proposedTime)}</span>
+                                    </div>
+                                    {neg.mode === 'online' && (neg.demoTime || neg.proposedTime)?.includes('||') && (
+                                      <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-blue-100/50">
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                          <span className="font-bold text-gray-600">Platform:</span>
+                                          <span className="text-gray-800">{(neg.demoTime || neg.proposedTime).split('||')[1]}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                          <span className="font-bold text-gray-600">Link:</span>
+                                          <a href={(neg.demoTime || neg.proposedTime).split('||')[2]} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate max-w-[150px]">{(neg.demoTime || neg.proposedTime).split('||')[2]}</a>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-center w-full sm:w-auto">
+                                    <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
+                                    <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
+                                  </div>
+                                )}
                               
                               {/* Request Specific Status UI */}
                               {neg.status === 'declined' ? (
@@ -1454,7 +1631,7 @@ export default function TeacherDashboard() {
                                       onClick={() => handleNegotiationAction(neg.id, 'decline')}
                                       className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
                                     >
-                                      Decline
+                                      Withdraw Offer
                                     </button>
                                   </div>
                                 )
@@ -1462,8 +1639,16 @@ export default function TeacherDashboard() {
 
                               {/* Demo Workflow States */}
                               {neg.status === 'demo_requested_by_teacher' && (
-                                <div className="w-full sm:w-auto bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 text-center">
-                                  <p className="text-sm font-semibold text-blue-600">Waiting for student to accept...</p>
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                  <div className="w-full sm:w-auto bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 text-center">
+                                    <p className="text-sm font-semibold text-blue-600">Waiting for student to accept...</p>
+                                  </div>
+                                  <button 
+                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
+                                  >
+                                    Withdraw Offer
+                                  </button>
                                 </div>
                               )}
                               {neg.status === 'demo_requested_by_student' && (
@@ -1476,6 +1661,12 @@ export default function TeacherDashboard() {
                                     className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
                                   >
                                     <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                                  </button>
+                                  <button 
+                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
+                                  >
+                                    Decline
                                   </button>
                                 </div>
                               )}
@@ -1490,6 +1681,65 @@ export default function TeacherDashboard() {
                                   >
                                     <Lock className="w-4 h-4" /> Pay Fee
                                   </button>
+                                </div>
+                              )}
+                              {neg.status === 'demo_booking_phase' && (
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                                  {!neg.proposedDate || neg.lastUpdatedBy === 'student' ? (
+                                    <>
+                                      {neg.proposedDate && (
+                                        <button 
+                                          onClick={() => handleNegotiationAction(neg.id, 'accept_demo_date')}
+                                          className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" /> Accept Proposed Date
+                                        </button>
+                                      )}
+                                      <button 
+                                        onClick={() => {
+                                          setModalConfig({
+                                            isOpen: true,
+                                            type: 'demo_booking',
+                                            title: neg.proposedDate ? 'Counter-Offer Date' : 'Propose Demo Schedule',
+                                            description: 'Suggest a date and time for the demo class.',
+                                            placeholder: '',
+                                            isOnline: neg.mode === 'online',
+                                            onSubmit: (val: string, date?: string, time?: string) => {
+                                              setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                              handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
+                                            }
+                                          });
+                                        }}
+                                        className={`w-full sm:w-auto px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${neg.proposedDate ? 'bg-white border-2 border-gray-200 text-gray-700 hover:border-emerald-500' : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg transform hover:scale-105'}`}
+                                      >
+                                        <Calendar className="w-4 h-4" /> {neg.proposedDate ? 'Change requested Date/Time' : 'Propose Date & Time'}
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
+                                      <p className="text-sm font-semibold text-gray-600">Waiting for parent to review date...</p>
+                                    </div>
+                                  )}
+                                  <button 
+                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
+                                  >
+                                    Cancel Demo
+                                  </button>
+                                </div>
+                              )}
+                              {neg.status === 'demo_scheduled' && (
+                                <div className="flex gap-3 items-center w-full sm:w-auto">
+                                  <div className="w-full sm:w-auto bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 text-center">
+                                    <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Prepare for the class.</p>
+                                  </div>
+                                </div>
+                              )}
+                              {neg.status === 'waiting_for_parent_decision' && (
+                                <div className="flex gap-3 items-center w-full sm:w-auto">
+                                  <div className="w-full sm:w-auto bg-orange-50 px-4 py-3 rounded-xl border border-orange-100 text-center">
+                                    <p className="text-sm font-semibold text-orange-600">Waiting for parent to hire...</p>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -1508,9 +1758,85 @@ export default function TeacherDashboard() {
             })()}
 {/* TAB: MY STUDENTS */}
             {activeTab === 'my_students' && (
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">My Students & Classes</h2>
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-12">
+                {/* Demo Classes Section */}
+                <div>
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Demo Classes</h2>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {data?.demoClasses?.map((cls: any) => (
+                      <li 
+                        key={cls.id} 
+                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden flex flex-col"
+                      >
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-50 to-emerald-100/20 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
+                        
+                        <div className="flex flex-col h-full gap-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30 flex-shrink-0">
+                                {cls.student?.charAt(0) || 'S'}
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight truncate max-w-[150px] sm:max-w-[200px]">{cls.student}</h3>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                  <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md border border-blue-100/50 uppercase tracking-wider">Demo Phase</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm whitespace-nowrap bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border-blue-200/50">
+                              {cls.status.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+
+                          <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
+                            {cls.studentDetails?.phoneNumber && (
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
+                                <div className="overflow-hidden">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
+                                  <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.phoneNumber}</p>
+                                </div>
+                              </div>
+                            )}
+                            {cls.app?.mode === 'offline' && (cls.studentDetails?.address || cls.studentDetails?.area) && (
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><MapPin className="w-4 h-4" /></div>
+                                <div className="overflow-hidden">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location</p>
+                                  <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.address || cls.studentDetails.area}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="mt-2 flex gap-2">
+                            <button
+                                onClick={() => setActiveRequestViewId(cls.id)}
+                                className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                            >
+                                Schedule Demo
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                    {(!data?.demoClasses || data?.demoClasses?.length === 0) && (
+                      <li className="col-span-full p-8 bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
+                        <Calendar className="w-8 h-8 text-gray-300 mb-2" />
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">No active demos</h3>
+                        <p className="text-gray-500 text-sm">Pay demo fees in the Requests section to schedule here.</p>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                
+                {/* Active Students Section */}
+                <div>
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Active Students</h2>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
@@ -1608,6 +1934,7 @@ export default function TeacherDashboard() {
                       </li>
                     )}
                   </ul>
+                </div>
               </div>
             )}
 
@@ -2086,6 +2413,62 @@ export default function TeacherDashboard() {
             </div>
           </div>
         </div>
+        );
+      })()}
+
+      {/* POST PAYMENT POPUP */}
+      {postPaymentPopup && (() => {
+        const student = postPaymentPopup.studentsList?.[0] || postPaymentPopup.studentDetails || {};
+        const isOffline = postPaymentPopup.mode === 'offline';
+        const phone = student.phoneNumber || student.whatsappNumber || 'Not provided';
+        const address = student.address || student.area || student.city || 'Not provided';
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden text-center">
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Payment Successful!</h3>
+              <p className="text-gray-500 mb-8 font-medium relative z-10">You have secured your demo slot. Here are the contact details for <span className="font-bold text-gray-900">{postPaymentPopup.studentName || student.name || 'the student'}</span>.</p>
+              
+              <div className="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100 relative z-10 text-left space-y-4">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Parent Phone</p>
+                  <p className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-emerald-600" /> {phone}
+                  </p>
+                </div>
+                {isOffline && (
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Student Location</p>
+                    <p className="text-md font-semibold text-gray-900 flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-emerald-600 mt-1 flex-shrink-0" /> {address}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex flex-col gap-3 relative z-10">
+                <button
+                  onClick={() => {
+                    setPostPaymentPopup(null);
+                    setActiveTab('my_students'); // Navigate to Demo Classes section
+                  }}
+                  className="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Calendar className="w-5 h-5" /> Propose Demo Date & Time
+                </button>
+                <button
+                  onClick={() => setPostPaymentPopup(null)}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         );
       })()}
 
