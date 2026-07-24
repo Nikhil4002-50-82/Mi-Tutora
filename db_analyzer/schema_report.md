@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-07-24T12:44:29.247Z
+Generated on: 2026-07-24T18:18:41.652Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 2*
@@ -91,7 +91,7 @@ Generated on: 2026-07-24T12:44:29.247Z
 ---
 
 ## Collection: `parents`
-*Documents sampled: 4*
+*Documents sampled: 5*
 
 | Field Path | Data Type |
 |---|---|
@@ -230,7 +230,7 @@ Generated on: 2026-07-24T12:44:29.247Z
 ---
 
 ## Collection: `users`
-*Documents sampled: 14*
+*Documents sampled: 15*
 
 | Field Path | Data Type |
 |---|---|

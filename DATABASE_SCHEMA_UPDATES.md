@@ -34,3 +34,18 @@ This document tracks schema additions and modifications that build upon the orig
 
 ### `students` Collection New Fields
 *   `pendingRequests` (array of strings): Stores the `applicationId` of all currently pending requests for this student. Max limit is 5. When the queue is full, the student is marked as "Locked / Unavailable" to teachers.
+
+## 5. Group Preferences Refactor (Task 4 & 5)
+**Purpose:** Move tuition preferences from the parent/global level down to the group level, so different groups can have different modes, timings, and teacher preferences.
+
+### `parents` Collection Modifications
+*   **Removed:** `preferredMode`, `address`. These are no longer global settings.
+
+### `students` Collection Modifications
+*   **Added:** `category` (string). Category is now tracked per-student rather than globally, enabling strict grouping rules.
+*   **Removed:** `preferredMode`, `address`, `hoursPerDay`, `daysPerWeek`, `specificDays`. These have moved to `tuition_requests`.
+
+### `tuition_requests` Collection Modifications
+*   **Purpose Expansion:** Now acts as the primary "Group Preferences" settings profile for a given `groupId`.
+*   **Added:** `teacherGenderPreference` (string): e.g., 'Male', 'Female', 'No Preference'.
+*   **Managed Fields:** `mode` (Online/Offline), `area`, `city`, `preferredTimeRange`, `daysPerWeek`, `specificDays` are all now definitively scoped to the group via this document.

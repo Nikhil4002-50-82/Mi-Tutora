@@ -82,6 +82,14 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     
     const [movedItem] = sourceList.splice(source.index, 1);
     
+    if (source.droppableId !== destination.droppableId && destination.droppableId !== 'unassigned') {
+      const destCategory = destList.length > 0 ? destList[0].category : null;
+      if (destCategory && movedItem.category && destCategory !== movedItem.category) {
+        toast.error("Category Mismatch", { description: "Students with different categories cannot be placed in the same group." });
+        return;
+      }
+    }
+    
     if (source.droppableId === destination.droppableId) {
       sourceList.splice(destination.index, 0, movedItem);
       setGroups({
@@ -134,6 +142,17 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     if (selectedStudents.includes(studentId)) {
       setSelectedStudents(selectedStudents.filter(id => id !== studentId));
     } else {
+      const student = Object.values(groups).flat().find(s => s.id === studentId);
+      if (student && selectionMode && selectionMode !== 'unassigned') {
+        const firstSelected = selectedStudents.length > 0 
+          ? Object.values(groups).flat().find(s => s.id === selectedStudents[0]) 
+          : null;
+          
+        if (firstSelected && firstSelected.category && student.category && firstSelected.category !== student.category) {
+          toast.error("Category Mismatch", { description: "You cannot mix students of different categories." });
+          return;
+        }
+      }
       setSelectedStudents([...selectedStudents, studentId]);
     }
   };

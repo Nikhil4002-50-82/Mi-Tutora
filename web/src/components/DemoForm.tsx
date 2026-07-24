@@ -16,6 +16,7 @@ interface Props {
   activeStudentId?: string;
   initialData?: any;
   parentOnly?: boolean;
+  defaultIsEditing?: boolean;
 }
 
 export const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
@@ -30,6 +31,7 @@ export default function DemoForm({
   activeStudentId,
   initialData,
   parentOnly = false,
+  defaultIsEditing = false,
 }: Props) {
 
   const getInitialFormData = () => {
@@ -44,18 +46,15 @@ export default function DemoForm({
         addressFlat: initialData.address?.split(', ')[0] || '',
         addressStreet: initialData.address?.split(', ')[1] || initialData.address || '',
         addressPincode: initialData.address?.split(', ')[2] || '',
-        category: initialData.category || category || '',
-        demoMode: initialData.preferredMode || '',
-        hours: initialData.hoursPerDay || '',
-        days: initialData.daysPerWeek || '',
-        specificDays: initialData.specificDays || [],
         goal: initialData.learningGoal || '',
         requirements: initialData.specialRequirements || '',
-        // Budget removed from global level
+        groupPreferences: {} as any,
         students: [
           {
+            id: initialData.id || 'new',
             fullName: initialData.name || '',
             gender: initialData.gender || '',
+            category: initialData.category || category || '',
             studentType: initialData.studentType || '',
             classGrade: initialData.classLevel || '',
             board: initialData.board || '',
@@ -63,6 +62,7 @@ export default function DemoForm({
             technologies: initialData.technologies || [],
             languages: initialData.languages || [],
             budget: initialData.budget?.toString() || '4000',
+            groupId: initialData.groupId || `indv_${initialData.id || 'new'}`,
           }
         ]
       };
@@ -77,18 +77,15 @@ export default function DemoForm({
       addressFlat: '',
       addressStreet: '',
       addressPincode: '',
-      category: category || '',
-      demoMode: '',
-      hours: '',
-      days: '',
-      specificDays: [],
       goal: '',
       requirements: '',
-      // Budget removed from global level
+      groupPreferences: {} as any,
       students: [
         {
+          id: `new_${Date.now()}`,
           fullName: '',
           gender: '',
+          category: category || '',
           studentType: '',
           classGrade: '',
           board: '',
@@ -96,12 +93,13 @@ export default function DemoForm({
           technologies: [] as string[],
           languages: [] as string[],
           budget: '4000',
+          groupId: hasProfile ? 'unassigned' : 'indv_temp',
         }
       ]
     };
   };
 
-  const [isEditing, setIsEditing] = useState(!hasProfile || !initialData || activeStudentId === 'new');
+  const [isEditing, setIsEditing] = useState(defaultIsEditing || !hasProfile || !initialData || activeStudentId === 'new');
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [formData, setFormData] = useState(getInitialFormData());
   const [shouldSubmitGroup, setShouldSubmitGroup] = useState(false);
@@ -147,36 +145,51 @@ export default function DemoForm({
 
               if (studentData) {
                 setIsEditing(false);
-                setFormData(prev => ({
-                  ...prev,
-                  parentName: parentData ? parentData.name : (studentData.parentName || ''),
-                  phone: studentData.phoneNumber || '',
-                  whatsapp: studentData.whatsappNumber || '',
-                  email: studentData.email || '',
-                  addressFlat: studentData.address?.split(', ')[0] || '',
-                  addressStreet: studentData.address?.split(', ')[1] || studentData.address || '',
-                  addressPincode: studentData.address?.split(', ')[2] || '',
-                  category: studentData.category || '',
-                  demoMode: studentData.preferredMode || '',
-                  hours: studentData.hoursPerDay || requestData.preferredTimeRange || '',
-                  days: studentData.daysPerWeek || '',
-                  specificDays: studentData.specificDays || [],
-                  goal: studentData.learningGoal || '',
-                  requirements: studentData.specialRequirements || '',
-                  budget: '4000',
-                  numberOfStudents: 1,
-                  students: [{
-                    fullName: studentData.name || '',
-                    gender: studentData.gender || '',
-                    studentType: studentData.studentType || '',
-                    classGrade: studentData.classLevel || '',
-                    board: studentData.board || '',
-                    subjects: studentData.subjects || [],
-                    technologies: studentData.technologies || [],
-                    languages: studentData.languages || [],
-                    budget: studentData.budget?.toString() || '4000',
-                  }]
-                }));
+                setFormData(prev => {
+                  const groupId = studentData.groupId || `indv_${studentData.id}`;
+                  const groupPrefs = { ...prev.groupPreferences };
+                  if (!groupPrefs[groupId]) {
+                    groupPrefs[groupId] = {
+                      teacherGenderPreference: requestData.teacherGenderPreference || studentData.teacherGenderPreference || 'No Preference',
+                      mode: studentData.preferredMode || '',
+                      hours: studentData.hoursPerDay || requestData.preferredTimeRange || '',
+                      days: studentData.daysPerWeek || '',
+                      specificDays: studentData.specificDays || [],
+                      addressFlat: studentData.address?.split(', ')[0] || '',
+                      addressStreet: studentData.address?.split(', ')[1] || studentData.address || '',
+                      addressPincode: studentData.address?.split(', ')[2] || '',
+                    };
+                  }
+                  
+                  return {
+                    ...prev,
+                    parentName: parentData ? parentData.name : (studentData.parentName || ''),
+                    phone: studentData.phoneNumber || '',
+                    whatsapp: studentData.whatsappNumber || '',
+                    email: studentData.email || '',
+                    addressFlat: parentData?.address?.split(', ')[0] || '',
+                    addressStreet: parentData?.address?.split(', ')[1] || parentData?.address || '',
+                    addressPincode: parentData?.address?.split(', ')[2] || '',
+                    goal: studentData.learningGoal || '',
+                    requirements: studentData.specialRequirements || '',
+                    groupPreferences: groupPrefs,
+                    numberOfStudents: 1,
+                    students: [{
+                      id: studentData.id,
+                      fullName: studentData.name || '',
+                      gender: studentData.gender || '',
+                      category: studentData.category || '',
+                      studentType: studentData.studentType || '',
+                      classGrade: studentData.classLevel || '',
+                      board: studentData.board || '',
+                      subjects: studentData.subjects || [],
+                      technologies: studentData.technologies || [],
+                      languages: studentData.languages || [],
+                      budget: studentData.budget?.toString() || '4000',
+                      groupId: groupId,
+                    }]
+                  };
+                });
               } else {
                 setIsEditing(true);
                 setFormData(prev => ({
@@ -203,10 +216,11 @@ export default function DemoForm({
 
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
   const [locationLoading, setLocationLoading] = useState(false);
   const router = useRouter();
 
-  const handleDetectLocation = () => {
+  const handleDetectLocation = (groupId: string) => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser');
       return;
@@ -224,8 +238,14 @@ export default function DemoForm({
         
         setFormData((prev: any) => ({
           ...prev,
-          addressStreet: `${street}${street && city ? ', ' : ''}${city}` || prev.addressStreet,
-          addressPincode: pincode || prev.addressPincode
+          groupPreferences: {
+            ...prev.groupPreferences,
+            [groupId]: {
+              ...prev.groupPreferences[groupId],
+              addressStreet: `${street}${street && city ? ', ' : ''}${city}` || prev.groupPreferences[groupId]?.addressStreet,
+              addressPincode: pincode || prev.groupPreferences[groupId]?.addressPincode
+            }
+          }
         }));
       } catch (err) {
         console.error('Error fetching location details:', err);
@@ -305,7 +325,9 @@ export default function DemoForm({
       if (num > currentStudents.length) {
         for (let i = currentStudents.length; i < num; i++) {
           currentStudents.push({
+            id: `new_${Date.now()}_${i}`,
             fullName: '',
+            category: '',
             gender: '',
             studentType: '',
             classGrade: '',
@@ -314,6 +336,7 @@ export default function DemoForm({
             technologies: [],
             languages: [],
             budget: '4000',
+            groupId: hasProfile ? 'unassigned' : 'indv_temp'
           });
         }
       } else if (num < currentStudents.length) {
@@ -353,25 +376,20 @@ export default function DemoForm({
     setSuccessMsg('');
 
     const actualCategory = formData.category || category;
-    if (actualCategory === 'programming') {
-      formData.demoMode = 'Online';
-    }
-    const isOnline = formData.demoMode?.toLowerCase() === 'online';
-    const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
-
+    
     if (!isDashboard) {
       const { auth } = await import('@/utils/firebase/client');
       if (auth.currentUser) {
         await auth.signOut();
       }
-      localStorage.setItem('demoFormData', JSON.stringify({ ...formData, category: formData.category || category }));
+      localStorage.setItem('demoFormData', JSON.stringify({ ...formData }));
       router.push('/signup?role=student&next=/dashboard/student');
       return;
     }
 
     try {
       const { auth, db } = await import('@/utils/firebase/client');
-      const { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, addDoc } = await import('firebase/firestore');
+      const { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc } = await import('firebase/firestore');
       
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
@@ -389,31 +407,10 @@ export default function DemoForm({
         name: formData.parentName,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
-        email: formData.email,
-        address: combinedAddress,
-        preferredMode: formData.demoMode || ''
+        email: formData.email
       }, { merge: true });
 
       if (parentOnly) {
-        const studentsQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
-        const studentsSnap = await getDocs(studentsQuery);
-        for (const sDoc of studentsSnap.docs) {
-          await updateDoc(sDoc.ref, {
-            address: combinedAddress,
-            preferredMode: formData.demoMode || ''
-          });
-        }
-
-        const requestsQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
-        const requestsSnap = await getDocs(requestsQuery);
-        for (const rDoc of requestsSnap.docs) {
-          await updateDoc(rDoc.ref, {
-            area: combinedAddress,
-            city: formData.demoMode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-            mode: formData.demoMode || ''
-          });
-        }
-
         setSuccessMsg('Parent profile updated successfully!');
         toast.success("Profile saved successfully!", { description: "Your parent profile has been updated." });
         sessionStorage.removeItem('demoFormData');
@@ -423,53 +420,50 @@ export default function DemoForm({
 
       if (activeStudentId && activeStudentId !== 'new') {
         const s = formData.students[0];
+        const groupId = (s as any).groupId || `indv_${activeStudentId}`;
+        const groupPref = formData.groupPreferences?.[groupId] || {};
+        const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
+
         const studentRef = doc(db, 'students', activeStudentId);
         await updateDoc(studentRef, {
           id: activeStudentId,
           guardianName: formData.parentName,
-          dob: '',
-          category: formData.category || '',
+          category: s.category || '',
           name: s.fullName,
           gender: s.gender,
           phoneNumber: formData.phone,
           whatsappNumber: formData.whatsapp,
           email: formData.email,
-          address: combinedAddress,
           studentType: s.studentType,
           classLevel: s.classGrade,
           board: s.board,
           subjects: s.subjects || [],
           technologies: s.technologies || [],
           languages: s.languages || [],
-          preferredMode: formData.demoMode || '',
-          learningGoal: formData.goal || '',
-          specialRequirements: formData.requirements || '',
-          hoursPerDay: formData.hours || '',
-          daysPerWeek: formData.days || '',
-          specificDays: formData.specificDays || [],
           budget: parseInt(s.budget) || 0,
-          groupId: (s as any).groupId || `indv_${activeStudentId}`,
+          groupId: groupId,
         });
 
         const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
         const requestSnap = await getDocs(requestQuery);
         if (!requestSnap.empty) {
           await updateDoc(requestSnap.docs[0].ref, {
-            id: requestSnap.docs[0].id,
-            city: '',
-            latitude: 0.0,
-            longitude: 0.0,
-            category: formData.category || '',
+            category: s.category || '',
             studentName: s.fullName,
             classLevel: s.classGrade,
             board: s.board,
             subjects: s.subjects || [],
             technologies: s.technologies || [],
             languages: s.languages || [],
-            mode: formData.demoMode || '',
-            preferredTimeRange: formData.hours || '',
-            area: combinedAddress,
             budget: parseInt(s.budget) || 0,
+            groupId: groupId,
+            teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+            mode: groupPref.mode || '',
+            area: combinedAddress,
+            city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+            preferredTimeRange: groupPref.hours || '',
+            daysPerWeek: groupPref.days || '',
+            specificDays: groupPref.specificDays || [],
           });
         }
         setSuccessMsg('Profile updated successfully!');
@@ -478,58 +472,66 @@ export default function DemoForm({
         for (let i = 0; i < formData.numberOfStudents; i++) {
           const s = formData.students[i];
           const newStudentRef = doc(collection(db, 'students'));
+          let groupId = (s as any).groupId || `indv_${newStudentRef.id}`;
+          if (groupId.startsWith('indv_temp')) {
+            groupId = `indv_${newStudentRef.id}`;
+          }
+
+          const lookupId = (s as any).groupId || 'unassigned';
+          const groupPref = formData.groupPreferences?.[lookupId] || formData.groupPreferences?.[groupId] || {};
+          const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
+
           await setDoc(newStudentRef, {
             id: newStudentRef.id,
             guardianName: formData.parentName,
             dob: '',
             parentId: user.uid,
-            category: formData.category || '',
+            category: s.category || '',
             name: s.fullName,
             gender: s.gender,
             phoneNumber: formData.phone,
             whatsappNumber: formData.whatsapp,
             email: formData.email,
-            address: combinedAddress,
             studentType: s.studentType,
             classLevel: s.classGrade,
             board: s.board,
             subjects: s.subjects || [],
             budget: parseInt(s.budget) || 0,
-            preferredMode: formData.demoMode || '',
-            learningGoal: formData.goal || '',
-            specialRequirements: formData.requirements || '',
             technologies: s.technologies || [],
             languages: s.languages || [],
-            hoursPerDay: formData.hours || '',
-            daysPerWeek: formData.days || '',
-            specificDays: formData.specificDays || [],
-            groupId: (s as any).groupId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : ((s as any).groupId || `indv_${newStudentRef.id}`),
+            groupId: groupId,
             createdAt: Date.now()
           });
 
-          const newRequestRef = doc(collection(db, 'tuition_requests'));
-          await setDoc(newRequestRef, {
-            id: newRequestRef.id,
-            city: '',
-            latitude: 0.0,
-            longitude: 0.0,
-            acceptedTutorId: '',
-            parentId: user.uid,
-            studentId: newStudentRef.id,
-            category: formData.category || '',
-            studentName: s.fullName,
-            classLevel: s.classGrade,
-            board: s.board,
-            subjects: s.subjects || [],
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            mode: formData.demoMode || '',
-            preferredTimeRange: formData.hours || '',
-            area: combinedAddress,
-            budget: parseInt(s.budget) || 0,
-            status: 'open',
-            createdAt: Date.now()
-          });
+          if (groupId !== 'unassigned') {
+            const newRequestRef = doc(collection(db, 'tuition_requests'));
+            await setDoc(newRequestRef, {
+              id: newRequestRef.id,
+              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+              latitude: 0.0,
+              longitude: 0.0,
+              acceptedTutorId: '',
+              parentId: user.uid,
+              studentId: newStudentRef.id,
+              groupId: groupId,
+              category: s.category || '',
+              studentName: s.fullName,
+              classLevel: s.classGrade,
+              board: s.board,
+              subjects: s.subjects || [],
+              technologies: s.technologies || [],
+              languages: s.languages || [],
+              budget: parseInt(s.budget) || 0,
+              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+              mode: groupPref.mode || '',
+              area: combinedAddress,
+              preferredTimeRange: groupPref.hours || '',
+              daysPerWeek: groupPref.days || '',
+              specificDays: groupPref.specificDays || [],
+              status: 'open',
+              createdAt: Date.now()
+            });
+          }
         }
         setSuccessMsg('Student(s) added successfully!');
         toast.success("Student(s) added successfully!", { description: "New students have been registered." });
@@ -692,10 +694,112 @@ export default function DemoForm({
     );
   };
 
+  const isGroupPreferencesStep = !parentOnly && formData.step === (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2);
+
   const renderFormStep = () => {
     if (formData.step === 1) {
       return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
+          {(!hasProfile || parentOnly) && (
+            <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 className="text-xl font-bold text-slate-800 border-b pb-3 mb-4 flex items-center gap-2">
+                👤 Parent / Guardian Details
+              </h3>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Parent/Guardian Name *</label>
+                  <input
+                    type="text"
+                    name="parentName"
+                    value={formData.parentName}
+                    onChange={handleCommonChange}
+                    required
+                    placeholder="Enter full name"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Email Address *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleCommonChange}
+                    required
+                    disabled={isDashboard}
+                    placeholder="Enter email"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-slate-100/50 cursor-not-allowed text-slate-500"
+                  />
+                  {isDashboard && <p className="text-xs text-slate-500 mt-1">Fetched securely from your account.</p>}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Phone Number *</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+91</span>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0,10);
+                        setFormData(prev => {
+                          const next = { ...prev, phone: val };
+                          if (sameAsPhone) next.whatsapp = val;
+                          return next;
+                        });
+                      }}
+                      required
+                      placeholder="Enter 10-digit number"
+                      className="w-full border border-slate-300 rounded-xl pl-12 pr-4 py-3 bg-white"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-semibold">WhatsApp Number *</label>
+                    <label className="flex items-center gap-2 text-xs font-medium cursor-pointer text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={sameAsPhone}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSameAsPhone(checked);
+                          if (checked) {
+                            setFormData(prev => ({ ...prev, whatsapp: prev.phone }));
+                          }
+                        }}
+                        className="accent-emerald-600"
+                      />
+                      Same as Phone
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+91</span>
+                    <input
+                      type="tel"
+                      name="whatsapp"
+                      value={formData.whatsapp}
+                      onChange={(e) => {
+                        if (!sameAsPhone) {
+                          setFormData(prev => ({ ...prev, whatsapp: e.target.value.replace(/\D/g, '').slice(0,10) }));
+                        }
+                      }}
+                      required
+                      disabled={sameAsPhone}
+                      placeholder="WhatsApp number"
+                      className={`w-full border border-slate-300 rounded-xl pl-12 pr-4 py-3 ${sameAsPhone ? 'bg-slate-100' : 'bg-white'}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!activeStudentId && !parentOnly && (
             <div>
               <label className="block text-sm font-semibold mb-2">👥 Number of Students</label>
@@ -712,220 +816,7 @@ export default function DemoForm({
           )}
 
           {!parentOnly && (
-            <div>
-              <label className="block text-sm font-semibold mb-2">📚 Selected Category</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleCommonChange}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="school">School / Academics</option>
-                <option value="programming">Programming / IT</option>
-                <option value="languages">Languages</option>
-              </select>
-            </div>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold mb-2">👤 Parent / Guardian Name *</label>
-              <input
-                type="text"
-                name="parentName"
-                placeholder="Enter parent's full name"
-                value={formData.parentName}
-                onChange={handleCommonChange}
-                required
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">📧 Email ID *</label>
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter email"
-                value={formData.email}
-                onChange={handleCommonChange}
-                required
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold mb-2">📞 Phone Number *</label>
-              <input
-                type="tel"
-                name="phone"
-                placeholder="Enter 10-digit phone number"
-                value={formData.phone}
-                onChange={handleCommonChange}
-                required
-                maxLength={10}
-                pattern="[0-9]{10}"
-                className="w-full border border-slate-300 rounded-xl px-4 py-4"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-semibold">💬 WhatsApp No. *</label>
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                  <input type="checkbox" checked={sameAsPhone} onChange={handleSameAsPhone} className="rounded accent-purple-500" />
-                  Same as Phone
-                </label>
-              </div>
-              <input
-                type="tel"
-                name="whatsapp"
-                placeholder="Enter 10-digit WhatsApp number"
-                value={formData.whatsapp}
-                onChange={handleCommonChange}
-                disabled={sameAsPhone}
-                required={!sameAsPhone}
-                maxLength={10}
-                pattern="[0-9]{10}"
-                className={`w-full border border-slate-300 rounded-xl px-4 py-4 ${sameAsPhone ? 'bg-slate-100' : ''}`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-3">🌐 Preferred Mode *</label>
-            {(formData.category === 'programming') ? (
-              <div className="border border-purple-200 bg-purple-50 rounded-xl px-4 py-4 flex items-center gap-3">
-                <input type="radio" name="demoMode" value="Online" checked readOnly className="accent-purple-500" />
-                <span className="font-semibold text-purple-700">Online Only (For Programming)</span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-4 sm:gap-6 pt-1">
-                {['Online', 'Offline'].map((item) => (
-                  <label key={item} className="flex items-center gap-2 font-medium cursor-pointer">
-                    <input
-                      type="radio"
-                      name="demoMode"
-                      value={item}
-                      checked={formData.demoMode === item}
-                      onChange={handleCommonChange}
-                      required
-                      className="accent-purple-500 w-4 h-4"
-                    />
-                    {item}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {(formData.demoMode !== 'Online' && formData.category !== 'programming') && (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <label className="block text-sm font-semibold">🏠 Residential Address *</label>
-                <button
-                  type="button"
-                  onClick={handleDetectLocation}
-                  disabled={locationLoading}
-                  className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors border border-emerald-200 shadow-sm w-max"
-                >
-                  {locationLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <MapPin className="w-4 h-4" />
-                  )}
-                  {locationLoading ? 'Detecting...' : 'Auto-Detect Location'}
-                </button>
-              </div>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  name="addressFlat"
-                  placeholder="Flat / House No. & Building"
-                  value={formData.addressFlat}
-                  onChange={handleCommonChange}
-                  required={formData.demoMode !== 'Online'}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
-                />
-                <input
-                  type="text"
-                  name="addressStreet"
-                  placeholder="Street & Landmark"
-                  value={formData.addressStreet}
-                  onChange={handleCommonChange}
-                  required={formData.demoMode !== 'Online'}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
-                />
-                <input
-                  type="text"
-                  name="addressPincode"
-                  placeholder="Pincode"
-                  value={formData.addressPincode}
-                  onChange={handleCommonChange}
-                  required={formData.demoMode !== 'Online'}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3"
-                />
-              </div>
-            </div>
-          )}
-
-          {!parentOnly && (
             <>
-              <div>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">⏱ Preferred Study Time</label>
-                    <select name="hours" value={formData.hours} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
-                      <option value="">Select duration</option>
-                      <option value="1 Hour/Day">1 Hour / Day</option>
-                      <option value="1.5 Hours/Day">1.5 Hours / Day</option>
-                      <option value="2 Hours/Day">2 Hours / Day</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">📅 Days per Week</label>
-                    <select name="days" value={formData.days} onChange={handleCommonChange} className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white">
-                      <option value="">Select days</option>
-                      <option value="1 Day/Week">1 Day / Week</option>
-                      <option value="2 Days/Week">2 Days / Week</option>
-                      <option value="3 Days/Week">3 Days / Week</option>
-                      <option value="4 Days/Week">4 Days / Week</option>
-                      <option value="5 Days/Week">5 Days / Week</option>
-                      <option value="6 Days/Week">6 Days / Week</option>
-                      <option value="Daily">Daily</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              
-              {formData.days && (
-                <div>
-                  <label className="block text-sm font-semibold mb-3">📆 Specific Days of the Week (Optional)</label>
-                  <div className="flex flex-wrap gap-3">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                      const isChecked = formData.specificDays.includes(day);
-                      const maxDays = formData.days === 'Daily' ? 7 : parseInt(formData.days?.charAt(0)) || 0;
-                      const isAtMax = maxDays > 0 && formData.specificDays.length >= maxDays;
-                      const isDisabled = !isChecked && isAtMax;
-                      return (
-                      <label key={day} className={`flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500'}`}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={isDisabled}
-                          onChange={() => handleSpecificDayCheckbox(day)}
-                          className="accent-purple-500"
-                        />
-                        <span className="text-sm font-medium">{day}</span>
-                      </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-semibold mb-2">🎯 Learning Goal</label>
                 <textarea
@@ -943,6 +834,225 @@ export default function DemoForm({
       );
     }
 
+    if (isGroupPreferencesStep) {
+      const uniqueGroups = Array.from(new Set(formData.students.slice(0, formData.numberOfStudents).map((s: any) => s.groupId || 'unassigned')));
+      
+      const handleGroupPrefChange = (groupId: string, field: string, value: any) => {
+        setFormData(prev => ({
+          ...prev,
+          groupPreferences: {
+            ...prev.groupPreferences,
+            [groupId]: {
+              ...prev.groupPreferences[groupId],
+              [field]: value
+            }
+          }
+        }));
+      };
+
+      const handleSpecificDayGroup = (groupId: string, day: string) => {
+        setFormData(prev => {
+          const currentDays = prev.groupPreferences[groupId]?.specificDays || [];
+          const newDays = currentDays.includes(day) ? currentDays.filter(d => d !== day) : [...currentDays, day];
+          return {
+            ...prev,
+            groupPreferences: {
+              ...prev.groupPreferences,
+              [groupId]: {
+                ...prev.groupPreferences[groupId],
+                specificDays: newDays
+              }
+            }
+          };
+        });
+      };
+
+      return (
+        <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
+          <h3 className="text-2xl font-bold border-b pb-4">Group Preferences</h3>
+          <p className="text-slate-500 mb-6">Please set the preferences for each group you created.</p>
+          
+          <div className="space-y-10">
+            {uniqueGroups.map((groupId: string, index: number) => {
+              const pref = formData.groupPreferences[groupId] || {};
+              const studentsInGroup = formData.students.filter(s => s.groupId === groupId);
+              const groupNames = studentsInGroup.map(s => s.fullName || 'Student').join(', ');
+              const isProgramming = studentsInGroup.some(s => s.category === 'programming');
+              
+              if (isProgramming && pref.mode !== 'Online') {
+                 setTimeout(() => handleGroupPrefChange(groupId, 'mode', 'Online'), 0);
+              }
+
+              return (
+                <div key={groupId} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 relative">
+                  <div className="absolute top-0 left-0 bg-purple-100 text-purple-700 font-bold px-4 py-1 rounded-br-xl rounded-tl-2xl text-xs uppercase tracking-wider">
+                    Group {index + 1}
+                  </div>
+                  <div className="pt-4">
+                    <p className="font-semibold text-slate-800 text-sm mb-1">Students in this group:</p>
+                    <p className="text-slate-600 font-medium">{groupNames}</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold mb-3">👩‍🏫 Teacher Gender Preference *</label>
+                      <div className="flex flex-wrap gap-3">
+                        {['Male', 'Female', 'No Preference'].map((item) => (
+                          <label key={item} className="flex items-center gap-2 font-medium cursor-pointer bg-white border border-slate-200 px-3 py-2 rounded-lg hover:border-purple-500 transition-colors">
+                            <input
+                              type="radio"
+                              name={`gender_${groupId}`}
+                              value={item}
+                              checked={pref.teacherGenderPreference === item}
+                              onChange={(e) => handleGroupPrefChange(groupId, 'teacherGenderPreference', e.target.value)}
+                              required
+                              className="accent-purple-500"
+                            />
+                            <span className="text-sm">{item}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-semibold mb-3">🌐 Preferred Mode *</label>
+                      {isProgramming ? (
+                        <div className="border border-purple-200 bg-purple-50 rounded-xl px-4 py-3 flex items-center gap-3">
+                          <input type="radio" checked readOnly className="accent-purple-500" />
+                          <span className="font-semibold text-purple-700 text-sm">Online Only (For Programming)</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-3">
+                          {['Online', 'Offline'].map((item) => (
+                            <label key={item} className="flex items-center gap-2 font-medium cursor-pointer bg-white border border-slate-200 px-3 py-2 rounded-lg hover:border-purple-500 transition-colors">
+                              <input
+                                type="radio"
+                                name={`mode_${groupId}`}
+                                value={item}
+                                checked={pref.mode === item}
+                                onChange={(e) => handleGroupPrefChange(groupId, 'mode', e.target.value)}
+                                required
+                                className="accent-purple-500"
+                              />
+                              <span className="text-sm">{item}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {(pref.mode === 'Offline' && !isProgramming) && (
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-sm font-semibold">🏠 Group Address *</label>
+                        <button
+                          type="button"
+                          onClick={() => handleDetectLocation(groupId)}
+                          disabled={locationLoading}
+                          className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {locationLoading ? 'Detecting...' : '📍 Detect Current Location'}
+                        </button>
+                      </div>
+                      <div className="grid gap-3">
+                        <input
+                          type="text"
+                          placeholder="Flat / House No. & Building"
+                          value={pref.addressFlat || ''}
+                          onChange={(e) => handleGroupPrefChange(groupId, 'addressFlat', e.target.value)}
+                          required={pref.mode === 'Offline'}
+                          className="w-full border border-slate-300 rounded-lg px-4 py-3 text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Street & Landmark"
+                          value={pref.addressStreet || ''}
+                          onChange={(e) => handleGroupPrefChange(groupId, 'addressStreet', e.target.value)}
+                          required={pref.mode === 'Offline'}
+                          className="w-full border border-slate-300 rounded-lg px-4 py-3 text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Pincode"
+                          value={pref.addressPincode || ''}
+                          onChange={(e) => handleGroupPrefChange(groupId, 'addressPincode', e.target.value)}
+                          required={pref.mode === 'Offline'}
+                          className="w-full border border-slate-300 rounded-lg px-4 py-3 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">⏱ Preferred Study Time *</label>
+                      <select 
+                        value={pref.hours || ''} 
+                        onChange={(e) => handleGroupPrefChange(groupId, 'hours', e.target.value)} 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white text-sm"
+                        required
+                      >
+                        <option value="">Select duration</option>
+                        <option value="1 Hour/Day">1 Hour / Day</option>
+                        <option value="1.5 Hours/Day">1.5 Hours / Day</option>
+                        <option value="2 Hours/Day">2 Hours / Day</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">📅 Days per Week *</label>
+                      <select 
+                        value={pref.days || ''} 
+                        onChange={(e) => handleGroupPrefChange(groupId, 'days', e.target.value)} 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white text-sm"
+                        required
+                      >
+                        <option value="">Select days</option>
+                        <option value="1 Day/Week">1 Day / Week</option>
+                        <option value="2 Days/Week">2 Days / Week</option>
+                        <option value="3 Days/Week">3 Days / Week</option>
+                        <option value="4 Days/Week">4 Days / Week</option>
+                        <option value="5 Days/Week">5 Days / Week</option>
+                        <option value="6 Days/Week">6 Days / Week</option>
+                        <option value="Daily">Daily</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {pref.days && (
+                    <div>
+                      <label className="block text-sm font-semibold mb-3">📆 Specific Days of the Week (Optional)</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                          const specificDays = pref.specificDays || [];
+                          const isChecked = specificDays.includes(day);
+                          const maxDays = pref.days === 'Daily' ? 7 : parseInt(pref.days?.charAt(0)) || 0;
+                          const isAtMax = maxDays > 0 && specificDays.length >= maxDays;
+                          const isDisabled = !isChecked && isAtMax;
+                          return (
+                          <label key={day} className={`flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2 bg-white ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500'}`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onChange={() => handleSpecificDayGroup(groupId, day)}
+                              className="accent-purple-500"
+                            />
+                            <span className="text-xs font-medium">{day.substring(0,3)}</span>
+                          </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     const sIndex = formData.step - 2;
     const student = formData.students[sIndex];
 
@@ -950,6 +1060,22 @@ export default function DemoForm({
       <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
         <h3 className="text-2xl font-bold border-b pb-4">Details for Student</h3>
         
+        <div className="mb-6">
+          <label className="block text-sm font-semibold mb-2">📚 Category *</label>
+          <select
+            name="category"
+            value={student.category || ''}
+            onChange={(e) => handleStudentChange(sIndex, e)}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+            required
+          >
+            <option value="">Select Category</option>
+            <option value="school">School / Academics</option>
+            <option value="programming">Programming / IT</option>
+            <option value="languages">Languages</option>
+          </select>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-semibold mb-2">👤 Student Name *</label>
@@ -1005,7 +1131,7 @@ export default function DemoForm({
           </div>
         </div>
 
-        {formData.category === 'school' && (
+        {student.category === 'school' && (
           <>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
@@ -1097,7 +1223,7 @@ export default function DemoForm({
           </>
         )}
 
-        {formData.category === 'programming' && (
+        {student.category === 'programming' && (
           <div>
             <label className="block text-sm font-semibold mb-3">💻 Technologies *</label>
             <div className="grid md:grid-cols-2 gap-3">
@@ -1116,7 +1242,7 @@ export default function DemoForm({
           </div>
         )}
 
-        {formData.category === 'languages' && (
+        {student.category === 'languages' && (
           <div>
             <label className="block text-sm font-semibold mb-3">🌍 Languages *</label>
             <div className="grid md:grid-cols-2 gap-3">
@@ -1144,7 +1270,7 @@ export default function DemoForm({
     const tempStudents = formData.students.slice(0, formData.numberOfStudents).map((s: any, index: number) => ({
       id: s.id || `temp_${index}`,
       name: s.fullName || s.name || `Student ${index + 1}`,
-      category: formData.category || category,
+      category: s.category,
       groupId: s.groupId || 'unassigned',
       ...s
     }));
@@ -1161,9 +1287,7 @@ export default function DemoForm({
                 newStudents[originalIndex] = { ...(newStudents[originalIndex] as any), groupId: gs.groupId };
               }
             });
-            setFormData(prev => ({ ...prev, students: newStudents }));
-            // Trigger submission via useEffect to avoid stale closure
-            setShouldSubmitGroup(true);
+            setFormData(prev => ({ ...prev, students: newStudents, step: prev.step + 1 }));
           }}
           onCancel={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
         />
@@ -1188,14 +1312,6 @@ export default function DemoForm({
                 </p>
               )}
             </div>
-            {hasProfile && activeStudentId !== 'new' && (
-              <button 
-                onClick={() => setIsEditing(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -1223,7 +1339,7 @@ export default function DemoForm({
                 disabled={loading}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg text-lg"
               >
-                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < formData.numberOfStudents + (formData.numberOfStudents > 1 ? 1 : 1) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
+                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
               </button>
             </div>
           </form>
