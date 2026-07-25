@@ -99,6 +99,7 @@ export default function StudentDashboard() {
   const [showGroupManager, setShowGroupManager] = useState(false);
   const [groupSettingsModalOpen, setGroupSettingsModalOpen] = useState(false);
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<any>(null);
+  const [newlyCreatedGroupId, setNewlyCreatedGroupId] = useState<string | null>(null);
   const router = useRouter();
 
   const fetcher = async () => {
@@ -359,10 +360,30 @@ export default function StudentDashboard() {
       }));
   }, [allStudents]);
 
+  useEffect(() => {
+    if (newlyCreatedGroupId && studentGroups && studentGroups.length > 0) {
+      const newGroup = studentGroups.find((g: any) => g.id === newlyCreatedGroupId);
+      if (newGroup) {
+        // We find the request doc for the new group from data (it may be stale, but the modal fetches/relies on group settings)
+        setSelectedGroupForSettings({ ...newGroup, requestDoc: { groupId: newlyCreatedGroupId } });
+        setGroupSettingsModalOpen(true);
+        setNewlyCreatedGroupId(null);
+      }
+    }
+  }, [studentGroups, newlyCreatedGroupId]);
+
   const activeGroup = studentGroups.find(g => g.id === activeGroupId) || studentGroups[0] || null;
   const activeStudent = allStudents.find((s:any) => s.id === activeStudentId) || data?.myStudent || allStudents[0] || null;
   
-  const allTutorsWithScores = (data?.allTutors || []).map((tutor: any) => ({
+  const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
+      const matchGroup = (app: any) => {
+          if (app.groupId) return app.groupId === activeGroup?.id;
+          return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+      };
+      const app = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app));
+      if (app && app.status === 'tuition_started') return false;
+      return true;
+  }).map((tutor: any) => ({
     ...tutor,
     suitabilityScore: calculateSuitabilityScore(activeStudent, tutor)
   })).sort((a: any, b: any) => {
@@ -2453,6 +2474,7 @@ export default function StudentDashboard() {
                                   } : {})
                                 });
                                 toast.info("New group created and preferences transferred!");
+                                setNewlyCreatedGroupId(groupId);
                               }
                             }
 

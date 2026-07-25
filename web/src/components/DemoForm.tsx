@@ -196,6 +196,8 @@ export default function DemoForm({
                   ...prev,
                   parentName: parentData ? parentData.name : (user.displayName || ''),
                   email: user.email || prev.email,
+                  phone: parentData ? parentData.phone : prev.phone,
+                  whatsapp: parentData ? parentData.whatsapp : prev.whatsapp,
                 }));
               }
             } else {

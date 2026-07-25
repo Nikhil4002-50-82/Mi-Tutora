@@ -157,7 +157,11 @@ export default function TeacherDashboard() {
       return acc;
     }, {});
 
-    const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
+    const availableGroupsRaw = Object.values(groupedStudentsMap).filter((g: any) => {
+      const app = applications.find((a: any) => (a.groupId === g.id || g.students.some((s:any) => s.id === a.studentId)) && a.status === 'tuition_started');
+      if (app) return false;
+      return true;
+    }).map((g: any) => ({
       ...g,
       name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
       category: g.categories[0] || 'school',
