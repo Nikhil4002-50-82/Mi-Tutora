@@ -93,7 +93,7 @@ export default function DemoForm({
           technologies: [] as string[],
           languages: [] as string[],
           budget: '4000',
-          groupId: hasProfile ? 'unassigned' : 'indv_temp',
+          groupId: 'unassigned',
         }
       ]
     };
@@ -336,7 +336,7 @@ export default function DemoForm({
             technologies: [],
             languages: [],
             budget: '4000',
-            groupId: hasProfile ? 'unassigned' : 'indv_temp'
+            groupId: 'unassigned'
           });
         }
       } else if (num < currentStudents.length) {
@@ -469,13 +469,11 @@ export default function DemoForm({
         setSuccessMsg('Profile updated successfully!');
         toast.success("Profile saved successfully!", { description: "Student profile has been updated." });
       } else {
+        const processedGroups = new Set<string>();
         for (let i = 0; i < formData.numberOfStudents; i++) {
           const s = formData.students[i];
           const newStudentRef = doc(collection(db, 'students'));
           let groupId = (s as any).groupId || `indv_${newStudentRef.id}`;
-          if (groupId.startsWith('indv_temp')) {
-            groupId = `indv_${newStudentRef.id}`;
-          }
 
           const lookupId = (s as any).groupId || 'unassigned';
           const groupPref = formData.groupPreferences?.[lookupId] || formData.groupPreferences?.[groupId] || {};
@@ -503,7 +501,8 @@ export default function DemoForm({
             createdAt: Date.now()
           });
 
-          if (groupId !== 'unassigned') {
+          if (groupId !== 'unassigned' && !processedGroups.has(groupId)) {
+            processedGroups.add(groupId);
             const newRequestRef = doc(collection(db, 'tuition_requests'));
             await setDoc(newRequestRef, {
               id: newRequestRef.id,

@@ -1853,7 +1853,7 @@ export default function StudentDashboard() {
                                   <button 
                                     onClick={() => {
                                       const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
-                                      setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: neg.finalPrice || neg.currentOffer, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []), tutorName: neg.tutorName });
+                                      setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: neg.finalPrice || neg.currentOffer, budget: neg.budget, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []), tutorName: neg.tutorName });
                                     }}
                                     className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
                                   >
@@ -2399,7 +2399,7 @@ export default function StudentDashboard() {
                         onSave={async (groupedStudents) => {
                           try {
                             const { db } = await import('@/utils/firebase/client');
-                            const { doc, updateDoc, collection, setDoc, getDocs, query, where } = await import('firebase/firestore');
+                            const { doc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
                             
                             const newGroupIds = new Set<string>();
 
@@ -2417,9 +2417,21 @@ export default function StudentDashboard() {
                               const q = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
                               const snap = await getDocs(q);
                               if (snap.empty) {
-                                // Create a basic empty tuition request for the new group
-                                const newReqRef = doc(collection(db, 'tuition_requests'));
+                                // Find a sample student to copy preferences from
                                 const sampleStudent = groupedStudents.find(s => s.groupId === groupId);
+                                
+                                // Attempt to find the sample student's OLD group preferences to copy over
+                                const oldStudentData = allStudents.find(s => s.id === sampleStudent?.id);
+                                let oldRequestData: any = null;
+                                if (oldStudentData && oldStudentData.groupId) {
+                                  const oldReqQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', oldStudentData.groupId));
+                                  const oldReqSnap = await getDocs(oldReqQuery);
+                                  if (!oldReqSnap.empty) {
+                                    oldRequestData = oldReqSnap.docs[0].data();
+                                  }
+                                }
+                                
+                                const newReqRef = doc(collection(db, 'tuition_requests'));
                                 await setDoc(newReqRef, {
                                   id: newReqRef.id,
                                   groupId: groupId,
@@ -2427,9 +2439,31 @@ export default function StudentDashboard() {
                                   studentId: sampleStudent?.id, // Just reference one student for legacy support
                                   category: sampleStudent?.category || '',
                                   status: 'open',
-                                  createdAt: Date.now()
+                                  createdAt: Date.now(),
+                                  // Copy old preferences if they exist
+                                  ...(oldRequestData ? {
+                                    teacherGenderPreference: oldRequestData.teacherGenderPreference || 'No Preference',
+                                    mode: oldRequestData.mode || '',
+                                    area: oldRequestData.area || '',
+                                    city: oldRequestData.city || '',
+                                    preferredTimeRange: oldRequestData.preferredTimeRange || '',
+                                    daysPerWeek: oldRequestData.daysPerWeek || '',
+                                    specificDays: oldRequestData.specificDays || [],
+                                    budget: oldRequestData.budget || 0,
+                                  } : {})
                                 });
-                                toast.info("New group created! Please update its preferences.");
+                                toast.info("New group created and preferences transferred!");
+                              }
+                            }
+
+                            // Cleanup orphaned requests
+                            const allRequestsQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', data?.user?.uid));
+                            const allRequestsSnap = await getDocs(allRequestsQuery);
+                            for (const requestDoc of allRequestsSnap.docs) {
+                              const reqData = requestDoc.data();
+                              if (reqData.groupId && !newGroupIds.has(reqData.groupId)) {
+                                // This tuition request belongs to a groupId that has NO students anymore. Delete it.
+                                await deleteDoc(doc(db, 'tuition_requests', requestDoc.id));
                               }
                             }
 
@@ -2477,7 +2511,7 @@ export default function StudentDashboard() {
                     <div className="space-y-3 mb-4">
                       <div className="flex justify-between items-center text-sm font-bold text-gray-500">
                         <div className="flex flex-col">
-                          <span className="text-gray-900">Tuition Fee</span>
+                          <span className="text-gray-900">Tuition Fee {payingClass.finalPrice ? '(Negotiated)' : '(Original)'}</span>
                           <span className="text-xs font-medium">Agreed monthly fee</span>
                         </div>
                         <span className="text-gray-900">₹{coursePrice}</span>
@@ -2714,7 +2748,7 @@ export default function StudentDashboard() {
                     <button 
                       onClick={() => {
                         const displayNames = selectedViewApp.studentName || (selectedViewApp.studentIds?.length > 1 ? 'Group' : 'Student');
-                        setPayingClass({ id: selectedViewApp.id, studentName: displayNames, finalPrice: selectedViewApp.finalPrice || selectedViewApp.currentOffer, studentsList: selectedViewApp.studentsList || (selectedViewApp.studentDetails ? [selectedViewApp.studentDetails] : []), tutorName: selectedViewApp.tutorName });
+                        setPayingClass({ id: selectedViewApp.id, studentName: displayNames, finalPrice: selectedViewApp.finalPrice || selectedViewApp.currentOffer, budget: selectedViewApp.budget, studentsList: selectedViewApp.studentsList || (selectedViewApp.studentDetails ? [selectedViewApp.studentDetails] : []), tutorName: selectedViewApp.tutorName });
                         setSelectedViewUser(null);
                         setSelectedViewApp(null);
                       }}
