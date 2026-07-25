@@ -61,6 +61,7 @@ export default function TeacherDashboard() {
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [hasDismissedReminder, setHasDismissedReminder] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
+  const [selectedViewApp, setSelectedViewApp] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
   const [subTab, setSubTab] = useState<string>('');
@@ -71,7 +72,7 @@ export default function TeacherDashboard() {
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', min: undefined as number | undefined, max: undefined as number | undefined, onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
@@ -285,7 +286,7 @@ export default function TeacherDashboard() {
         const timeParts = app.demoTime.split('||')[0].split(':');
         if (timeParts.length >= 2) {
           demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-          const demoEndTime = demoDateObj.getTime() + 60 * 60 * 1000; // 1 hour demo
+          const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
           if (now > demoEndTime + 24 * 60 * 60 * 1000) {
             currentStatus = 'declined';
             try {
@@ -359,6 +360,7 @@ export default function TeacherDashboard() {
       })),
       upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => ({
         id: app.id,
+        app: app,
         student: app.studentName || 'Assigned Student',
         subject: app.category || 'General',
         date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
@@ -541,7 +543,7 @@ export default function TeacherDashboard() {
     setPaymentLoading(true);
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove, getDoc } = await import('firebase/firestore');
       
       // Update application directly to demo_booking_phase
       if (payingClass?.id && payingClass.id !== 'mock-id') {
@@ -560,9 +562,23 @@ export default function TeacherDashboard() {
         }
       }
       
+      let finalPayingClass = { ...payingClass };
+      const studentData = finalPayingClass?.studentsList?.[0] || finalPayingClass?.studentDetails || {};
+      
+      if (studentData?.parentId && !studentData?.parentDetails?.phone) {
+        const parentDoc = await getDoc(doc(db, 'parents', studentData.parentId));
+        if (parentDoc.exists()) {
+           if (finalPayingClass.studentsList) {
+             finalPayingClass.studentsList[0].parentDetails = parentDoc.data();
+           } else if (finalPayingClass.studentDetails) {
+             finalPayingClass.studentDetails.parentDetails = parentDoc.data();
+           }
+        }
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 1500));
       toast.success("Payment completed successfully!");
-      setPostPaymentPopup(payingClass);
+      setPostPaymentPopup(finalPayingClass);
       setPayingClass(null);
       mutate();
     } catch (e: any) {
@@ -634,9 +650,9 @@ export default function TeacherDashboard() {
         lastUpdatedBy: 'tutor',
         status: 'negotiating',
         source: 'direct',
-        category: student.category,
-        mode: student.students ? student.students[0].preferredMode : (student.preferredMode || 'flexible'),
-        demoHours: student.students ? student.students[0].hoursPerDay : (student.hoursPerDay || student.preferredTimeRange || 'Flexible'),
+        category: student.category || 'general',
+        mode: (student.students ? student.students[0]?.preferredMode : student.preferredMode) || 'flexible',
+        demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
         createdAt: Date.now()
       });
 
@@ -709,9 +725,9 @@ export default function TeacherDashboard() {
         lastUpdatedBy: 'tutor',
         status: 'demo_requested_by_teacher',
         source: 'direct',
-        category: student.category,
-        mode: student.students ? student.students[0].preferredMode : (student.preferredMode || 'flexible'),
-        demoHours: student.students ? student.students[0].hoursPerDay : (student.hoursPerDay || student.preferredTimeRange || 'Flexible'),
+        category: student.category || 'general',
+        mode: (student.students ? student.students[0]?.preferredMode : student.preferredMode) || 'flexible',
+        demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
@@ -1226,11 +1242,12 @@ export default function TeacherDashboard() {
                               const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                               return !lockedApp;
                             }).slice(0, 4).map((student: any, index: number) => {
-                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
                               const isLocked = !!offerApp;
                               const isRed = false; 
-                              const labelText = offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received';
+                              const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
+                              const labelText = isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received');
 
                               return (
                                 <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
@@ -1342,15 +1359,16 @@ export default function TeacherDashboard() {
                           const numStudents = group.students?.length || 1;
 
                           const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                           
                           const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                           const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
                           
                           const isLocked = !!lockedApp || !!offerApp;
                           const isRed = !!lockedApp;
-                          const labelText = isRed ? 'Locked' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received');
-                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting for response...' : 'Waiting to analyze...');
+                          const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
+                          const labelText = isRed ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received'));
+                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (isDemoPhase ? 'Demo in progress...' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting for response...' : 'Waiting to analyze...'));
 
                           return (
                             <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden relative">
@@ -1403,6 +1421,7 @@ export default function TeacherDashboard() {
                                   ) : (
                                     <>
                                       <div className="mb-3">
+                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                                         <input 
                                           type="number"
                                           min={group.budget || 0}
@@ -1433,22 +1452,25 @@ export default function TeacherDashboard() {
                                             >
                                               View
                                             </button>
-                                            <button 
-                                              onClick={() => handleSendOffer(group)}
-                                              disabled={offerLoading}
-                                              className={`flex-1 font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white disabled:cursor-not-allowed'}`}
-                                            >
-                                              {offerLoading ? 'Sending...' : 'Send Offer'}
-                                            </button>
+                                            {negotiationOffer[group.id] ? (
+                                              <button 
+                                                onClick={() => handleSendOffer(group)}
+                                                disabled={offerLoading}
+                                                className={`flex-1 font-bold py-2 rounded-lg transition-colors shadow-sm text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white disabled:cursor-not-allowed'}`}
+                                              >
+                                                {offerLoading ? 'Sending...' : 'Negotiate'}
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => {
+                                                  handleDirectRequestDemo(group);
+                                                }}
+                                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                                              >
+                                                Request Demo
+                                              </button>
+                                            )}
                                           </div>
-                                          <button
-                                            onClick={() => {
-                                              handleDirectRequestDemo(group);
-                                            }}
-                                            className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
-                                          >
-                                            Accept & Request Demo
-                                          </button>
                                         </div>
                                       )}
                                     </>
@@ -1703,6 +1725,7 @@ export default function TeacherDashboard() {
                                             title: neg.proposedDate ? 'Counter-Offer Date' : 'Propose Demo Schedule',
                                             description: 'Suggest a date and time for the demo class.',
                                             placeholder: '',
+                                            initialValue: '',
                                             isOnline: neg.mode === 'online',
                                             onSubmit: (val: string, date?: string, time?: string) => {
                                               setModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -1763,7 +1786,10 @@ export default function TeacherDashboard() {
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Demo Classes</h2>
                   <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {data?.demoClasses?.map((cls: any) => (
+                    {data?.demoClasses?.map((cls: any) => {
+                      const phone = cls.studentDetails?.phoneNumber || cls.studentDetails?.whatsappNumber || cls.studentDetails?.parentDetails?.phone || cls.studentDetails?.parentDetails?.whatsapp;
+                      const email = cls.studentDetails?.email || cls.studentDetails?.parentDetails?.email;
+                      return (
                       <li 
                         key={cls.id} 
                         className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden flex flex-col"
@@ -1792,37 +1818,84 @@ export default function TeacherDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
-                            {cls.studentDetails?.phoneNumber && (
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
-                                  <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.phoneNumber}</p>
+                            {cls.demoDate && cls.demoTime && (
+                              <div className="col-span-full bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                  <Calendar className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Demo Schedule</p>
+                                  <p className="font-bold text-gray-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
                                 </div>
                               </div>
                             )}
-                            {cls.app?.mode === 'offline' && (cls.studentDetails?.address || cls.studentDetails?.area) && (
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><MapPin className="w-4 h-4" /></div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location</p>
-                                  <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.address || cls.studentDetails.area}</p>
-                                </div>
-                              </div>
-                            )}
+                            {(() => {
+                              const primaryStudent = cls.studentDetails || cls.app?.studentsList?.[0];
+                              return primaryStudent ? (
+                                <>
+                                  {(primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone || primaryStudent.parentDetails?.whatsapp) && (
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
+                                      <div className="overflow-hidden">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
+                                        <p className="font-semibold text-gray-700 truncate">{primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone || primaryStudent.parentDetails?.whatsapp}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(primaryStudent.email || primaryStudent.parentDetails?.email) && (
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
+                                      <div className="overflow-hidden">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
+                                        <p className="font-semibold text-gray-700 truncate" title={primaryStudent.email || primaryStudent.parentDetails?.email}>{primaryStudent.email || primaryStudent.parentDetails?.email}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(primaryStudent.address || primaryStudent.area) && (
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><MapPin className="w-4 h-4" /></div>
+                                      <div className="overflow-hidden">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Location</p>
+                                        <p className="font-semibold text-gray-700 truncate">{primaryStudent.address || primaryStudent.area}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {primaryStudent.classLevel && (
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Target className="w-4 h-4" /></div>
+                                      <div className="overflow-hidden">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Class</p>
+                                        <p className="font-semibold text-gray-700 truncate">{primaryStudent.classLevel} {primaryStudent.board && `(${primaryStudent.board})`}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : null;
+                            })()}
                           </div>
                           
                           <div className="mt-2 flex gap-2">
                             <button
-                                onClick={() => setActiveRequestViewId(cls.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const viewUser = cls.studentDetails || { 
+                                    id: cls.id, 
+                                    name: cls.student || 'Group', 
+                                    students: cls.app?.studentsList || [], 
+                                    budget: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                    preferredMode: cls.app?.preferredMode || 'Online'
+                                  };
+                                  setSelectedViewUser(viewUser);
+                                  setSelectedViewApp(cls);
+                                }}
                                 className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
                             >
-                                Schedule Demo
+                                View
                             </button>
                           </div>
                         </div>
                       </li>
-                    ))}
+                    );})}
                     {(!data?.demoClasses || data?.demoClasses?.length === 0) && (
                       <li className="col-span-full p-8 bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
                         <Calendar className="w-8 h-8 text-gray-300 mb-2" />
@@ -1840,7 +1913,15 @@ export default function TeacherDashboard() {
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
-                        onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }}
+                        onClick={() => {
+                          if (cls.studentDetails) {
+                            setSelectedViewUser(cls.studentDetails);
+                            setSelectedViewApp(cls);
+                          } else if (cls.groupDetails) {
+                            setSelectedViewUser(cls.groupDetails);
+                            setSelectedViewApp(cls);
+                          }
+                        }}
                         className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,169,146,0.1)] hover:border-emerald-200 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
                       >
                         
@@ -1876,51 +1957,73 @@ export default function TeacherDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
 
                           {/* Details section */}
-                          {cls.status === 'confirmed' && cls.studentDetails ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
-                              {cls.studentDetails.phoneNumber && (
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
-                                  <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.phoneNumber}</p>
+                          {(() => {
+                            const primaryStudent = cls.studentDetails || cls.app?.studentsList?.[0];
+                            return cls.status === 'confirmed' && primaryStudent ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
+                                {(primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone) && (
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
+                                    <div className="overflow-hidden">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
+                                      <p className="font-semibold text-gray-700 truncate">{primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone}</p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {cls.studentDetails.email && (
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
-                                  <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.email}</p>
+                                )}
+                                {primaryStudent.email && (
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
+                                    <div className="overflow-hidden">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
+                                      <p className="font-semibold text-gray-700 truncate">{primaryStudent.email}</p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {cls.studentDetails.address && (
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><MapPin className="w-4 h-4" /></div>
-                                  <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Address</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.address}</p>
+                                )}
+                                {(primaryStudent.address || primaryStudent.area) && (
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><MapPin className="w-4 h-4" /></div>
+                                    <div className="overflow-hidden">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Address</p>
+                                      <p className="font-semibold text-gray-700 truncate">{primaryStudent.address || primaryStudent.area}</p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {cls.studentDetails.classLevel && (
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Target className="w-4 h-4" /></div>
-                                  <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Class</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.studentDetails.classLevel} {cls.studentDetails.board && `(${cls.studentDetails.board})`}</p>
+                                )}
+                                {primaryStudent.classLevel && (
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Target className="w-4 h-4" /></div>
+                                    <div className="overflow-hidden">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Class</p>
+                                      <p className="font-semibold text-gray-700 truncate">{primaryStudent.classLevel} {primaryStudent.board && `(${primaryStudent.board})`}</p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex-grow flex items-center justify-center p-4 bg-gray-50/50 rounded-2xl border border-gray-100 border-dashed">
-                              <p className="text-sm font-medium text-gray-500 text-center">Contact details will be revealed once the tuition is confirmed.</p>
-                            </div>
-                          )}
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex-grow flex items-center justify-center p-4 bg-gray-50/50 rounded-2xl border border-gray-100 border-dashed">
+                                <p className="text-sm font-medium text-gray-500 text-center">Contact details will be revealed once the tuition is confirmed.</p>
+                              </div>
+                            );
+                          })()}
 
+                          <div className="mt-2 flex gap-2">
+                            <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const viewUser = cls.studentDetails || { 
+                                    id: cls.id, 
+                                    name: cls.student || 'Group', 
+                                    students: cls.app?.studentsList || [], 
+                                    budget: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                    preferredMode: cls.app?.preferredMode || 'Online'
+                                  };
+                                  setSelectedViewUser(viewUser);
+                                  setSelectedViewApp(cls);
+                                }}
+                                className="w-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                            >
+                                View
+                            </button>
+                          </div>
                         </div>
                       </li>
                     ))}
@@ -2112,7 +2215,7 @@ export default function TeacherDashboard() {
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
-              onClick={() => setSelectedViewUser(null)}
+              onClick={() => { setSelectedViewUser(null); setSelectedViewApp(null); }}
               className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
             >
               <X className="w-5 h-5" />
@@ -2199,8 +2302,10 @@ export default function TeacherDashboard() {
 
                 <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Budget</p>
-                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewUser.budget || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                      {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Amount Received' : 'Amount to be Received') : 'Total Budget'}
+                    </p>
+                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.budget || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
@@ -2216,16 +2321,18 @@ export default function TeacherDashboard() {
             
             {/* Actions */}
             {(() => {
+              const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['negotiating'].includes(app.status));
               const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
               const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
               const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending || cooldownApp) return null;
+              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) return null;
               
               return (
                 <div className="mt-6 pt-6 border-t border-gray-100">
                   <div className="flex flex-col gap-3">
                     <div>
+                      <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                       <input 
                         type="number"
@@ -2241,19 +2348,22 @@ export default function TeacherDashboard() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <button 
-                        onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
-                        disabled={offerLoading}
-                        className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Send Offer'}
-                      </button>
-                      <button 
-                        onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
-                        className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> Accept & Request Demo
-                      </button>
+                      {negotiationOffer[selectedViewUser.id] ? (
+                        <button 
+                          onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
+                          disabled={offerLoading}
+                          className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Negotiate'}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
+                          className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Request Demo
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2372,21 +2482,26 @@ export default function TeacherDashboard() {
             
             <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
               <div className="space-y-3 mb-4">
-                {demoFees.map((fee: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center text-sm font-bold text-gray-500">
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
                     <div className="flex flex-col">
-                      <span className="text-gray-900">{fee.feeData.name}</span>
-                      <span className="text-xs font-medium">For {fee.student?.name || 'Student'}</span>
+                      <span className="text-gray-900">Demo Fee</span>
+                      <span className="text-xs font-medium">Consolidated fee for the group</span>
                     </div>
-                    <span className="text-gray-900">₹{fee.feeData.price}</span>
+                    <span className="text-gray-900">₹{coursePrice}</span>
                   </div>
-                ))}
+                  
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">GST (18%)</span>
+                    </div>
+                    <span className="text-gray-900">₹{Math.round(coursePrice * 0.18)}</span>
+                  </div>
               </div>
               
               <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
                 <span>Total to Pay</span>
                 <span className="text-[#00a992]">
-                  ₹{coursePrice}
+                  ₹{coursePrice + Math.round(coursePrice * 0.18)}
                 </span>
               </div>
             </div>
@@ -2420,7 +2535,7 @@ export default function TeacherDashboard() {
       {postPaymentPopup && (() => {
         const student = postPaymentPopup.studentsList?.[0] || postPaymentPopup.studentDetails || {};
         const isOffline = postPaymentPopup.mode === 'offline';
-        const phone = student.phoneNumber || student.whatsappNumber || 'Not provided';
+        const phone = student.phoneNumber || student.whatsappNumber || student.parentDetails?.phone || student.parentDetails?.whatsapp || 'Not provided';
         const address = student.address || student.area || student.city || 'Not provided';
         
         return (
@@ -2453,8 +2568,23 @@ export default function TeacherDashboard() {
               <div className="flex flex-col gap-3 relative z-10">
                 <button
                   onClick={() => {
+                    const neg = data?.allNegotiations?.find((n: any) => n.id === postPaymentPopup.id) || postPaymentPopup;
+                    setModalConfig({
+                      isOpen: true,
+                      type: 'demo_booking',
+                      title: 'Propose Demo Schedule',
+                      description: 'Suggest a date and time for the demo class.',
+                      placeholder: '',
+                      initialValue: '',
+                      isOnline: neg.mode === 'online',
+                      onSubmit: (val: string, date?: string, time?: string) => {
+                        setModalConfig(prev => ({ ...prev, isOpen: false }));
+                        handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
+                      }
+                    });
+                    setActiveRequestViewId(postPaymentPopup.id);
+                    setActiveTab('requests');
                     setPostPaymentPopup(null);
-                    setActiveTab('my_students'); // Navigate to Demo Classes section
                   }}
                   className="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
                 >

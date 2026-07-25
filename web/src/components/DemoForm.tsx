@@ -375,7 +375,7 @@ export default function DemoForm({
     setLoading(true);
     setSuccessMsg('');
 
-    const actualCategory = formData.category || category;
+
     
     if (!isDashboard) {
       const { auth } = await import('@/utils/firebase/client');
@@ -616,7 +616,7 @@ export default function DemoForm({
           {!parentOnly && (
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Category</p>
-              <p className="text-lg font-bold text-purple-600 capitalize">{formData.category || '-'}</p>
+              <p className="text-lg font-bold text-purple-600 capitalize">{formData.students?.[0]?.category || category || '-'}</p>
             </div>
           )}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
@@ -627,14 +627,14 @@ export default function DemoForm({
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Email</p>
             <p className="text-lg font-bold text-slate-800">{formData.email || '-'}</p>
           </div>
-          {formData.demoMode !== 'Online' && (
+          {(!formData.groupPreferences || !Object.values(formData.groupPreferences).every((g: any) => g.mode === 'Online')) && (
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 md:col-span-2">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Residential Address</p>
               <p className="text-lg font-bold text-slate-800">{[formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ') || '-'}</p>
             </div>
           )}
           
-          {formData.category === 'school' && (
+          {student.category === 'school' && (
             <>
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Class / Grade</p>
@@ -651,7 +651,7 @@ export default function DemoForm({
             </>
           )}
 
-          {formData.category === 'programming' && student.technologies.length > 0 && (
+          {student.category === 'programming' && student.technologies.length > 0 && (
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies</p>
               <div className="flex gap-2 flex-wrap">
@@ -664,7 +664,7 @@ export default function DemoForm({
             </div>
           )}
 
-          {formData.category === 'languages' && student.languages.length > 0 && (
+          {student.category === 'languages' && student.languages.length > 0 && (
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages</p>
               <div className="flex gap-2 flex-wrap">
@@ -680,7 +680,7 @@ export default function DemoForm({
 
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Preferred Mode</p>
-            <p className="text-lg font-bold text-slate-800">{(formData.category === 'programming') ? 'Online' : (formData.demoMode || '-')}</p>
+            <p className="text-lg font-bold text-slate-800">{(formData.students?.[0]?.category === 'programming') ? 'Online' : (Array.from(new Set(Object.values(formData.groupPreferences || {}).map((g: any) => g.mode).filter(Boolean))).join(', ') || '-')}</p>
           </div>
           
           {(formData.goal || formData.requirements) && (
@@ -853,7 +853,7 @@ export default function DemoForm({
       const handleSpecificDayGroup = (groupId: string, day: string) => {
         setFormData(prev => {
           const currentDays = prev.groupPreferences[groupId]?.specificDays || [];
-          const newDays = currentDays.includes(day) ? currentDays.filter(d => d !== day) : [...currentDays, day];
+          const newDays = currentDays.includes(day) ? currentDays.filter((d: string) => d !== day) : [...currentDays, day];
           return {
             ...prev,
             groupPreferences: {

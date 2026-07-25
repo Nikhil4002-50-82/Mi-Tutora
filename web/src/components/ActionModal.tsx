@@ -44,13 +44,17 @@ export default function ActionModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!value.trim()) return;
+    
     if (type === "price") {
+      if (!value.trim()) return;
       const parsed = parseFloat(value);
       if (isNaN(parsed) || parsed <= 0) {
         return;
       }
+    } else if (type !== "timing" && type !== "demo_booking") {
+      if (!value.trim()) return;
     }
+
     if (type === "timing") {
       if (!dateValue || !timeValue) return;
       onSubmit(value, dateValue, timeValue);

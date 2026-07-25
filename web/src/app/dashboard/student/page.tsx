@@ -64,6 +64,7 @@ export default function StudentDashboard() {
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [hasDismissedReminder, setHasDismissedReminder] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
+  const [selectedViewApp, setSelectedViewApp] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -84,7 +85,7 @@ export default function StudentDashboard() {
   const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'price' as 'price'|'timing', title: '', description: '', placeholder: '', initialValue: '', min: undefined as number | undefined, max: undefined as number | undefined, onSubmit: (val: string, date?: string, time?: string) => {} });
+  const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [isEditingParentProfile, setIsEditingParentProfile] = useState(false);
   const [parentFormData, setParentFormData] = useState({ name: '', email: '', phone: '', whatsapp: '', address: '' });
@@ -237,7 +238,7 @@ export default function StudentDashboard() {
         const timeParts = app.demoTime.split('||')[0].split(':');
         if (timeParts.length >= 2) {
           demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-          const demoEndTime = demoDateObj.getTime() + 60 * 60 * 1000; // 1 hour demo
+          const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
           if (now > demoEndTime + 24 * 60 * 60 * 1000) {
             currentStatus = 'declined';
             try {
@@ -788,7 +789,7 @@ export default function StudentDashboard() {
   };
 
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
-    if (['request_demo', 'accept_demo', 'accept_demo_date'].includes(action)) {
+    if (['request_demo', 'accept_demo'].includes(action)) {
       const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
       const recentDemosCount = data?.applications?.filter((app: any) => 
         ['demo_requested_by_student', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status) &&
@@ -896,15 +897,14 @@ export default function StudentDashboard() {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc, collection, query, where, getDocs, getDoc, arrayRemove } = await import('firebase/firestore');
       
-      const payingStudents = data?.students?.filter((s:any) => payingClass.studentIds?.includes(s.id)) || [];
-      const totalDemoFee = payingStudents.reduce((sum: number, s: any) => sum + (payingClass.finalPrice || getStudentDemoFee(s, data?.marketplacePricing || []).price), 0);
+      const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
+      const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
       
-      const coursePrice = totalDemoFee || 100;
       const walletBalance = data?.userData?.walletBalance || 0;
       
       // Deduct wallet if used
       if (useWallet && walletBalance > 0) {
-        const usedAmount = Math.min(coursePrice, walletBalance);
+        const usedAmount = Math.min(totalToPay, walletBalance);
         await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
       }
 
@@ -1352,7 +1352,7 @@ export default function StudentDashboard() {
                                 if (app.groupId) return app.groupId === activeGroup?.id;
                                 return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
                               };
-                              const offerApp = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const offerApp = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
                               const teacherLimit = tutor.isSubscribed ? 15 : 5;
                               const teacherPendingCount = tutor.pendingRequests?.length || 0;
@@ -1360,7 +1360,8 @@ export default function StudentDashboard() {
 
                               const isLocked = !!offerApp || isTeacherFull; // We filtered out declines, so only offerApp or full queue can lock it here
                               const isRed = isTeacherFull; 
-                              const labelText = isTeacherFull ? 'Queue Full' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
+                              const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
+                              const labelText = isTeacherFull ? 'Queue Full' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent'));
 
                               return (
                                 <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
@@ -1449,7 +1450,7 @@ export default function StudentDashboard() {
                         return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
                       };
                       const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                      const offerApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                      const offerApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                       
                       const teacherLimit = teacher.isSubscribed ? 15 : 5;
                       const teacherPendingCount = teacher.pendingRequests?.length || 0;
@@ -1460,8 +1461,9 @@ export default function StudentDashboard() {
                       
                       const isLocked = !!lockedApp || !!offerApp || isTeacherFull;
                       const isRed = !!lockedApp || isTeacherFull;
-                      const labelText = isTeacherFull ? 'Queue Full' : (!!lockedApp ? 'Locked' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent'));
-                      const subText = isTeacherFull ? 'Teacher is unavailable' : (!!lockedApp ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...'));
+                      const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
+                      const labelText = isTeacherFull ? 'Queue Full' : (!!lockedApp ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent')));
+                      const subText = isTeacherFull ? 'Teacher is unavailable' : (!!lockedApp ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (isDemoPhase ? 'Demo in progress...' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...')));
                       
                       return (
                         <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full relative overflow-hidden">
@@ -1515,6 +1517,7 @@ export default function StudentDashboard() {
                             ) : (
                               <>
                                 <div className="mb-4">
+                                  <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                                   <input 
                                     type="number"
@@ -1546,20 +1549,23 @@ export default function StudentDashboard() {
                                       >
                                         View
                                       </button>
-                                      <button
-                                        disabled={requestLoading}
-                                        onClick={() => handleRequestTutor(teacher)}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold disabled:opacity-50 transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
-                                      >
-                                        {requestLoading ? 'Requesting...' : 'Request & Offer'}
-                                      </button>
+                                      {negotiationOffer[teacher.id] ? (
+                                        <button
+                                          disabled={requestLoading}
+                                          onClick={() => handleRequestTutor(teacher)}
+                                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold disabled:opacity-50 transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                                        >
+                                          {requestLoading ? 'Requesting...' : 'Negotiate'}
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => { handleDirectRequestDemo(teacher); }}
+                                          className={`flex-1 py-3 px-3 rounded-xl text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                                        >
+                                          Request Demo
+                                        </button>
+                                      )}
                                     </div>
-                                    <button
-                                      onClick={() => { handleDirectRequestDemo(teacher); }}
-                                      className={`w-full py-3 px-3 rounded-xl text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
-                                    >
-                                      Accept & Request Demo
-                                    </button>
                                   </div>
                                 )}
                               </>
@@ -1809,6 +1815,7 @@ export default function StudentDashboard() {
                                             title: 'Counter-Offer Date',
                                             description: 'Suggest a different date and time for the demo class.',
                                             placeholder: '',
+                                            initialValue: '',
                                             isOnline: neg.mode === 'online',
                                             onSubmit: (val: string, date?: string, time?: string) => {
                                               setModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -1883,7 +1890,10 @@ export default function StudentDashboard() {
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Demo Teachers</h2>
                   <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {data?.demoClasses?.map((cls: any) => (
+                    {data?.demoClasses?.map((cls: any) => {
+                      const phone = cls.tutorDetails?.phone || cls.tutorDetails?.whatsapp;
+                      const email = cls.tutorDetails?.email;
+                      return (
                       <li 
                         key={cls.id} 
                         className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(59,130,246,0.1)] hover:border-blue-200 transition-all duration-300 group overflow-hidden flex flex-col"
@@ -1913,12 +1923,32 @@ export default function StudentDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
-                            {cls.tutorDetails?.phone && (
+                            {cls.demoDate && cls.demoTime && (
+                              <div className="col-span-full bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                  <Calendar className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Demo Schedule</p>
+                                  <p className="font-bold text-gray-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
+                                </div>
+                              </div>
+                            )}
+                            {phone && (
                               <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
                                 <div className="overflow-hidden">
                                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
-                                  <p className="font-semibold text-gray-700 truncate">{cls.tutorDetails.phone}</p>
+                                  <p className="font-semibold text-gray-700 truncate">{phone}</p>
+                                </div>
+                              </div>
+                            )}
+                            {email && (
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
+                                <div className="overflow-hidden">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
+                                  <p className="font-semibold text-gray-700 truncate" title={email}>{email}</p>
                                 </div>
                               </div>
                             )}
@@ -1926,15 +1956,24 @@ export default function StudentDashboard() {
                           
                           <div className="mt-2 flex gap-2">
                             <button
-                                onClick={() => setActiveRequestViewId(cls.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const viewUser = cls.tutorDetails || {
+                                    id: cls.app?.tutorId,
+                                    name: cls.teacher || 'Tutor',
+                                    feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                  };
+                                  setSelectedViewUser(viewUser);
+                                  setSelectedViewApp(cls);
+                                }}
                                 className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
                             >
-                                Schedule Demo
+                                View
                             </button>
                           </div>
                         </div>
                       </li>
-                    ))}
+                    );})}
                     {(!data?.demoClasses || data?.demoClasses?.length === 0) && (
                       <li className="col-span-full p-8 bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
                         <Calendar className="w-8 h-8 text-gray-300 mb-2" />
@@ -1952,7 +1991,13 @@ export default function StudentDashboard() {
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
-                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 transition-all duration-300 group overflow-hidden flex flex-col"
+                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
+                        onClick={() => {
+                          if (cls.tutorDetails) {
+                            setSelectedViewUser(cls.tutorDetails);
+                            setSelectedViewApp(cls);
+                          }
+                        }}
                       >
                         
                         {/* Decorative background element */}
@@ -2032,6 +2077,24 @@ export default function StudentDashboard() {
                               <p className="text-sm font-medium text-gray-500 text-center">Contact details will be revealed once the tuition is active.</p>
                             </div>
                           )}
+
+                          <div className="mt-2 flex gap-2">
+                            <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const viewUser = cls.tutorDetails || {
+                                    id: cls.app?.tutorId,
+                                    name: cls.teacher || 'Tutor',
+                                    feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                  };
+                                  setSelectedViewUser(viewUser);
+                                  setSelectedViewApp(cls);
+                                }}
+                                className="w-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                            >
+                                View
+                            </button>
+                          </div>
 
                           {/* Action Button */}
                           {cls.status === 'demo_requested_by_teacher' && (
@@ -2344,7 +2407,9 @@ export default function StudentDashboard() {
                               await updateDoc(doc(db, 'students', student.id), {
                                 groupId: student.groupId
                               });
-                              newGroupIds.add(student.groupId);
+                              if (student.groupId) {
+                                newGroupIds.add(student.groupId);
+                              }
                             }
                             
                             // Check if any groups don't have tuition requests and create default ones
@@ -2398,10 +2463,8 @@ export default function StudentDashboard() {
 
             {/* PAYMENT MODAL */}
             {payingClass && (() => {
-              const payingStudents = payingClass.studentsList?.length ? payingClass.studentsList : (data?.students?.filter((s:any) => payingClass.studentIds?.includes(s.id)) || []);
-              const demoFees = payingStudents.map((s:any) => ({ student: s, feeData: { name: 'Tuition Fee', price: payingClass.finalPrice || getStudentDemoFee(s, data?.marketplacePricing || []).price } }));
-              const totalDemoFee = demoFees.reduce((sum: number, curr: any) => sum + curr.feeData.price, 0) || 100;
-              const coursePrice = totalDemoFee;
+              const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
+              const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
               
               return (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -2412,15 +2475,19 @@ export default function StudentDashboard() {
                   
                   <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
                     <div className="space-y-3 mb-4">
-                      {demoFees.map((fee: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center text-sm font-bold text-gray-500">
-                          <div className="flex flex-col">
-                            <span className="text-gray-900">{fee.feeData.name}</span>
-                            <span className="text-xs font-medium">For {fee.student.name}</span>
-                          </div>
-                          <span className="text-gray-900">₹{fee.feeData.price}</span>
+                      <div className="flex justify-between items-center text-sm font-bold text-gray-500">
+                        <div className="flex flex-col">
+                          <span className="text-gray-900">Tuition Fee</span>
+                          <span className="text-xs font-medium">Agreed monthly fee</span>
                         </div>
-                      ))}
+                        <span className="text-gray-900">₹{coursePrice}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm font-bold text-gray-500">
+                        <div className="flex flex-col">
+                          <span className="text-gray-900">GST (18%)</span>
+                        </div>
+                        <span className="text-gray-900">₹{Math.round(coursePrice * 0.18)}</span>
+                      </div>
                     </div>
                     
                     {(data?.userData?.walletBalance || 0) > 0 && (
@@ -2439,7 +2506,7 @@ export default function StudentDashboard() {
                           <p className="text-xs text-gray-500 font-medium">Available: ₹{data?.userData?.walletBalance}</p>
                         </div>
                         <span className="text-emerald-600 font-bold text-sm">
-                          -₹{useWallet ? Math.min(coursePrice, data?.userData?.walletBalance) : 0}
+                          -₹{useWallet ? Math.min(totalToPay, data?.userData?.walletBalance) : 0}
                         </span>
                       </div>
                     )}
@@ -2447,7 +2514,7 @@ export default function StudentDashboard() {
                     <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
                       <span>Total to Pay</span>
                       <span className="text-[#00a992]">
-                        ₹{useWallet ? Math.max(0, coursePrice - (data?.userData?.walletBalance || 0)) : coursePrice}
+                        ₹{useWallet ? Math.max(0, totalToPay - (data?.userData?.walletBalance || 0)) : totalToPay}
                       </span>
                     </div>
                   </div>
@@ -2527,7 +2594,7 @@ export default function StudentDashboard() {
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
             <button 
-              onClick={() => setSelectedViewUser(null)}
+              onClick={() => { setSelectedViewUser(null); setSelectedViewApp(null); }}
               className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
             >
               <X className="w-5 h-5" />
@@ -2613,8 +2680,10 @@ export default function StudentDashboard() {
 
                 <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Budget</p>
-                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewUser.feeRange || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                      {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Amount Paid' : 'Amount to be Paid') : 'Total Budget'}
+                    </p>
+                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.feeRange || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
@@ -2639,17 +2708,46 @@ export default function StudentDashboard() {
 
             {/* Actions */}
             {(() => {
+              if (selectedViewApp?.status === 'waiting_for_parent_decision') {
+                return (
+                  <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
+                    <button 
+                      onClick={() => {
+                        const displayNames = selectedViewApp.studentName || (selectedViewApp.studentIds?.length > 1 ? 'Group' : 'Student');
+                        setPayingClass({ id: selectedViewApp.id, studentName: displayNames, finalPrice: selectedViewApp.finalPrice || selectedViewApp.currentOffer, studentsList: selectedViewApp.studentsList || (selectedViewApp.studentDetails ? [selectedViewApp.studentDetails] : []), tutorName: selectedViewApp.tutorName });
+                        setSelectedViewUser(null);
+                        setSelectedViewApp(null);
+                      }}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Hire Teacher
+                    </button>
+                    <button 
+                      onClick={() => {
+                        handleNegotiationAction(selectedViewApp.id, 'decline');
+                        setSelectedViewUser(null);
+                        setSelectedViewApp(null);
+                      }}
+                      className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                );
+              }
+
               const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['negotiating'].includes(app.status));
               const isPending = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
               const isHired = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['tuition_started'].includes(app.status));
               const cooldownApp = data?.applications?.find((app: any) => app.tutorId === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending || hasNegotiation || cooldownApp) return null;
+              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) return null;
               
               return (
                 <div className="mt-6 pt-6 border-t border-gray-100">
                   <div className="flex flex-col gap-3">
                     <div>
+                      <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                       <input 
                         type="number"
@@ -2665,18 +2763,21 @@ export default function StudentDashboard() {
                       )}
                     </div>
                     <div className="flex gap-2">
+                      {negotiationOffer[selectedViewUser.id] ? (
                         <button 
                           onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
                           className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                         >
-                          <CheckCircle2 className="w-4 h-4" /> Send Request
+                          <CheckCircle2 className="w-4 h-4" /> Negotiate
                         </button>
+                      ) : (
                         <button 
                           onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
                           className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                         >
-                          <CheckCircle2 className="w-4 h-4" /> Accept & Request Demo
+                          <CheckCircle2 className="w-4 h-4" /> Request Demo
                         </button>
+                      )}
                     </div>
                   </div>
                 </div>
