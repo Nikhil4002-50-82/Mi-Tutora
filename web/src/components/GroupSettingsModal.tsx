@@ -10,6 +10,7 @@ interface GroupSettingsModalProps {
   groupId: string;
   category: string;
   initialData: any;
+  parentId: string;
   onSave: () => void;
 }
 
@@ -19,6 +20,7 @@ export default function GroupSettingsModal({
   groupId,
   category,
   initialData,
+  parentId,
   onSave
 }: GroupSettingsModalProps) {
   const [formData, setFormData] = useState({
@@ -26,6 +28,8 @@ export default function GroupSettingsModal({
     addressFlat: '',
     addressStreet: '',
     addressPincode: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     teacherGenderPreference: 'No Preference',
     hours: '',
     days: '',
@@ -53,7 +57,9 @@ export default function GroupSettingsModal({
         setFormData(prev => ({
           ...prev,
           addressStreet: `${street}${street && city ? ', ' : ''}${city}` || prev.addressStreet,
-          addressPincode: pincode || prev.addressPincode
+          addressPincode: pincode || prev.addressPincode,
+          latitude,
+          longitude
         }));
       } catch (err) {
         console.error('Error fetching location details:', err);
@@ -72,9 +78,11 @@ export default function GroupSettingsModal({
     if (initialData) {
       setFormData({
         mode: initialData.mode || '',
-        addressFlat: '',
-        addressStreet: initialData.area || '',
-        addressPincode: initialData.city || '',
+        addressFlat: initialData.addressFlat || '',
+        addressStreet: initialData.addressStreet || initialData.area || '',
+        addressPincode: initialData.addressPincode || initialData.city || '',
+        latitude: initialData.latitude || null,
+        longitude: initialData.longitude || null,
         teacherGenderPreference: initialData.teacherGenderPreference || 'No Preference',
         hours: initialData.preferredTimeRange || '',
         days: initialData.daysPerWeek || '',
@@ -86,6 +94,8 @@ export default function GroupSettingsModal({
         addressFlat: '',
         addressStreet: '',
         addressPincode: '',
+        latitude: null,
+        longitude: null,
         teacherGenderPreference: 'No Preference',
         hours: '',
         days: '',
@@ -96,14 +106,41 @@ export default function GroupSettingsModal({
 
   const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const isAddressChange = ['addressFlat', 'addressStreet', 'addressPincode'].includes(name);
+      let newSpecificDays = prev.specificDays;
+      
+      if (name === 'days' && value !== 'Flexible / Any Days' && value !== '') {
+        const allowedDaysCount = parseInt(value);
+        if (!isNaN(allowedDaysCount) && newSpecificDays.length > allowedDaysCount) {
+          newSpecificDays = newSpecificDays.slice(0, allowedDaysCount);
+        }
+      }
+
+      return { 
+        ...prev, 
+        [name]: value,
+        specificDays: newSpecificDays,
+        ...(isAddressChange ? { latitude: null, longitude: null } : {})
+      };
+    });
   };
 
   const handleSpecificDay = (day: string) => {
     setFormData(prev => {
       const currentDays = prev.specificDays;
-      const newDays = currentDays.includes(day) ? currentDays.filter(d => d !== day) : [...currentDays, day];
-      return { ...prev, specificDays: newDays, days: '' };
+      const isRemoving = currentDays.includes(day);
+      
+      if (!isRemoving && prev.days && prev.days !== 'Flexible / Any Days' && prev.days !== '') {
+        const allowedDaysCount = parseInt(prev.days);
+        if (!isNaN(allowedDaysCount) && currentDays.length >= allowedDaysCount) {
+           toast.error(`You can only select up to ${allowedDaysCount} days.`);
+           return prev;
+        }
+      }
+      
+      const newDays = isRemoving ? currentDays.filter(d => d !== day) : [...currentDays, day];
+      return { ...prev, specificDays: newDays };
     });
   };
 
@@ -121,6 +158,37 @@ export default function GroupSettingsModal({
 
       const combinedAddress = formData.mode === 'Online' ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
+      let finalLat = formData.latitude;
+      let finalLng = formData.longitude;
+
+      if (formData.mode === 'Offline (Home Tuition)' && (!finalLat || !finalLng) && combinedAddress) {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(combinedAddress)}&limit=1`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            finalLat = parseFloat(data[0].lat);
+            finalLng = parseFloat(data[0].lon);
+          }
+        } catch (err) {
+          console.error("Geocoding failed during save:", err);
+        }
+      }
+
+      const groupRef = doc(db, 'groups', groupId);
+      await setDoc(groupRef, {
+        mode: formData.mode,
+        area: combinedAddress,
+        city: formData.mode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+        latitude: formData.mode === 'Online' ? null : finalLat,
+        longitude: formData.mode === 'Online' ? null : finalLng,
+        teacherGenderPreference: formData.teacherGenderPreference,
+        preferredTimeRange: formData.hours,
+        daysPerWeek: formData.days,
+        specificDays: formData.specificDays,
+        parentId: parentId,
+        updatedAt: Date.now()
+      }, { merge: true });
+
       const q = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
       const snap = await getDocs(q);
 
@@ -131,13 +199,13 @@ export default function GroupSettingsModal({
             teacherGenderPreference: formData.teacherGenderPreference,
             area: combinedAddress,
             city: formData.mode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+            latitude: formData.mode === 'Online' ? null : finalLat,
+            longitude: formData.mode === 'Online' ? null : finalLng,
             preferredTimeRange: formData.hours,
             daysPerWeek: formData.days,
             specificDays: formData.specificDays
           });
         }
-      } else {
-        toast.error('Could not find tuition request for this group. Wait for the system to link it.');
       }
 
       toast.success('Group settings updated successfully!');

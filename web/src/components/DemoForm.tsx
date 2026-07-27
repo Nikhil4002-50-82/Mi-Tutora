@@ -158,6 +158,8 @@ export default function DemoForm({
                       addressFlat: studentData.address?.split(', ')[0] || '',
                       addressStreet: studentData.address?.split(', ')[1] || studentData.address || '',
                       addressPincode: studentData.address?.split(', ')[2] || '',
+                      latitude: requestData.latitude || null,
+                      longitude: requestData.longitude || null,
                     };
                   }
                   
@@ -245,7 +247,9 @@ export default function DemoForm({
             [groupId]: {
               ...prev.groupPreferences[groupId],
               addressStreet: `${street}${street && city ? ', ' : ''}${city}` || prev.groupPreferences[groupId]?.addressStreet,
-              addressPincode: pincode || prev.groupPreferences[groupId]?.addressPincode
+              addressPincode: pincode || prev.groupPreferences[groupId]?.addressPincode,
+              latitude,
+              longitude
             }
           }
         }));
@@ -426,8 +430,23 @@ export default function DemoForm({
         const groupPref = formData.groupPreferences?.[groupId] || {};
         const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
 
-        const studentRef = doc(db, 'students', activeStudentId);
-        await updateDoc(studentRef, {
+        let finalLat = groupPref.latitude || null;
+        let finalLng = groupPref.longitude || null;
+
+        if (groupPref.mode === 'Offline' && (!finalLat || !finalLng) && combinedAddress) {
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(combinedAddress)}&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+              finalLat = parseFloat(data[0].lat);
+              finalLng = parseFloat(data[0].lon);
+            }
+          } catch (err) {
+            console.error("Geocoding failed during save:", err);
+          }
+        }
+
+        const studentData = {
           id: activeStudentId,
           guardianName: formData.parentName,
           category: s.category || '',
@@ -444,95 +463,197 @@ export default function DemoForm({
           languages: s.languages || [],
           budget: parseInt(s.budget) || 0,
           groupId: groupId,
-        });
+        };
 
-        const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
+        const studentRef = doc(db, 'students', activeStudentId);
+        await updateDoc(studentRef, studentData);
+
+        // Update Groups Doc
+        const groupRef = doc(db, 'groups', groupId);
+        await setDoc(groupRef, {
+           id: groupId,
+           parentId: user.uid,
+           mode: groupPref.mode || '',
+           area: combinedAddress,
+           city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+           latitude: groupPref.mode === 'Online' ? null : finalLat,
+           longitude: groupPref.mode === 'Online' ? null : finalLng,
+           teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+           preferredTimeRange: groupPref.hours || '',
+           daysPerWeek: groupPref.days || '',
+           specificDays: groupPref.specificDays || [],
+           updatedAt: Date.now()
+        }, { merge: true });
+
+        // Update Aggregate Tuition Request
+        const groupStudentsSnap = await getDocs(query(collection(db, 'students'), where('groupId', '==', groupId)));
+        const groupStudents = groupStudentsSnap.docs.map(d => d.data());
+        const updatedIndex = groupStudents.findIndex((st: any) => st.id === activeStudentId);
+        if (updatedIndex > -1) {
+           groupStudents[updatedIndex] = { ...groupStudents[updatedIndex], ...studentData };
+        } else {
+           groupStudents.push(studentData);
+        }
+
+        const combinedSubjects = Array.from(new Set(groupStudents.flatMap(st => st.subjects || [])));
+        const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(st => st.technologies || [])));
+        const combinedLanguages = Array.from(new Set(groupStudents.flatMap(st => st.languages || [])));
+        const combinedBudget = groupStudents.reduce((acc, st) => acc + (st.budget || 0), 0);
+        const studentsDetails = groupStudents.map(st => ({
+           id: st.id,
+           name: st.name,
+           classLevel: st.classLevel || st.classGrade || '',
+           board: st.board || '',
+           subjects: st.subjects || [],
+           technologies: st.technologies || [],
+           languages: st.languages || [],
+           budget: st.budget || 0,
+        }));
+
+        const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
         const requestSnap = await getDocs(requestQuery);
         if (!requestSnap.empty) {
           await updateDoc(requestSnap.docs[0].ref, {
             category: s.category || '',
-            studentName: s.fullName,
-            classLevel: s.classGrade,
-            board: s.board,
-            subjects: s.subjects || [],
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            budget: parseInt(s.budget) || 0,
-            groupId: groupId,
-            teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
             mode: groupPref.mode || '',
             area: combinedAddress,
             city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+            latitude: groupPref.mode === 'Online' ? null : finalLat,
+            longitude: groupPref.mode === 'Online' ? null : finalLng,
+            teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
             preferredTimeRange: groupPref.hours || '',
             daysPerWeek: groupPref.days || '',
             specificDays: groupPref.specificDays || [],
+            studentsDetails,
+            combinedSubjects,
+            combinedTechnologies,
+            combinedLanguages,
+            combinedBudget,
           });
         }
         setSuccessMsg('Profile updated successfully!');
         toast.success("Profile saved successfully!", { description: "Student profile has been updated." });
       } else {
-        const processedGroups = new Set<string>();
+        const studentDocs = [];
         for (let i = 0; i < formData.numberOfStudents; i++) {
-          const s = formData.students[i];
-          const newStudentRef = doc(collection(db, 'students'));
-          let groupId = (s as any).groupId || `indv_${newStudentRef.id}`;
+           const s = formData.students[i];
+           const newStudentRef = doc(collection(db, 'students'));
+           let tempGroupId = (s as any).groupId || 'unassigned';
+           if (tempGroupId === 'unassigned') {
+              tempGroupId = `indv_${newStudentRef.id}`;
+           }
+           studentDocs.push({
+             ref: newStudentRef,
+             data: {
+               id: newStudentRef.id,
+               guardianName: formData.parentName,
+               dob: '',
+               parentId: user.uid,
+               category: s.category || '',
+               name: s.fullName,
+               gender: s.gender,
+               phoneNumber: formData.phone,
+               whatsappNumber: formData.whatsapp,
+               email: formData.email,
+               studentType: s.studentType,
+               classLevel: s.classGrade,
+               board: s.board,
+               subjects: s.subjects || [],
+               budget: parseInt(s.budget) || 0,
+               technologies: s.technologies || [],
+               languages: s.languages || [],
+               groupId: tempGroupId,
+               createdAt: Date.now()
+             },
+             frontendStudent: s
+           });
+        }
+        
+        for (const sDoc of studentDocs) {
+           await setDoc(sDoc.ref, sDoc.data);
+        }
 
-          const lookupId = (s as any).groupId || 'unassigned';
-          const groupPref = formData.groupPreferences?.[lookupId] || formData.groupPreferences?.[groupId] || {};
-          const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
+        const uniqueGroups = Array.from(new Set(studentDocs.map(s => s.data.groupId)));
+        for (const gId of uniqueGroups) {
+           const groupStudents = studentDocs.filter(s => s.data.groupId === gId);
+           const studentIds = groupStudents.map(s => s.data.id);
+           const lookupId = groupStudents[0].frontendStudent.groupId || 'unassigned';
+           const groupPref = formData.groupPreferences?.[lookupId] || formData.groupPreferences?.[gId] || {};
+           const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
+           
+           let finalLat = groupPref.latitude || null;
+           let finalLng = groupPref.longitude || null;
 
-          await setDoc(newStudentRef, {
-            id: newStudentRef.id,
-            guardianName: formData.parentName,
-            dob: '',
-            parentId: user.uid,
-            category: s.category || '',
-            name: s.fullName,
-            gender: s.gender,
-            phoneNumber: formData.phone,
-            whatsappNumber: formData.whatsapp,
-            email: formData.email,
-            studentType: s.studentType,
-            classLevel: s.classGrade,
-            board: s.board,
-            subjects: s.subjects || [],
-            budget: parseInt(s.budget) || 0,
-            technologies: s.technologies || [],
-            languages: s.languages || [],
-            groupId: groupId,
-            createdAt: Date.now()
-          });
-
-          if (groupId !== 'unassigned' && !processedGroups.has(groupId)) {
-            processedGroups.add(groupId);
-            const newRequestRef = doc(collection(db, 'tuition_requests'));
-            await setDoc(newRequestRef, {
-              id: newRequestRef.id,
-              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-              latitude: 0.0,
-              longitude: 0.0,
-              acceptedTutorId: '',
+           if (groupPref.mode === 'Offline' && (!finalLat || !finalLng) && combinedAddress) {
+             try {
+               const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(combinedAddress)}&limit=1`);
+               const data = await res.json();
+               if (data && data.length > 0) {
+                 finalLat = parseFloat(data[0].lat);
+                 finalLng = parseFloat(data[0].lon);
+               }
+             } catch (err) {
+               console.error("Geocoding failed during save:", err);
+             }
+           }
+           
+           const groupRef = doc(db, 'groups', gId);
+           await setDoc(groupRef, {
+              id: gId,
               parentId: user.uid,
-              studentId: newStudentRef.id,
-              groupId: groupId,
-              category: s.category || '',
-              studentName: s.fullName,
-              classLevel: s.classGrade,
-              board: s.board,
-              subjects: s.subjects || [],
-              technologies: s.technologies || [],
-              languages: s.languages || [],
-              budget: parseInt(s.budget) || 0,
-              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+              studentIds,
               mode: groupPref.mode || '',
               area: combinedAddress,
+              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+              latitude: groupPref.mode === 'Online' ? null : finalLat,
+              longitude: groupPref.mode === 'Online' ? null : finalLng,
+              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
               preferredTimeRange: groupPref.hours || '',
               daysPerWeek: groupPref.days || '',
               specificDays: groupPref.specificDays || [],
-              status: 'open',
+              status: 'active',
               createdAt: Date.now()
-            });
-          }
+           });
+           
+           const combinedSubjects = Array.from(new Set(groupStudents.flatMap(s => s.data.subjects)));
+           const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(s => s.data.technologies)));
+           const combinedLanguages = Array.from(new Set(groupStudents.flatMap(s => s.data.languages)));
+           const combinedBudget = groupStudents.reduce((acc, s) => acc + s.data.budget, 0);
+           const studentsDetails = groupStudents.map(s => ({
+              id: s.data.id,
+              name: s.data.name,
+              classLevel: s.data.classLevel,
+              board: s.data.board,
+              subjects: s.data.subjects,
+              technologies: s.data.technologies,
+              languages: s.data.languages,
+              budget: s.data.budget,
+           }));
+           
+           const newRequestRef = doc(collection(db, 'tuition_requests'));
+           await setDoc(newRequestRef, {
+              id: newRequestRef.id,
+              groupId: gId,
+              parentId: user.uid,
+              category: groupStudents[0].data.category,
+              mode: groupPref.mode || '',
+              area: combinedAddress,
+              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+              latitude: groupPref.mode === 'Online' ? null : finalLat,
+              longitude: groupPref.mode === 'Online' ? null : finalLng,
+              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+              preferredTimeRange: groupPref.hours || '',
+              daysPerWeek: groupPref.days || '',
+              specificDays: groupPref.specificDays || [],
+              studentsDetails,
+              combinedSubjects,
+              combinedTechnologies,
+              combinedLanguages,
+              combinedBudget,
+              status: 'open',
+              acceptedTutorId: '',
+              createdAt: Date.now()
+           });
         }
         setSuccessMsg('Student(s) added successfully!');
         toast.success("Student(s) added successfully!", { description: "New students have been registered." });
@@ -839,16 +960,31 @@ export default function DemoForm({
       const uniqueGroups = Array.from(new Set(formData.students.slice(0, formData.numberOfStudents).map((s: any) => s.groupId || 'unassigned')));
       
       const handleGroupPrefChange = (groupId: string, field: string, value: any) => {
-        setFormData(prev => ({
-          ...prev,
-          groupPreferences: {
-            ...prev.groupPreferences,
-            [groupId]: {
-              ...prev.groupPreferences[groupId],
-              [field]: value
-            }
+        setFormData((prev: any) => {
+          let updatedSpecificDays = prev.groupPreferences[groupId]?.specificDays || [];
+          
+          if (field === 'days') {
+             const maxDays = value === 'Daily' ? 7 : parseInt(value.charAt(0)) || 0;
+             if (maxDays > 0 && updatedSpecificDays.length > maxDays) {
+                 updatedSpecificDays = updatedSpecificDays.slice(0, maxDays);
+             }
           }
-        }));
+          
+          const isAddressChange = ['addressFlat', 'addressStreet', 'addressPincode'].includes(field);
+
+          return {
+            ...prev,
+            groupPreferences: {
+              ...prev.groupPreferences,
+              [groupId]: {
+                ...prev.groupPreferences[groupId],
+                [field]: value,
+                ...(field === 'days' ? { specificDays: updatedSpecificDays } : {}),
+                ...(isAddressChange ? { latitude: null, longitude: null } : {})
+              }
+            }
+          };
+        });
       };
 
       const handleSpecificDayGroup = (groupId: string, day: string) => {

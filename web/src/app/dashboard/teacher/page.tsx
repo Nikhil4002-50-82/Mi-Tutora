@@ -11,7 +11,7 @@ import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { generateReferralCode } from '@/utils/referral';
-import { calculateSuitabilityScore } from '@/utils/matching';
+import { calculateSuitabilityScore, doesClassMatch } from '@/utils/matching';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -284,14 +284,14 @@ export default function TeacherDashboard() {
           console.error('Failed to auto-expire application:', e);
         }
       }
-      // Auto-expire if demo finished and 24 hours passed
+      // Auto-expire if demo finished and 48 hours passed
       if (['demo_scheduled', 'waiting_for_parent_decision'].includes(currentStatus) && app.demoDate && app.demoTime) {
         const demoDateObj = new Date(app.demoDate);
         const timeParts = app.demoTime.split('||')[0].split(':');
         if (timeParts.length >= 2) {
           demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
           const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
-          if (now > demoEndTime + 24 * 60 * 60 * 1000) {
+          if (now > demoEndTime + 48 * 60 * 60 * 1000) {
             currentStatus = 'declined';
             try {
               const { updateDoc, doc, arrayRemove } = await import('firebase/firestore');
@@ -655,7 +655,6 @@ export default function TeacherDashboard() {
         status: 'negotiating',
         source: 'direct',
         category: student.category || 'general',
-        mode: (student.students ? student.students[0]?.preferredMode : student.preferredMode) || 'flexible',
         demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
         createdAt: Date.now()
       });
@@ -730,7 +729,6 @@ export default function TeacherDashboard() {
         status: 'demo_requested_by_teacher',
         source: 'direct',
         category: student.category || 'general',
-        mode: (student.students ? student.students[0]?.preferredMode : student.preferredMode) || 'flexible',
         demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -869,10 +867,16 @@ export default function TeacherDashboard() {
   ];
 
   const activeTeacher = data?.profile || data?.user || null;
-  const allStudentsWithScores = (data?.allStudents || []).map((student: any) => ({
-    ...student,
-    suitabilityScore: calculateSuitabilityScore(student, activeTeacher)
-  })).sort((a: any, b: any) => {
+  const allStudentsWithScores = (data?.allStudents || []).map((studentGroup: any) => {
+    const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
+    const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getDetail(studentGroup, 'budget') || 0);
+    const teacherFee = parseFloat(activeTeacher?.feeRange || activeTeacher?.minFee || 0);
+    return {
+      ...studentGroup,
+      suitabilityScore: calculateSuitabilityScore(studentGroup, activeTeacher),
+      budgetDifference: Math.abs(studentBudget - teacherFee)
+    };
+  }).sort((a: any, b: any) => {
       const getStatus = (studentId: string) => {
           const app = data?.applications?.find((app: any) => app.studentId === studentId || app.groupId === studentId);
           if (!app) return '';
@@ -889,13 +893,42 @@ export default function TeacherDashboard() {
       const statusDiff = getScore(getStatus(b.id)) - getScore(getStatus(a.id));
       if (statusDiff !== 0) return statusDiff;
       
-      return b.suitabilityScore - a.suitabilityScore;
+      if (b.suitabilityScore !== a.suitabilityScore) {
+          return b.suitabilityScore - a.suitabilityScore;
+      }
+      
+      return a.budgetDifference - b.budgetDifference;
   }).map((student: any, index: number) => ({
       ...student,
       rank: index + 1
   }));
 
-  const computedRecommendedStudents = allStudentsWithScores.filter((student: any) => student.suitabilityScore >= 40);
+  const computedRecommendedStudents = allStudentsWithScores.filter((studentGroup: any) => {
+      if (studentGroup.suitabilityScore <= 0) return false;
+      
+      const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
+
+      const studentCat = getDetail(studentGroup, 'category').toLowerCase().trim();
+      const teacherCats = activeTeacher?.category ? activeTeacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
+      if (studentCat && !teacherCats.includes(studentCat)) return false;
+
+      if (studentCat === 'school') {
+          const studentBoard = getDetail(studentGroup, 'board').toLowerCase().trim();
+          const teacherBoards = (activeTeacher?.boards || []).map((b: string) => b.toLowerCase().trim());
+          if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
+
+          const studentClass = (getDetail(studentGroup, 'classLevel') || getDetail(studentGroup, 'classGrade')).toLowerCase().trim();
+          const teacherClasses = (activeTeacher?.classes || []).map((c: string) => c.toLowerCase().trim());
+          if (!doesClassMatch(studentClass, teacherClasses)) return false;
+      }
+
+      const genderPref = studentGroup.requestDoc?.teacherGenderPreference || studentGroup.teacherGenderPreference;
+      if (genderPref && genderPref !== 'No Preference') {
+          if (activeTeacher?.gender !== genderPref) return false;
+      }
+
+      return true;
+  });
 
   if (loading && !data) {
     return <LoadingScreen />;

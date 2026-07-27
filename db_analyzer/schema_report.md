@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-07-24T18:18:41.652Z
+Generated on: 2026-07-27T10:46:47.789Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 2*
@@ -19,7 +19,7 @@ Generated on: 2026-07-24T18:18:41.652Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 1*
+*Documents sampled: 3*
 
 | Field Path | Data Type |
 |---|---|
@@ -28,18 +28,24 @@ Generated on: 2026-07-24T18:18:41.652Z
 | `category` | `string` |
 | `createdAt` | `number` |
 | `currentOffer` | `number` |
+| `declinedAt` | `number` |
+| `demoDate` | `string` |
 | `demoHours` | `string` |
 | `demoPaymentPaid` | `boolean` |
+| `demoTime` | `string` |
 | `finalPrice` | `number` |
 | `groupId` | `string` |
 | `initialBudget` | `number` |
 | `initiator` | `string` |
 | `lastUpdatedBy` | `string` |
-| `mode` | `string` |
 | `parentId` | `string` |
+| `proposedDate` | `string` |
+| `proposedTime` | `string` |
+| `reason` | `string` |
+| `requestId` | `string` |
 | `source` | `string` |
-| `startDate` | `string` |
 | `status` | `string` |
+| `studentId` | `string` |
 | `studentIds` | `array of string` |
 | `studentName` | `string` |
 | `tutorId` | `string` |
@@ -67,6 +73,32 @@ Generated on: 2026-07-24T18:18:41.652Z
 
 ---
 
+## Collection: `groups`
+*Documents sampled: 5*
+
+| Field Path | Data Type |
+|---|---|
+| `addressFlat` | `string` |
+| `addressPincode` | `string` |
+| `addressStreet` | `string` |
+| `area` | `string` |
+| `city` | `string` |
+| `createdAt` | `number` |
+| `daysPerWeek` | `string` |
+| `id` | `string` |
+| `latitude` | `null | number` |
+| `longitude` | `null | number` |
+| `mode` | `string` |
+| `parentId` | `string` |
+| `preferredTimeRange` | `string` |
+| `specificDays` | `array of string` |
+| `status` | `string` |
+| `studentIds` | `array of string` |
+| `teacherGenderPreference` | `string` |
+| `updatedAt` | `number` |
+
+---
+
 ## Collection: `id_counters`
 *Documents sampled: 5*
 
@@ -91,16 +123,14 @@ Generated on: 2026-07-24T18:18:41.652Z
 ---
 
 ## Collection: `parents`
-*Documents sampled: 5*
+*Documents sampled: 6*
 
 | Field Path | Data Type |
 |---|---|
-| `address` | `string` |
 | `email` | `string` |
 | `id` | `string` |
 | `name` | `string` |
 | `phone` | `string` |
-| `preferredMode` | `string` |
 | `whatsapp` | `string` |
 
 ---
@@ -123,70 +153,75 @@ Generated on: 2026-07-24T18:18:41.652Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 12*
+*Documents sampled: 20*
 
 | Field Path | Data Type |
 |---|---|
-| `address` | `string` |
 | `board` | `string` |
 | `budget` | `number` |
 | `category` | `string` |
 | `classLevel` | `string` |
 | `createdAt` | `number` |
-| `daysPerWeek` | `string` |
 | `dob` | `string` |
 | `email` | `string` |
 | `gender` | `string` |
 | `groupId` | `string` |
 | `guardianName` | `string` |
-| `hoursPerDay` | `string` |
 | `id` | `string` |
-| `languages` | `array` |
+| `languages` | `array | array of string` |
 | `learningGoal` | `string` |
 | `name` | `string` |
 | `parentId` | `string` |
 | `pendingRequests` | `array of string | array` |
 | `phoneNumber` | `string` |
-| `preferredMode` | `string` |
 | `specialRequirements` | `string` |
-| `specificDays` | `array | array of string` |
 | `studentType` | `string` |
-| `subjects` | `array of string` |
-| `technologies` | `array` |
+| `subjects` | `array of string | array` |
+| `technologies` | `array | array of string` |
 | `whatsappNumber` | `string` |
 
 ---
 
 ## Collection: `tuition_requests`
-*Documents sampled: 3*
+*Documents sampled: 7*
 
 | Field Path | Data Type |
 |---|---|
 | `acceptedTutorId` | `string` |
 | `area` | `string` |
-| `board` | `string` |
-| `budget` | `number` |
 | `category` | `string` |
 | `city` | `string` |
-| `classLevel` | `string` |
+| `combinedBudget` | `number` |
+| `combinedLanguages` | `array` |
+| `combinedSubjects` | `array | array of string` |
+| `combinedTechnologies` | `array of string | array` |
 | `createdAt` | `number` |
+| `daysPerWeek` | `string` |
+| `groupId` | `string` |
 | `id` | `string` |
-| `languages` | `array` |
-| `latitude` | `number` |
-| `longitude` | `number` |
+| `latitude` | `null` |
+| `longitude` | `null` |
 | `mode` | `string` |
 | `parentId` | `string` |
 | `preferredTimeRange` | `string` |
+| `specificDays` | `array of string` |
 | `status` | `string` |
 | `studentId` | `string` |
-| `studentName` | `string` |
-| `subjects` | `array of string` |
-| `technologies` | `array` |
+| `studentsDetails` | `array of object` |
+| `studentsDetails[].board` | `string` |
+| `studentsDetails[].budget` | `number` |
+| `studentsDetails[].classLevel` | `string` |
+| `studentsDetails[].id` | `string` |
+| `studentsDetails[].languages` | `array` |
+| `studentsDetails[].name` | `string` |
+| `studentsDetails[].subjects` | `array | array of string` |
+| `studentsDetails[].technologies` | `array of string | array` |
+| `teacherGenderPreference` | `string` |
 
 ---
 
 ## Collection: `tutors`
-*Documents sampled: 8*
+*Documents sampled: 9*
 
 | Field Path | Data Type |
 |---|---|
@@ -230,7 +265,7 @@ Generated on: 2026-07-24T18:18:41.652Z
 ---
 
 ## Collection: `users`
-*Documents sampled: 15*
+*Documents sampled: 18*
 
 | Field Path | Data Type |
 |---|---|

@@ -1,86 +1,96 @@
-export function calculateSuitabilityScore(student: any, teacher: any): number {
-  if (!student || !teacher) return 0;
+function getAcademicDetail(studentGroup: any, field: string): any {
+  if (studentGroup[field]) return studentGroup[field];
+  if (studentGroup.students && studentGroup.students.length > 0 && studentGroup.students[0][field]) return studentGroup.students[0][field];
+  if (studentGroup.studentsDetails && studentGroup.studentsDetails.length > 0 && studentGroup.studentsDetails[0][field]) return studentGroup.studentsDetails[0][field];
+  if (studentGroup.requestDoc && studentGroup.requestDoc[field]) return studentGroup.requestDoc[field];
+  return undefined;
+}
+
+export function doesClassMatch(studentClass: string, teacherClasses: string[]): boolean {
+    if (!studentClass || teacherClasses.length === 0) return false;
+    
+    studentClass = studentClass.toLowerCase().trim();
+    teacherClasses = teacherClasses.map(c => c.toLowerCase().trim());
+    
+    if (teacherClasses.includes(studentClass)) return true;
+
+    const stdMatch = studentClass.match(/(\d+)[a-z]*\s+standard/);
+    if (stdMatch) {
+        const grade = parseInt(stdMatch[1]);
+        if (grade >= 1 && grade <= 5 && teacherClasses.includes('1st - 5th')) return true;
+        if (grade >= 6 && grade <= 8 && teacherClasses.includes('6th - 8th')) return true;
+        if (grade >= 9 && grade <= 10 && teacherClasses.includes('9th - 10th')) return true;
+        if (grade === 11 && (teacherClasses.includes('1st pu') || teacherClasses.includes('11th'))) return true;
+        if (grade === 12 && (teacherClasses.includes('2nd pu') || teacherClasses.includes('12th'))) return true;
+    }
+
+    return false;
+}
+
+export function calculateSuitabilityScore(studentGroup: any, teacher: any): number {
+  if (!studentGroup || !teacher) return 0;
   
   let score = 0;
   
-  const studentCat = (student.category || '').toLowerCase().trim();
+  const studentCat = (getAcademicDetail(studentGroup, 'category') || '').toLowerCase().trim();
   const teacherCats = teacher.category ? teacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
   
-  // 1. Category Match (Base Requirement: 40 points)
-  if (studentCat && teacherCats.includes(studentCat)) {
-    score += 40;
-  } else {
-    // If category doesn't even match, they are not suitable at all.
+  // Base requirement: Category must match, else score is 0
+  if (studentCat && !teacherCats.includes(studentCat)) {
     return 0; 
   }
 
-  // 2. Board & Class Match (20 points)
+  // Board Match (20 points)
   if (studentCat === 'school') {
-    const studentBoard = (student.board || '').toLowerCase().trim();
+    const studentBoard = (getAcademicDetail(studentGroup, 'board') || '').toLowerCase().trim();
     const teacherBoards = (teacher.boards || []).map((b: string) => b.toLowerCase().trim());
     if (studentBoard && teacherBoards.includes(studentBoard)) {
-      score += 10;
-    } else if (!studentBoard || teacherBoards.length === 0) {
-      score += 5; // Partial points if one didn't specify
+      score += 20;
     }
 
-    const studentClass = (student.classLevel || '').toLowerCase().trim();
+    // Class Match (30 points)
+    const studentClass = (getAcademicDetail(studentGroup, 'classLevel') || getAcademicDetail(studentGroup, 'classGrade') || '').toLowerCase().trim();
     const teacherClasses = (teacher.classes || []).map((c: string) => c.toLowerCase().trim());
-    if (studentClass && teacherClasses.includes(studentClass)) {
-      score += 10;
-    } else if (!studentClass || teacherClasses.length === 0) {
-      score += 5; // Partial points if one didn't specify
+    if (doesClassMatch(studentClass, teacherClasses)) {
+      score += 30;
     }
   }
 
-  // 3. Subject/Technology/Language Overlap (30 points)
+  // Subject/Technology/Language Match (+50 points PER MATCH)
   let studentNeeds: string[] = [];
   let teacherOffers: string[] = [];
 
   if (studentCat === 'school') {
-    studentNeeds = student.subjects || [];
+    studentNeeds = getAcademicDetail(studentGroup, 'subjects') || getAcademicDetail(studentGroup, 'combinedSubjects') || [];
     teacherOffers = teacher.subjects || [];
   } else if (studentCat === 'programming') {
-    studentNeeds = student.technologies || [];
+    studentNeeds = getAcademicDetail(studentGroup, 'technologies') || getAcademicDetail(studentGroup, 'combinedTechnologies') || [];
     teacherOffers = teacher.technologies || [];
   } else if (studentCat === 'languages') {
-    studentNeeds = student.languages || [];
+    studentNeeds = getAcademicDetail(studentGroup, 'languages') || getAcademicDetail(studentGroup, 'combinedLanguages') || [];
     teacherOffers = teacher.languagesTaught || teacher.languages || [];
   }
 
   if (studentNeeds.length > 0 && teacherOffers.length > 0) {
-    const normalizedNeeds = studentNeeds.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const normalizedOffers = teacherOffers.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const normalizedNeeds = studentNeeds.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
     
-    let matchCount = 0;
-    normalizedNeeds.forEach(need => {
-      if (normalizedOffers.some(offer => offer.includes(need) || need.includes(offer))) {
-        matchCount++;
+    normalizedNeeds.forEach((need:string) => {
+      if (normalizedOffers.some((offer:string) => offer.includes(need) || need.includes(offer))) {
+        score += 50;
       }
     });
-
-    const matchPercentage = matchCount / normalizedNeeds.length;
-    score += Math.round(matchPercentage * 30);
-  } else if (studentNeeds.length === 0) {
-    score += 15; // If student didn't specify subjects, assume some average overlap
   }
 
-  // 4. Budget Match (10 points)
-  const studentBudget = parseFloat(student.budget || student.totalBudget || student.expectedBudget || 0);
-  const teacherMin = parseFloat(teacher.minFee || teacher.feeRange?.min || 0);
-  const teacherMax = parseFloat(teacher.maxFee || teacher.feeRange?.max || Infinity);
+  // Budget Proximity Match (Sliding Scale: +0 to +30 points)
+  const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getAcademicDetail(studentGroup, 'budget') || 0);
+  const teacherFee = parseFloat(teacher.feeRange || teacher.minFee || 0);
 
-  if (studentBudget > 0 && teacherMin > 0) {
-    if (studentBudget >= teacherMin && studentBudget <= teacherMax) {
-      score += 10;
-    } else if (studentBudget >= teacherMin * 0.8) {
-      // Within 20% of minimum
-      score += 5;
-    }
-  } else {
-    score += 5; // If budget not specified, partial points
+  if (studentBudget > 0 && teacherFee > 0) {
+    const diffRatio = Math.abs(studentBudget - teacherFee) / teacherFee;
+    const budgetPoints = Math.round(Math.max(0, 30 - (diffRatio * 30)));
+    score += budgetPoints;
   }
 
-  // Cap at 100
-  return Math.min(100, Math.max(0, score));
+  return score;
 }

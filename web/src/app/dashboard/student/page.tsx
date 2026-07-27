@@ -14,7 +14,7 @@ import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
 import GroupSettingsModal from '@/components/GroupSettingsModal';
 import { generateReferralCode } from '@/utils/referral';
-import { calculateSuitabilityScore } from '@/utils/matching';
+import { calculateSuitabilityScore, doesClassMatch } from '@/utils/matching';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -146,6 +146,9 @@ export default function StudentDashboard() {
     students.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
     const myStudent = students.length > 0 ? students[0] : null;
 
+    const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentId', '==', user.uid)));
+    const groups = groupsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
     const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid)));
     const requests = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
     const myRequest = requests.length > 0 ? requests[0] : null;
@@ -233,14 +236,14 @@ export default function StudentDashboard() {
           console.error('Failed to auto-expire application:', e);
         }
       }
-      // Auto-expire if demo finished and 24 hours passed
+      // Auto-expire if demo finished and 48 hours passed
       if (['demo_scheduled', 'waiting_for_parent_decision'].includes(currentStatus) && app.demoDate && app.demoTime) {
         const demoDateObj = new Date(app.demoDate);
         const timeParts = app.demoTime.split('||')[0].split(':');
         if (timeParts.length >= 2) {
           demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
           const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
-          if (now > demoEndTime + 24 * 60 * 60 * 1000) {
+          if (now > demoEndTime + 48 * 60 * 60 * 1000) {
             currentStatus = 'declined';
             try {
               const { updateDoc, doc, arrayRemove } = await import('firebase/firestore');
@@ -296,6 +299,7 @@ export default function StudentDashboard() {
       students: students,
       allStudents: students,
       myRequest,
+      groups,
       tuitionRequests: requests,
       applications: applicationsWithSubjects,
       availableTeachers: matchedTutors,
@@ -374,7 +378,8 @@ export default function StudentDashboard() {
 
   const activeGroup = studentGroups.find(g => g.id === activeGroupId) || studentGroups[0] || null;
   const activeStudent = allStudents.find((s:any) => s.id === activeStudentId) || data?.myStudent || allStudents[0] || null;
-  
+  const scoringContext = activeGroup || activeStudent;
+
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
       const matchGroup = (app: any) => {
           if (app.groupId) return app.groupId === activeGroup?.id;
@@ -383,10 +388,16 @@ export default function StudentDashboard() {
       const app = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app));
       if (app && app.status === 'tuition_started') return false;
       return true;
-  }).map((tutor: any) => ({
-    ...tutor,
-    suitabilityScore: calculateSuitabilityScore(activeStudent, tutor)
-  })).sort((a: any, b: any) => {
+  }).map((tutor: any) => {
+    const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
+    const studentBudget = parseFloat(scoringContext?.budget || scoringContext?.totalBudget || scoringContext?.combinedBudget || getDetail(scoringContext, 'budget') || 0);
+    const teacherFee = parseFloat(tutor.feeRange || tutor.minFee || 0);
+    return {
+      ...tutor,
+      suitabilityScore: calculateSuitabilityScore(scoringContext, tutor),
+      budgetDifference: Math.abs(studentBudget - teacherFee)
+    };
+  }).sort((a: any, b: any) => {
       const getStatus = (tutorId: string) => {
           const matchGroup = (app: any) => {
               if (app.groupId) return app.groupId === activeGroup?.id;
@@ -407,13 +418,43 @@ export default function StudentDashboard() {
       const statusDiff = getScore(getStatus(b.id)) - getScore(getStatus(a.id));
       if (statusDiff !== 0) return statusDiff;
       
-      return b.suitabilityScore - a.suitabilityScore;
+      if (b.suitabilityScore !== a.suitabilityScore) {
+          return b.suitabilityScore - a.suitabilityScore;
+      }
+      
+      return a.budgetDifference - b.budgetDifference;
   }).map((tutor: any, index: number) => ({
       ...tutor,
       rank: index + 1
   }));
 
-  const computedRecommendedTutors = allTutorsWithScores.filter((tutor: any) => tutor.suitabilityScore >= 40);
+  const computedRecommendedTutors = allTutorsWithScores.filter((tutor: any) => {
+      if (tutor.suitabilityScore <= 0) return false;
+      
+      const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
+      
+      const studentCat = getDetail(scoringContext, 'category').toLowerCase().trim();
+      const teacherCats = tutor.category ? tutor.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
+      if (studentCat && !teacherCats.includes(studentCat)) return false;
+
+      if (studentCat === 'school') {
+          const studentBoard = getDetail(scoringContext, 'board').toLowerCase().trim();
+          const teacherBoards = (tutor.boards || []).map((b: string) => b.toLowerCase().trim());
+          if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
+
+          const studentClass = (getDetail(scoringContext, 'classLevel') || getDetail(scoringContext, 'classGrade')).toLowerCase().trim();
+          const teacherClasses = (tutor.classes || []).map((c: string) => c.toLowerCase().trim());
+          if (!doesClassMatch(studentClass, teacherClasses)) return false;
+      }
+
+      const activeGroupDoc = data?.groups?.find((g: any) => g.id === activeGroup?.id) || data?.tuitionRequests?.find((req: any) => req.groupId === activeGroup?.id);
+      const genderPref = activeGroupDoc?.teacherGenderPreference || scoringContext?.teacherGenderPreference;
+      if (genderPref && genderPref !== 'No Preference') {
+          if (tutor.gender !== genderPref) return false;
+      }
+
+      return true;
+  });
 
   const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorId)) || [];
 
@@ -2347,7 +2388,7 @@ export default function StudentDashboard() {
                 ) : (
                   <div className="grid grid-cols-1 gap-6">
                     {studentGroups.map((group: any, idx: number) => {
-                      const requestDoc = data?.tuitionRequests?.find((req: any) => req.groupId === group.id) || data?.myRequest; // Fallback
+                      const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupId === group.id) || data?.myRequest; // Fallback
                       
                       return (
                         <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -2420,7 +2461,8 @@ export default function StudentDashboard() {
                         onSave={async (groupedStudents) => {
                           try {
                             const { db } = await import('@/utils/firebase/client');
-                            const { doc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
+                            const { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
+                            const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
                             
                             const newGroupIds = new Set<string>();
 
@@ -2433,60 +2475,53 @@ export default function StudentDashboard() {
                               }
                             }
                             
-                            // Check if any groups don't have tuition requests and create default ones
                             for (const groupId of Array.from(newGroupIds)) {
-                              const q = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
-                              const snap = await getDocs(q);
-                              if (snap.empty) {
-                                // Find a sample student to copy preferences from
-                                const sampleStudent = groupedStudents.find(s => s.groupId === groupId);
-                                
-                                // Attempt to find the sample student's OLD group preferences to copy over
-                                const oldStudentData = allStudents.find(s => s.id === sampleStudent?.id);
-                                let oldRequestData: any = null;
-                                if (oldStudentData && oldStudentData.groupId) {
-                                  const oldReqQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', oldStudentData.groupId));
-                                  const oldReqSnap = await getDocs(oldReqQuery);
-                                  if (!oldReqSnap.empty) {
-                                    oldRequestData = oldReqSnap.docs[0].data();
+                               const groupRef = doc(db, 'groups', groupId);
+                               const groupSnap = await getDoc(groupRef);
+                               
+                               if (!groupSnap.exists()) {
+                                  const sampleStudent = groupedStudents.find(s => s.groupId === groupId);
+                                  const oldStudentData = allStudents.find(s => s.id === sampleStudent?.id);
+                                  let oldGroupData: any = {};
+                                  if (oldStudentData && oldStudentData.groupId) {
+                                    const oldGroupSnap = await getDoc(doc(db, 'groups', oldStudentData.groupId));
+                                    if (oldGroupSnap.exists()) oldGroupData = oldGroupSnap.data();
                                   }
-                                }
-                                
-                                const newReqRef = doc(collection(db, 'tuition_requests'));
-                                await setDoc(newReqRef, {
-                                  id: newReqRef.id,
-                                  groupId: groupId,
-                                  parentId: data?.user?.uid,
-                                  studentId: sampleStudent?.id, // Just reference one student for legacy support
-                                  category: sampleStudent?.category || '',
-                                  status: 'open',
-                                  createdAt: Date.now(),
-                                  // Copy old preferences if they exist
-                                  ...(oldRequestData ? {
-                                    teacherGenderPreference: oldRequestData.teacherGenderPreference || 'No Preference',
-                                    mode: oldRequestData.mode || '',
-                                    area: oldRequestData.area || '',
-                                    city: oldRequestData.city || '',
-                                    preferredTimeRange: oldRequestData.preferredTimeRange || '',
-                                    daysPerWeek: oldRequestData.daysPerWeek || '',
-                                    specificDays: oldRequestData.specificDays || [],
-                                    budget: oldRequestData.budget || 0,
-                                  } : {})
-                                });
-                                toast.info("New group created and preferences transferred!");
-                                setNewlyCreatedGroupId(groupId);
-                              }
+                                  
+                                  await setDoc(groupRef, {
+                                     id: groupId,
+                                     parentId: data?.user?.uid,
+                                     mode: oldGroupData.mode || '',
+                                     area: oldGroupData.area || '',
+                                     city: oldGroupData.city || '',
+                                     latitude: oldGroupData.latitude || null,
+                                     longitude: oldGroupData.longitude || null,
+                                     teacherGenderPreference: oldGroupData.teacherGenderPreference || 'No Preference',
+                                     preferredTimeRange: oldGroupData.preferredTimeRange || '',
+                                     daysPerWeek: oldGroupData.daysPerWeek || '',
+                                     specificDays: oldGroupData.specificDays || [],
+                                     createdAt: Date.now(),
+                                     status: 'active'
+                                  });
+                                  toast.info("New group created and preferences transferred!");
+                                  setNewlyCreatedGroupId(groupId);
+                               }
+                               
+                               const groupStudents = groupedStudents.filter(s => s.groupId === groupId).map(s => s.id);
+                               await updateDoc(groupRef, { studentIds: groupStudents });
+                               await syncTuitionRequestForGroup(db, groupId, data?.user?.uid);
                             }
 
-                            // Cleanup orphaned requests
-                            const allRequestsQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', data?.user?.uid));
-                            const allRequestsSnap = await getDocs(allRequestsQuery);
-                            for (const requestDoc of allRequestsSnap.docs) {
-                              const reqData = requestDoc.data();
-                              if (reqData.groupId && !newGroupIds.has(reqData.groupId)) {
-                                // This tuition request belongs to a groupId that has NO students anymore. Delete it.
-                                await deleteDoc(doc(db, 'tuition_requests', requestDoc.id));
-                              }
+                            const allGroupsQuery = query(collection(db, 'groups'), where('parentId', '==', data?.user?.uid));
+                            const allGroupsSnap = await getDocs(allGroupsQuery);
+                            for (const groupDoc of allGroupsSnap.docs) {
+                               const reqData = groupDoc.data();
+                               if (reqData.id && !newGroupIds.has(reqData.id)) {
+                                 await deleteDoc(doc(db, 'groups', reqData.id));
+                                 const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', reqData.id));
+                                 const requestSnap = await getDocs(requestQuery);
+                                 for(const r of requestSnap.docs) await deleteDoc(r.ref);
+                               }
                             }
 
                             toast.success("Groups updated successfully!");
@@ -2868,11 +2903,19 @@ export default function StudentDashboard() {
                     // Delete student
                     await deleteDoc(doc(db, 'students', studentToRemove.id));
                     
-                    // Delete tuition requests
-                    const reqQ = query(collection(db, 'tuition_requests'), where('studentId', '==', studentToRemove.id));
-                    const reqSnap = await getDocs(reqQ);
-                    for (const reqDoc of reqSnap.docs) {
-                      await deleteDoc(doc(db, 'tuition_requests', reqDoc.id));
+                    // Update group and sync tuition requests
+                    const groupId = studentToRemove.groupId;
+                    if (groupId) {
+                        const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+                        const { getDoc, updateDoc } = await import('firebase/firestore');
+                        const groupRef = doc(db, 'groups', groupId);
+                        const groupSnap = await getDoc(groupRef);
+                        if (groupSnap.exists()) {
+                            const groupData = groupSnap.data();
+                            const newStudentIds = (groupData.studentIds || []).filter((id: string) => id !== studentToRemove.id);
+                            await updateDoc(groupRef, { studentIds: newStudentIds });
+                            await syncTuitionRequestForGroup(db, groupId, data?.user?.uid);
+                        }
                     }
                     
                     // Delete applications
@@ -3013,6 +3056,7 @@ export default function StudentDashboard() {
         }}
         groupId={selectedGroupForSettings?.id}
         category={selectedGroupForSettings?.category}
+        parentId={data?.user?.uid}
         initialData={selectedGroupForSettings?.requestDoc}
         onSave={() => mutate()}
       />
