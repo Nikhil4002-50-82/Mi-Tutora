@@ -118,7 +118,11 @@ export default function StudentDashboard() {
     let userDocSnap = await getDoc(userDocRef);
     let userData = userDocSnap.exists() ? userDocSnap.data() : null;
     
-    if (userData && userData.role !== 'student') {
+    const roles = userData?.roles || (userData?.role ? [userData.role] : []);
+    if (userData) {
+      userData.roles = roles;
+    }
+    if (userData && !roles.includes('student')) {
       window.location.href = '/dashboard/teacher';
       throw new Error('Unauthorized');
     }
@@ -381,6 +385,7 @@ export default function StudentDashboard() {
   const scoringContext = activeGroup || activeStudent;
 
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
+      if (tutor.id === data?.userData?.id) return false; // Prevent self-hiring
       const matchGroup = (app: any) => {
           if (app.groupId) return app.groupId === activeGroup?.id;
           return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
@@ -458,7 +463,7 @@ export default function StudentDashboard() {
 
   const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorId)) || [];
 
-  const hasProfile = data?.userData?.hasProfile || allStudents.length > 0 || false;
+  const hasProfile = allStudents.length > 0;
 
   const initialRedirectDone = useRef(false);
 
@@ -1082,7 +1087,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="px-3 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
             Menu
           </div>
@@ -2535,7 +2540,33 @@ export default function StudentDashboard() {
                   </div>
                 )}
 
-                <div className="mt-12 pt-8 border-t border-red-100">
+                {data?.userData?.roles?.includes('teacher') && (
+                  <div className="mt-12 pt-8 border-t border-gray-100">
+                    <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100">
+                      <h3 className="text-xl font-black text-emerald-900 mb-2">Teacher Portal</h3>
+                      <p className="text-sm text-emerald-700 font-medium mb-4">
+                        You have a verified Teacher Profile. Switch to your Teacher dashboard to manage tuitions, students, and requests.
+                      </p>
+                      <button
+                        onClick={() => {
+                          let userString = localStorage.getItem('user');
+                          if (userString) {
+                            let userObj = JSON.parse(userString);
+                            userObj.role = 'teacher';
+                            localStorage.setItem('user', JSON.stringify(userObj));
+                          }
+                          router.push('/dashboard/teacher');
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors inline-flex items-center gap-2"
+                      >
+                        <GraduationCap className="w-4 h-4" />
+                        Switch to Teacher Portal
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-8 pt-8 border-t border-red-100">
                   <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
                     <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
                     <p className="text-sm text-red-600/80 font-medium mb-4">

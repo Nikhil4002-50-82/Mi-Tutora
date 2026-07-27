@@ -84,7 +84,11 @@ function SignupContent() {
         }, 3000);
       }
     } catch (err: any) {
-      setError(getFriendlyAuthError(err));
+      if (err.code === 'auth/email-already-in-use') {
+        setError(`This email is already registered! Please go to the Login page and select '${role === 'teacher' ? 'Teacher' : 'Student'}' to instantly add this role to your account.`);
+      } else {
+        setError(getFriendlyAuthError(err));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -104,10 +108,23 @@ function SignupContent() {
       let userRole = role;
       
       if (userDoc.exists()) {
-        if (userDoc.data().role !== role) {
-          await auth.signOut();
-          throw new Error(`This email is registered as a ${userDoc.data().role === 'teacher' ? 'Teacher' : 'Student'}. Please use the correct login portal.`);
+        const data = userDoc.data();
+        let roles = data.roles || (data.role ? [data.role] : []);
+        
+        if (!roles.includes(role)) {
+          const { updateDoc, arrayUnion } = await import('firebase/firestore');
+          await updateDoc(doc(db, 'users', user.uid), {
+            roles: arrayUnion(role)
+          });
+          roles.push(role);
+          
+          if (role === 'student') {
+            await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: user.displayName || '' });
+          } else {
+            await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+          }
         }
+        userRole = role;
       }
       
       if (!userDoc.exists()) {
@@ -116,6 +133,7 @@ function SignupContent() {
           email: user.email,
           name: user.displayName || '',
           role: role,
+          roles: [role],
           referredBy: referralCode.trim()
         });
 
@@ -146,11 +164,13 @@ function SignupContent() {
         } else {
           await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
         }
-      } else {
-        userRole = userDoc.data().role || role;
       }
       
-      localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
+      // Fetch latest roles for localStorage
+      const finalDoc = await getDoc(doc(db, 'users', user.uid));
+      const roles = finalDoc.exists() ? (finalDoc.data().roles || [userRole]) : [userRole];
+      
+      localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
       const searchParams = new URLSearchParams(window.location.search);
       const next = searchParams.get('next');
       router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));

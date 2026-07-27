@@ -43,7 +43,7 @@ function LoginContent() {
     try {
       const { auth, db } = await import('@/utils/firebase/client');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const { doc, getDoc } = await import('firebase/firestore');
+      const { doc, getDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
       
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -58,14 +58,24 @@ function LoginContent() {
         // Fetch user role
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
-        if (userDoc.exists() && userDoc.data().role !== role) {
-          await auth.signOut();
-          throw new Error(`This email is registered as a ${userDoc.data().role === 'teacher' ? 'Teacher' : 'Student'}. Please use the correct login portal.`);
+        let userRole = role;
+        let roles = [role];
+
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          roles = data.roles || (data.role ? [data.role] : []);
+          
+          if (!roles.includes(role)) {
+            // Append new role to existing user
+            await updateDoc(doc(db, 'users', user.uid), {
+              roles: arrayUnion(role)
+            });
+            roles.push(role);
+          }
+          userRole = role; // Active role for this session
         }
         
-        const userRole = userDoc.exists() ? userDoc.data().role : role;
-        
-        localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
+        localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
         
         toast.success("Login successful!");
         if (userRole === 'student') {
@@ -230,7 +240,7 @@ function LoginContent() {
               onClick={async () => {
                 const { auth, db } = await import('@/utils/firebase/client');
                 const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
-                const { doc, getDoc, setDoc } = await import('firebase/firestore');
+                const { doc, getDoc, setDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
                 try {
                   const provider = new GoogleAuthProvider();
                   const result = await signInWithPopup(auth, provider);
@@ -238,18 +248,26 @@ function LoginContent() {
                   
                   const userDoc = await getDoc(doc(db, 'users', user.uid));
                   let userRole = role;
+                  let roles = [role];
+
                   if (userDoc.exists()) {
-                    if (userDoc.data().role !== role) {
-                      await auth.signOut();
-                      throw new Error(`This email is registered as a ${userDoc.data().role === 'teacher' ? 'Teacher' : 'Student'}. Please use the correct login portal.`);
+                    const data = userDoc.data();
+                    roles = data.roles || (data.role ? [data.role] : []);
+                    
+                    if (!roles.includes(role)) {
+                      await updateDoc(doc(db, 'users', user.uid), {
+                        roles: arrayUnion(role)
+                      });
+                      roles.push(role);
                     }
-                    userRole = userDoc.data().role || role;
+                    userRole = role;
                   } else {
                     await setDoc(doc(db, 'users', user.uid), {
                       id: user.uid,
                       email: user.email,
                       name: user.displayName || '',
-                      role: role
+                      role: role,
+                      roles: [role]
                     });
                     if (role === 'student') {
                       await setDoc(doc(db, 'parents', user.uid), { id: user.uid });
@@ -258,7 +276,7 @@ function LoginContent() {
                     }
                   }
                   
-                  localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole }));
+                  localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
                   const next = searchParams.get('next');
                   router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
                 } catch (error: any) {

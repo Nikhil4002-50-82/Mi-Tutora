@@ -102,7 +102,11 @@ export default function TeacherDashboard() {
     let userDocSnap = await getDoc(userDocRef);
     let userData = userDocSnap.exists() ? userDocSnap.data() : null;
     
-    if (userData && userData.role !== 'teacher') {
+    const roles = userData?.roles || (userData?.role ? [userData.role] : []);
+    if (userData) {
+      userData.roles = roles;
+    }
+    if (userData && !roles.includes('teacher')) {
       window.location.href = '/dashboard/student';
       throw new Error('Unauthorized');
     }
@@ -377,7 +381,7 @@ export default function TeacherDashboard() {
   const { data, error: swrError, isLoading: loading, mutate } = useSWR('teacherDashboardData', fetcher);
 
 
-  const hasProfile = data?.userData?.hasProfile || !!data?.profile?.phone || false;
+  const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
 
   const initialRedirectDone = useRef(false);
 
@@ -867,7 +871,7 @@ export default function TeacherDashboard() {
   ];
 
   const activeTeacher = data?.profile || data?.user || null;
-  const allStudentsWithScores = (data?.allStudents || []).map((studentGroup: any) => {
+  const allStudentsWithScores = (data?.allStudents || []).filter((group: any) => group.parentId !== data?.userData?.id).map((studentGroup: any) => {
     const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
     const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getDetail(studentGroup, 'budget') || 0);
     const teacherFee = parseFloat(activeTeacher?.feeRange || activeTeacher?.minFee || 0);
@@ -970,7 +974,7 @@ export default function TeacherDashboard() {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="px-3 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
             Menu
           </div>
@@ -2184,8 +2188,33 @@ export default function TeacherDashboard() {
                     onSuccess={() => mutate()} 
                   />
                 </div>
+                {data?.userData?.roles?.includes('student') && (
+                  <div className="mt-12 pt-8 border-t border-gray-100">
+                    <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100">
+                      <h3 className="text-xl font-black text-emerald-900 mb-2">Student Portal</h3>
+                      <p className="text-sm text-emerald-700 font-medium mb-4">
+                        You have a verified Student Profile. Switch to your Student dashboard to find tutors and manage tuition requests.
+                      </p>
+                      <button
+                        onClick={() => {
+                          let userString = localStorage.getItem('user');
+                          if (userString) {
+                            let userObj = JSON.parse(userString);
+                            userObj.role = 'student';
+                            localStorage.setItem('user', JSON.stringify(userObj));
+                          }
+                          router.push('/dashboard/student');
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors inline-flex items-center gap-2"
+                      >
+                        <User className="w-4 h-4" />
+                        Switch to Student Portal
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
-                <div className="mt-12 pt-8 border-t border-red-100">
+                <div className="mt-8 pt-8 border-t border-red-100">
                   <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
                     <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
                     <p className="text-sm text-red-600/80 font-medium mb-4">
