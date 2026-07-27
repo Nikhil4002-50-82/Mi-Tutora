@@ -2514,7 +2514,7 @@ export default function StudentDashboard() {
                                
                                const groupStudents = groupedStudents.filter(s => s.groupId === groupId).map(s => s.id);
                                await updateDoc(groupRef, { studentIds: groupStudents });
-                               await syncTuitionRequestForGroup(db, groupId, data?.user?.uid);
+                               await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
                             }
 
                             const allGroupsQuery = query(collection(db, 'groups'), where('parentId', '==', data?.user?.uid));
@@ -2945,7 +2945,7 @@ export default function StudentDashboard() {
                             const groupData = groupSnap.data();
                             const newStudentIds = (groupData.studentIds || []).filter((id: string) => id !== studentToRemove.id);
                             await updateDoc(groupRef, { studentIds: newStudentIds });
-                            await syncTuitionRequestForGroup(db, groupId, data?.user?.uid);
+                            await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
                         }
                     }
                     
@@ -3087,7 +3087,7 @@ export default function StudentDashboard() {
         }}
         groupId={selectedGroupForSettings?.id}
         category={selectedGroupForSettings?.category}
-        parentId={data?.user?.uid}
+        parentId={(data?.user?.uid || '') as string}
         initialData={selectedGroupForSettings?.requestDoc}
         onSave={() => mutate()}
       />

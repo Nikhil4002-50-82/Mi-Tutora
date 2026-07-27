@@ -870,11 +870,11 @@ export default function TeacherDashboard() {
     { id: 'referrals', label: 'Referrals', icon: Gift },
   ];
 
-  const activeTeacher = data?.profile || data?.user || null;
+  const activeTeacher = (data?.profile || data?.user || null) as any;
   const allStudentsWithScores = (data?.allStudents || []).filter((group: any) => group.parentId !== data?.userData?.id).map((studentGroup: any) => {
     const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
     const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getDetail(studentGroup, 'budget') || 0);
-    const teacherFee = parseFloat(activeTeacher?.feeRange || activeTeacher?.minFee || 0);
+    const teacherFee = parseFloat((activeTeacher as any)?.feeRange || (activeTeacher as any)?.minFee || 0);
     return {
       ...studentGroup,
       suitabilityScore: calculateSuitabilityScore(studentGroup, activeTeacher),
