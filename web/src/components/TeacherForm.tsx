@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { generateReferralCode } from '@/utils/referral';
 import { MapPin, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ export default function TeacherForm({
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: initialData?.name || (typeof window !== 'undefined' ? localStorage.getItem('signup_name') || '' : ''),
@@ -267,123 +269,122 @@ export default function TeacherForm({
 
   return (
 
-    <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto">
+    <div className={hasProfile && !isEditing && isDashboard ? "" : "bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto"}>
 
       {hasProfile && !isEditing ? (
-        <div className="space-y-8 animate-in fade-in duration-300">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-6">
-            <div>
-              <h2 className="text-3xl font-black text-black">👤 My Profile</h2>
-              <p className="text-slate-500 mt-1 font-medium">Your teaching details and preferences.</p>
-            </div>
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-2xl font-black text-gray-900">Teacher Profile</h2>
             <button 
               onClick={() => setIsEditing(true)}
-              className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 px-5 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
+              className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
             >
-              ✏️ Edit Profile
+              Edit Profile
             </button>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Full Name</p>
-              <p className="text-lg font-bold text-slate-800">{formData.fullName || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gender</p>
-              <p className="text-lg font-bold text-slate-800 capitalize">{formData.gender || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Teaching Categories</p>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {[formData.category].map(c => (
-                  <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold capitalize">{c}</span>
-                ))}
+          <div className="relative bg-white rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 overflow-hidden">
+            <div className="bg-[#00a992] p-6 md:p-8 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl md:text-2xl font-black text-white">{formData.fullName || '-'}</h3>
+                <p className="text-sm font-medium text-emerald-100">{formData.email || '-'}</p>
               </div>
             </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Phone / WhatsApp</p>
-              <p className="text-lg font-bold text-slate-800">{formData.phone || formData.whatsapp || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Email</p>
-              <p className="text-lg font-bold text-slate-800">{formData.email || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Highest Qualification</p>
-              <p className="text-lg font-bold text-slate-800">{formData.qualification || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Experience</p>
-              <p className="text-lg font-bold text-slate-800">{formData.experience || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Occupation</p>
-              <p className="text-lg font-bold text-slate-800">{formData.occupation || '-'}</p>
-            </div>
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Mode of Teaching</p>
-              <p className="text-lg font-bold text-slate-800">{(formData.category === 'programming' || formData.category === 'languages') ? 'Online' : (formData.mode || '-')}</p>
-            </div>
             
-            {formData.category ===('school') && (
-              <>
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Subjects (School)</p>
-                  <p className="text-lg font-bold text-slate-800">{formData.subjects?.length > 0 ? formData.subjects.join(', ') : '-'}</p>
+            <div className="p-6 md:p-8 bg-gray-50/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Gender</p>
+                  <p className="text-lg font-bold text-gray-900 capitalize">{formData.gender || '-'}</p>
                 </div>
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Classes (School)</p>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Teaching Categories</p>
                   <div className="flex gap-2 flex-wrap mt-1">
-                    {formData.classes.map((c: string) => (
-                      <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{c}</span>
+                    {[formData.category].map(c => (
+                      <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold capitalize">{c}</span>
                     ))}
                   </div>
                 </div>
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Boards (School)</p>
-                  <div className="flex gap-2 flex-wrap mt-1">
-                    {formData.boards.map((b: string) => (
-                      <span key={b} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{b}</span>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Phone / WhatsApp</p>
+                  <p className="text-lg font-bold text-gray-900">{formData.phone || formData.whatsapp || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Highest Qualification</p>
+                  <p className="text-lg font-bold text-gray-900">{formData.qualification || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Experience</p>
+                  <p className="text-lg font-bold text-gray-900">{formData.experience || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Occupation</p>
+                  <p className="text-lg font-bold text-gray-900">{formData.occupation || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Mode of Teaching</p>
+                  <p className="text-lg font-bold text-gray-900">{(formData.category === 'programming' || formData.category === 'languages') ? 'Online' : (formData.mode || '-')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Fee Range</p>
+                  <p className="text-xl font-black text-emerald-600">₹{formData.feeRange || 0} <span className="text-sm text-gray-500 font-medium">/ month</span></p>
+                </div>
+              </div>
+
+              {formData.category ===('school') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Subjects (School)</p>
+                    <p className="text-lg font-bold text-gray-900">{formData.subjects?.length > 0 ? formData.subjects.join(', ') : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Classes (School)</p>
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {formData.classes?.map((c: string) => (
+                        <span key={c} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Boards (School)</p>
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {formData.boards?.map((b: string) => (
+                        <span key={b} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{b}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {formData.category ===('programming') && formData.technologies?.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Technologies Taught</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {formData.technologies.map((t: string) => (
+                      <span key={t} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{t}</span>
                     ))}
                   </div>
                 </div>
-              </>
-            )}
+              )}
 
-            {formData.category ===('programming') && formData.technologies.length > 0 && (
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Technologies Taught</p>
-                <div className="flex gap-2 flex-wrap">
-                  {formData.technologies.map((t: string) => (
-                    <span key={t} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{t}</span>
-                  ))}
+              {formData.category ===('languages') && formData.languages?.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Languages Taught</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {formData.languages.map((l: string) => (
+                      <span key={l} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{l}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {formData.category ===('languages') && formData.languages.length > 0 && (
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Languages Taught</p>
-                <div className="flex gap-2 flex-wrap">
-                  {formData.languages.map((l: string) => (
-                    <span key={l} className="bg-emerald-100/50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-sm font-bold">{l}</span>
-                  ))}
+              {formData.description && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Teaching Approach</p>
+                  <p className="text-base text-gray-700 whitespace-pre-wrap">{formData.description}</p>
                 </div>
-              </div>
-            )}
-
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Fee Range</p>
-              <p className="text-xl font-black text-emerald-600">₹{formData.feeRange || 0} <span className="text-sm text-slate-500 font-medium">/ month</span></p>
+              )}
             </div>
-            
-            {formData.description && (
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Teaching Approach</p>
-                <p className="text-base text-slate-700 whitespace-pre-wrap">{formData.description}</p>
-              </div>
-            )}
           </div>
         </div>
       ) : (
@@ -1101,9 +1102,27 @@ export default function TeacherForm({
           </div>
         )}
 
+        {!hasProfile && (
+          <div className="flex items-start gap-3 mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <input 
+              type="checkbox" 
+              id="legal-accept-teacher"
+              checked={acceptedLegal}
+              onChange={(e) => setAcceptedLegal(e.target.checked)}
+              className="mt-1 w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500"
+            />
+            <label htmlFor="legal-accept-teacher" className="text-sm text-gray-700 leading-tight">
+              I have read and accept the{' '}
+              <Link href="/legal/terms-and-conditions" target="_blank" className="text-emerald-600 hover:underline font-semibold">Terms & Conditions</Link>,{' '}
+              <Link href="/legal/privacy-policy" target="_blank" className="text-emerald-600 hover:underline font-semibold">Privacy Policy</Link>, and{' '}
+              <Link href="/legal/refund-policy" target="_blank" className="text-emerald-600 hover:underline font-semibold">Refund Policy</Link>.
+            </label>
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (!hasProfile && !acceptedLegal)}
           className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-white font-semibold py-5 rounded-xl transition-all shadow-lg text-lg"
         >
           {loading ? 'Processing...' : (hasProfile ? '✅ Save Changes' : (isDashboard ? '✅ Save Profile' : '🚀 Continue to Apply'))}

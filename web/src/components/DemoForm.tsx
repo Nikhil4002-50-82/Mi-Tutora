@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { generateReferralCode } from '@/utils/referral';
 import { toast } from 'sonner';
 import GroupManager from '@/components/GroupManager';
@@ -220,7 +221,8 @@ export default function DemoForm({
 
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  
   const [locationLoading, setLocationLoading] = useState(false);
   const router = useRouter();
 
@@ -812,6 +814,17 @@ export default function DemoForm({
             </div>
           )}
         </div>
+        
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center text-sm text-slate-500 font-medium">
+          <p className="mb-2">Legal & Policies</p>
+          <div className="flex justify-center gap-4">
+            <Link href="/legal/privacy-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Privacy Policy</Link>
+            <span>&bull;</span>
+            <Link href="/legal/terms-and-conditions" target="_blank" className="hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
+            <span>&bull;</span>
+            <Link href="/legal/refund-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Refund Policy</Link>
+          </div>
+        </div>
       </div>
     );
   };
@@ -922,7 +935,7 @@ export default function DemoForm({
             </div>
           )}
 
-          {!activeStudentId && !parentOnly && (
+          {(!activeStudentId || activeStudentId === 'new') && !parentOnly && (
             <div>
               <label className="block text-sm font-semibold mb-2">👥 Number of Students</label>
               <select
@@ -1197,6 +1210,21 @@ export default function DemoForm({
       <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
         <h3 className="text-2xl font-bold border-b pb-4">Details for Student</h3>
         
+        {sIndex === 0 && hasProfile && (!activeStudentId || activeStudentId === 'new') && !parentOnly && (
+          <div className="mb-6">
+            <label className="block text-sm font-semibold mb-2">👥 Number of Students to Add</label>
+            <select
+              value={formData.numberOfStudents}
+              onChange={(e) => updateNumberOfStudents(parseInt(e.target.value))}
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
+            >
+              {[1, 2, 3, 4, 5].map(num => (
+                <option key={num} value={num}>{num} Student{num > 1 ? 's' : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
         <div className="mb-6">
           <label className="block text-sm font-semibold mb-2">📚 Category *</label>
           <select
@@ -1460,6 +1488,24 @@ export default function DemoForm({
               </div>
             )}
 
+            {!hasProfile && formData.step >= (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) && (
+              <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <input 
+                  type="checkbox" 
+                  id="legal-accept-demo"
+                  checked={acceptedLegal}
+                  onChange={(e) => setAcceptedLegal(e.target.checked)}
+                  className="mt-1 w-5 h-5 rounded border-gray-300 text-[#00a992] focus:ring-[#00a992]"
+                />
+                <label htmlFor="legal-accept-demo" className="text-sm text-gray-700 leading-tight">
+                  I have read and accept the{' '}
+                  <Link href="/legal/terms-and-conditions" target="_blank" className="text-[#00a992] hover:underline font-semibold">Terms & Conditions</Link>,{' '}
+                  <Link href="/legal/privacy-policy" target="_blank" className="text-[#00a992] hover:underline font-semibold">Privacy Policy</Link>, and{' '}
+                  <Link href="/legal/refund-policy" target="_blank" className="text-[#00a992] hover:underline font-semibold">Refund Policy</Link>.
+                </label>
+              </div>
+            )}
+
             <div className="flex gap-4 pt-4 border-t border-slate-100">
               {formData.step > (hasProfile ? 2 : 1) && (
                 <button
@@ -1473,12 +1519,13 @@ export default function DemoForm({
               
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (!hasProfile && formData.step >= (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) && !acceptedLegal)}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg text-lg"
               >
                 {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
               </button>
             </div>
+
           </form>
         </div>
       )}

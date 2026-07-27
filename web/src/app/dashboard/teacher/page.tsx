@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
@@ -2174,9 +2175,9 @@ export default function TeacherDashboard() {
             {/* TAB: PROFILE */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
+                <div>
                   {!hasProfile && (
-                    <div className="bg-orange-50 border-b border-orange-100 p-4 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
+                    <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl mb-6 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
                       <Lock className="w-4 h-4" /> Please complete your profile to unlock the dashboard and start finding students!
                     </div>
                   )}
@@ -2226,6 +2227,17 @@ export default function TeacherDashboard() {
                     >
                       Delete Account
                     </button>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-gray-100 text-center text-sm text-gray-500 font-medium pb-8">
+                  <p className="mb-2">Legal & Policies</p>
+                  <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2">
+                    <Link href="/legal/privacy-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Privacy Policy</Link>
+                    <span className="hidden sm:inline">&bull;</span>
+                    <Link href="/legal/terms-and-conditions" target="_blank" className="hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
+                    <span className="hidden sm:inline">&bull;</span>
+                    <Link href="/legal/refund-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Refund Policy</Link>
                   </div>
                 </div>
               </div>
