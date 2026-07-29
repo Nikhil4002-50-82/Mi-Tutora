@@ -155,6 +155,7 @@ export default function ActionModal({
                           <label className="block text-sm font-bold text-gray-700 mb-2">Select Date</label>
                           <input
                             type="date"
+                            min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                             value={dateValue}
                             onChange={(e) => setDateValue(e.target.value)}
                             className="w-full bg-slate-50 border border-gray-200 rounded-2xl py-4 px-4 text-gray-900 font-medium focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"

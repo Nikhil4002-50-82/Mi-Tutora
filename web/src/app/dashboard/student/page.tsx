@@ -1535,7 +1535,7 @@ export default function StudentDashboard() {
                     <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
                       {tuitionSubTab === 'all' ? 'All Tutors' : 'Recommended Tutors'}
                     </h2>
-                    {tuitionSubTab === 'recommendation' && studentGroups.length > 0 && (
+                    {studentGroups.length > 0 && (
                       <div className="mt-4 flex items-center gap-3">
                         <label className="text-sm font-bold text-gray-600">Finding tutors for:</label>
                         <select 
