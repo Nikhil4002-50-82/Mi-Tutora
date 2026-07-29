@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
 import useSWR from 'swr';
+import { WhatsAppButton } from '@/components/WhatsAppButton';
 
 export const getStudentDemoFee = (student: any, pricingData: any[]) => {
   if (!student || !pricingData) return { price: 100, name: 'General Tuition' };
@@ -2077,13 +2078,13 @@ export default function StudentDashboard() {
                             )}
                             <div className="grid grid-cols-2 gap-3">
                               {phone && (
-                                <div className="flex items-center gap-2.5">
+                                <a href={`tel:${phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
                                     <p className="font-semibold text-slate-700 text-xs truncate">{phone}</p>
                                   </div>
-                                </div>
+                                </a>
                               )}
                               {email && (
                                 <div className="flex items-center gap-2.5">
@@ -2181,13 +2182,13 @@ export default function StudentDashboard() {
                           {cls.status === 'tuition_started' && cls.tutorDetails ? (
                             <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
                               {cls.tutorDetails.phone && (
-                                <div className="flex items-center gap-2.5">
+                                <a href={`tel:${cls.tutorDetails.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                                   <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
                                     <p className="font-semibold text-slate-700 text-xs truncate">{cls.tutorDetails.phone}</p>
                                   </div>
-                                </div>
+                                </a>
                               )}
                               {cls.tutorDetails.email && (
                                 <div className="flex items-center gap-2.5">
@@ -2516,7 +2517,7 @@ export default function StudentDashboard() {
                               {group.students.map((s: any) => (
                                 <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-lg hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-300">
                                   <div className="flex justify-between items-start mb-4">
-                                    <h5 className="text-lg font-black text-slate-900 tracking-tight">{s.name}</h5>
+                                    <h5 className="text-lg font-bold text-slate-800 tracking-tight">{s.name}</h5>
                                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">₹{s.budget}/mo</span>
                                   </div>
                                   <div className="space-y-2 text-sm text-slate-600 flex-grow bg-slate-50 p-4 rounded-xl border border-slate-100/60 shadow-inner">
@@ -3231,7 +3232,7 @@ export default function StudentDashboard() {
         initialData={selectedGroupForSettings?.requestDoc}
         onSave={() => mutate()}
       />
-
+      <WhatsAppButton />
     </div>
   );
 }

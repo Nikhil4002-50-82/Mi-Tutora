@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
 import useSWR from 'swr';
+import { WhatsAppButton } from '@/components/WhatsAppButton';
 
 export const getStudentDemoFee = (student: any, pricingData: any[]) => {
   if (!student || !pricingData) return { price: 100, name: 'General Tuition' };
@@ -1912,13 +1913,13 @@ export default function TeacherDashboard() {
                               return primaryStudent ? (
                                 <>
                                   {(primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone || primaryStudent.parentDetails?.whatsapp) && (
-                                    <div className="flex items-center gap-2.5">
+                                    <a href={`tel:${primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone || primaryStudent.parentDetails?.whatsapp}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                                       <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
                                       <div className="overflow-hidden">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
                                         <p className="font-semibold text-slate-700 text-xs truncate">{primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone || primaryStudent.parentDetails?.whatsapp}</p>
                                       </div>
-                                    </div>
+                                    </a>
                                   )}
                                   {(primaryStudent.email || primaryStudent.parentDetails?.email) && (
                                     <div className="flex items-center gap-2.5">
@@ -2043,13 +2044,13 @@ export default function TeacherDashboard() {
                             return cls.status === 'confirmed' && primaryStudent ? (
                               <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
                                 {(primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone) && (
-                                  <div className="flex items-center gap-2.5">
+                                  <a href={`tel:${primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                                     <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
                                     <div className="overflow-hidden">
                                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
                                       <p className="font-semibold text-slate-700 text-xs truncate">{primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone}</p>
                                     </div>
-                                  </div>
+                                  </a>
                                 )}
                                 {(primaryStudent.email || primaryStudent.parentDetails?.email) && (
                                   <div className="flex items-center gap-2.5">
@@ -2763,6 +2764,7 @@ export default function TeacherDashboard() {
       })()}
 
       </main>
+      <WhatsAppButton />
     </div>
   );
 }
