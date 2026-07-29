@@ -2229,54 +2229,60 @@ export default function TeacherDashboard() {
                   />
                 </div>
                 {data?.userData?.roles?.includes('student') && (
-                  <div className="mt-12 pt-8 border-t border-gray-100">
-                    <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100">
-                      <h3 className="text-xl font-black text-emerald-900 mb-2">Student Portal</h3>
-                      <p className="text-sm text-emerald-700 font-medium mb-4">
-                        You have a verified Student Profile. Switch to your Student dashboard to find tutors and manage tuition requests.
-                      </p>
-                      <button
-                        onClick={() => {
-                          let userString = localStorage.getItem('user');
-                          if (userString) {
-                            let userObj = JSON.parse(userString);
-                            userObj.role = 'student';
-                            localStorage.setItem('user', JSON.stringify(userObj));
-                          }
-                          router.push('/dashboard/student');
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors inline-flex items-center gap-2"
-                      >
-                        <User className="w-4 h-4" />
-                        Switch to Student Portal
-                      </button>
+                  <div className="mt-12 pt-8 border-t border-slate-100">
+                    <div className="bg-gradient-to-br from-[#00a992] to-teal-600 rounded-3xl p-8 sm:p-10 shadow-xl shadow-teal-900/10 border border-[#00a992]/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
+                      <div className="relative z-10">
+                        <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Student Portal</h3>
+                        <p className="text-emerald-50 font-medium mb-6 max-w-lg">
+                          You have a verified Student Profile. Switch to your Student dashboard to find tutors and manage tuition requests.
+                        </p>
+                        <button
+                          onClick={() => {
+                            let userString = localStorage.getItem('user');
+                            if (userString) {
+                              let userObj = JSON.parse(userString);
+                              userObj.role = 'student';
+                              localStorage.setItem('user', JSON.stringify(userObj));
+                            }
+                            router.push('/dashboard/student');
+                          }}
+                          className="bg-white text-emerald-700 px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-teal-900/20 hover:shadow-xl hover:bg-emerald-50 hover:-translate-y-1 active:scale-95 transition-all inline-flex items-center gap-2"
+                        >
+                          <User className="w-4 h-4" />
+                          Switch to Student Portal
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
                 
-                <div className="mt-8 pt-8 border-t border-red-100">
-                  <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
-                    <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
-                    <p className="text-sm text-red-600/80 font-medium mb-4">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                    </p>
-                    <button 
-                      onClick={() => setShowDeleteAccountModal(true)}
-                      className="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-red-600 hover:text-white transition-colors"
-                    >
-                      Delete Account
-                    </button>
+                <div className="mt-12 pt-8 border-t border-red-50">
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-3xl p-8 border border-red-100 shadow-lg shadow-red-900/5 relative overflow-hidden group">
+                    <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-red-100/50 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
+                    <div className="relative z-10">
+                      <h3 className="text-xl font-bold text-red-700 mb-2 tracking-tight flex items-center gap-2"><Lock className="w-5 h-5" /> Danger Zone</h3>
+                      <p className="text-sm text-red-600/80 font-medium mb-6 max-w-lg">
+                        Permanently delete your account and all associated data. This action cannot be undone.
+                      </p>
+                      <button 
+                        onClick={() => setShowDeleteAccountModal(true)}
+                        className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-red-600/20 hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto"
+                      >
+                        Delete Account
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-gray-100 text-center text-sm text-gray-500 font-medium pb-8">
-                  <p className="mb-2">Legal & Policies</p>
-                  <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2">
-                    <Link href="/legal/privacy-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Privacy Policy</Link>
-                    <span className="hidden sm:inline">&bull;</span>
-                    <Link href="/legal/terms-and-conditions" target="_blank" className="hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
-                    <span className="hidden sm:inline">&bull;</span>
-                    <Link href="/legal/refund-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Refund Policy</Link>
+                <div className="mt-12 pt-8 border-t border-slate-100 text-center pb-8 flex flex-col items-center">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Legal & Policies</p>
+                  <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 bg-slate-50/80 backdrop-blur-sm px-8 py-4 rounded-full border border-slate-200/60 shadow-sm w-max max-w-full">
+                    <Link href="/legal/privacy-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Privacy Policy</Link>
+                    <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
+                    <Link href="/legal/terms-and-conditions" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
+                    <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
+                    <Link href="/legal/refund-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Refund Policy</Link>
                   </div>
                 </div>
               </div>

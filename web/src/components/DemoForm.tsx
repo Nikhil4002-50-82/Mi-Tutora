@@ -1520,7 +1520,7 @@ export default function DemoForm({
               <button
                 type="submit"
                 disabled={loading || (!hasProfile && formData.step >= (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) && !acceptedLegal)}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg text-lg"
+                className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 disabled:opacity-50 disabled:hover:from-[#00a992] disabled:hover:to-teal-500 disabled:hover:-translate-y-0 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-teal-500/25 text-lg hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2"
               >
                 {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
               </button>

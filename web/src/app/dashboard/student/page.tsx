@@ -2363,9 +2363,9 @@ export default function StudentDashboard() {
                       {!isEditingParentProfile && (
                         <button 
                           onClick={() => setIsEditingParentProfile(true)}
-                          className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
+                          className="bg-white border border-emerald-200 text-emerald-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-50 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
                         >
-                          Edit Profile
+                          <Edit2 className="w-4 h-4" /> Edit Profile
                         </button>
                       )}
                     </div>
@@ -2397,22 +2397,36 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     ) : (
-                      <div className="relative bg-white rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 overflow-hidden mb-8">
-                        <div className="bg-[#00a992] p-6 flex justify-between items-center">
-                          <div>
-                            <h3 className="text-xl font-black text-white">{data?.profile?.name || data?.user?.displayName || 'Parent Profile'}</h3>
-                            <p className="text-sm font-medium text-emerald-100">{data?.profile?.email || data?.user?.email || 'No email provided'}</p>
+                    <div className="relative bg-white/80 backdrop-blur-md rounded-3xl shadow-xl shadow-teal-900/5 border border-white/50 hover:shadow-2xl hover:shadow-teal-900/10 transition-all duration-300 overflow-hidden mb-8 group">
+                      <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 sm:p-8 flex justify-between items-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-900/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
+                        
+                        <div className="relative z-10 flex items-center gap-5">
+                          <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
+                            {(data?.profile?.name || data?.user?.displayName || 'P').charAt(0).toUpperCase()}
                           </div>
-                        </div>
-                        <div className="p-6 bg-gray-50/50">
-                          <div className="grid grid-cols-1 gap-6">
-                            <div>
-                              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Phone Number</p>
-                              <p className="text-lg font-bold text-gray-900">{data?.profile?.phone || '-'}</p>
-                            </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-white tracking-tight">{data?.profile?.name || data?.user?.displayName || 'Parent Profile'}</h3>
+                            <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{data?.profile?.email || data?.user?.email || 'No email provided'}</p>
                           </div>
                         </div>
                       </div>
+                      <div className="p-6 sm:p-8 bg-slate-50/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <div>
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone Number</p>
+                            <p className="text-lg font-bold text-slate-800">{data?.profile?.phone || '-'}</p>
+                          </div>
+                          {data?.profile?.whatsapp && (
+                            <div>
+                              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</p>
+                              <p className="text-lg font-bold text-slate-800">{data?.profile?.whatsapp}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     )}
                   </>
                 )}
@@ -2425,9 +2439,9 @@ export default function StudentDashboard() {
                         onClick={() => {
                           setActiveStudentId('new');
                         }}
-                        className="bg-[#00a992] text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-600 transition-colors"
+                        className="bg-gradient-to-r from-[#00a992] to-teal-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-teal-500/25 hover:from-[#009b86] hover:to-teal-600 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
                       >
-                        + Add Student
+                        <Plus className="w-4 h-4" /> Add Student
                       </button>
                     </div>
                   )}
@@ -2469,17 +2483,20 @@ export default function StudentDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 gap-8">
                     {studentGroups.map((group: any, idx: number) => {
                       const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupId === group.id) || data?.myRequest; // Fallback
                       
                       return (
-                        <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                          <div className="bg-[#00a992] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                              <h3 className="text-xl font-bold text-white">Group {idx + 1}: {group.name}</h3>
-                              <p className="text-sm font-medium text-emerald-100 capitalize mt-1">
-                                Category: {group.category}
+                        <div key={group.id} className="relative bg-white/80 backdrop-blur-md rounded-3xl shadow-xl shadow-teal-900/5 border border-white/50 hover:shadow-2xl hover:shadow-teal-900/10 transition-all duration-300 overflow-hidden group">
+                          <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
+                            <div className="absolute top-0 right-1/4 w-40 h-40 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+                            <div className="relative z-10">
+                              <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                                Group {idx + 1}: {group.name.replace(/^Group:\s*/i, '')}
+                              </h3>
+                              <p className="text-sm font-medium text-emerald-100/90 capitalize mt-1 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" /> {group.category}
                               </p>
                             </div>
                             <button
@@ -2487,34 +2504,34 @@ export default function StudentDashboard() {
                                 setSelectedGroupForSettings({ ...group, requestDoc });
                                 setGroupSettingsModalOpen(true);
                               }}
-                              className="bg-white text-emerald-700 px-5 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
+                              className="relative z-10 bg-white border border-emerald-100 text-emerald-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-50 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto"
                             >
                               <Settings className="w-4 h-4" /> Group Preferences
                             </button>
                           </div>
                           
-                          <div className="p-6">
-                            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Students in this group</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="p-6 sm:p-8 bg-slate-50/50">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2"><Users className="w-4 h-4" /> Students in this group</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                               {group.students.map((s: any) => (
-                                <div key={s.id} className="bg-gray-50 rounded-xl border border-gray-100 p-5 flex flex-col">
-                                  <div className="flex justify-between items-start mb-3">
-                                    <h5 className="font-bold text-gray-900">{s.name}</h5>
-                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md">₹{s.budget}/mo</span>
+                                <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-lg hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-300">
+                                  <div className="flex justify-between items-start mb-4">
+                                    <h5 className="text-lg font-black text-slate-900 tracking-tight">{s.name}</h5>
+                                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">₹{s.budget}/mo</span>
                                   </div>
-                                  <div className="space-y-1.5 text-xs text-gray-600 flex-grow">
-                                    {s.classLevel && <p><strong>Class:</strong> {s.classLevel}</p>}
-                                    {s.board && <p><strong>Board:</strong> {s.board}</p>}
-                                    {s.subjects && s.subjects.length > 0 && <p className="truncate" title={s.subjects.join(', ')}><strong>Subjects:</strong> {s.subjects.join(', ')}</p>}
-                                    {s.technologies && s.technologies.length > 0 && <p className="truncate" title={s.technologies.join(', ')}><strong>Tech:</strong> {s.technologies.join(', ')}</p>}
-                                    {s.languages && s.languages.length > 0 && <p className="truncate" title={s.languages.join(', ')}><strong>Lang:</strong> {s.languages.join(', ')}</p>}
+                                  <div className="space-y-2 text-sm text-slate-600 flex-grow bg-slate-50 p-4 rounded-xl border border-slate-100/60 shadow-inner">
+                                    {s.classLevel && <p><strong className="text-slate-900">Class:</strong> {s.classLevel}</p>}
+                                    {s.board && <p><strong className="text-slate-900">Board:</strong> {s.board}</p>}
+                                    {s.subjects && s.subjects.length > 0 && <p className="truncate" title={s.subjects.join(', ')}><strong className="text-slate-900">Subjects:</strong> {s.subjects.join(', ')}</p>}
+                                    {s.technologies && s.technologies.length > 0 && <p className="truncate" title={s.technologies.join(', ')}><strong className="text-slate-900">Tech:</strong> {s.technologies.join(', ')}</p>}
+                                    {s.languages && s.languages.length > 0 && <p className="truncate" title={s.languages.join(', ')}><strong className="text-slate-900">Lang:</strong> {s.languages.join(', ')}</p>}
                                   </div>
-                                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+                                  <div className="flex gap-3 mt-5 pt-5 border-t border-slate-100">
                                     <button 
                                       onClick={() => setEditingStudentId(s.id)}
-                                      className="flex-1 text-emerald-600 font-bold hover:text-emerald-700 transition-colors bg-emerald-50 py-2 rounded-lg text-sm"
+                                      className="flex-1 text-emerald-700 font-bold hover:text-emerald-800 hover:bg-emerald-100 transition-colors bg-emerald-50 py-2.5 rounded-xl text-sm border border-emerald-100/50"
                                     >
-                                      Edit Student
+                                      Edit
                                     </button>
                                     <button 
                                       onClick={() => setStudentToRemove(s)}
@@ -2619,54 +2636,60 @@ export default function StudentDashboard() {
                 )}
 
                 {data?.userData?.roles?.includes('teacher') && (
-                  <div className="mt-12 pt-8 border-t border-gray-100">
-                    <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100">
-                      <h3 className="text-xl font-black text-emerald-900 mb-2">Teacher Portal</h3>
-                      <p className="text-sm text-emerald-700 font-medium mb-4">
-                        You have a verified Teacher Profile. Switch to your Teacher dashboard to manage tuitions, students, and requests.
-                      </p>
-                      <button
-                        onClick={() => {
-                          let userString = localStorage.getItem('user');
-                          if (userString) {
-                            let userObj = JSON.parse(userString);
-                            userObj.role = 'teacher';
-                            localStorage.setItem('user', JSON.stringify(userObj));
-                          }
-                          router.push('/dashboard/teacher');
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors inline-flex items-center gap-2"
-                      >
-                        <GraduationCap className="w-4 h-4" />
-                        Switch to Teacher Portal
-                      </button>
+                  <div className="mt-12 pt-8 border-t border-slate-100">
+                    <div className="bg-gradient-to-br from-[#00a992] to-teal-600 rounded-3xl p-8 sm:p-10 shadow-xl shadow-teal-900/10 border border-[#00a992]/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
+                      <div className="relative z-10">
+                        <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Teacher Portal</h3>
+                        <p className="text-emerald-50 font-medium mb-6 max-w-lg">
+                          You have a verified Teacher Profile. Switch to your Teacher dashboard to manage tuitions, students, and requests.
+                        </p>
+                        <button
+                          onClick={() => {
+                            let userString = localStorage.getItem('user');
+                            if (userString) {
+                              let userObj = JSON.parse(userString);
+                              userObj.role = 'teacher';
+                              localStorage.setItem('user', JSON.stringify(userObj));
+                            }
+                            router.push('/dashboard/teacher');
+                          }}
+                          className="bg-white text-emerald-700 px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-teal-900/20 hover:shadow-xl hover:bg-emerald-50 hover:-translate-y-1 active:scale-95 transition-all inline-flex items-center gap-2"
+                        >
+                          <GraduationCap className="w-4 h-4" />
+                          Switch to Teacher Portal
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="mt-8 pt-8 border-t border-red-100">
-                  <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
-                    <h3 className="text-xl font-black text-red-700 mb-2">Danger Zone</h3>
-                    <p className="text-sm text-red-600/80 font-medium mb-4">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                    </p>
-                    <button 
-                      onClick={() => setShowDeleteAccountModal(true)}
-                      className="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-red-600 hover:text-white transition-colors"
-                    >
-                      Delete Account
-                    </button>
+                <div className="mt-12 pt-8 border-t border-red-50">
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-3xl p-8 border border-red-100 shadow-lg shadow-red-900/5 relative overflow-hidden group">
+                    <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-red-100/50 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
+                    <div className="relative z-10">
+                      <h3 className="text-xl font-black text-red-700 mb-2 tracking-tight flex items-center gap-2"><Lock className="w-5 h-5" /> Danger Zone</h3>
+                      <p className="text-sm text-red-600/80 font-medium mb-6 max-w-lg">
+                        Permanently delete your account and all associated data. This action cannot be undone.
+                      </p>
+                      <button 
+                        onClick={() => setShowDeleteAccountModal(true)}
+                        className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-red-600/20 hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto"
+                      >
+                        Delete Account
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-gray-100 text-center text-sm text-gray-500 font-medium pb-8">
-                  <p className="mb-2">Legal & Policies</p>
-                  <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2">
-                    <Link href="/legal/privacy-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Privacy Policy</Link>
-                    <span className="hidden sm:inline">&bull;</span>
-                    <Link href="/legal/terms-and-conditions" target="_blank" className="hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
-                    <span className="hidden sm:inline">&bull;</span>
-                    <Link href="/legal/refund-policy" target="_blank" className="hover:text-[#00a992] transition-colors">Refund Policy</Link>
+                <div className="mt-12 pt-8 border-t border-slate-100 text-center pb-8 flex flex-col items-center">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Legal & Policies</p>
+                  <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 bg-slate-50/80 backdrop-blur-sm px-8 py-4 rounded-full border border-slate-200/60 shadow-sm w-max max-w-full">
+                    <Link href="/legal/privacy-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Privacy Policy</Link>
+                    <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
+                    <Link href="/legal/terms-and-conditions" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
+                    <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
+                    <Link href="/legal/refund-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Refund Policy</Link>
                   </div>
                 </div>
               </div>
