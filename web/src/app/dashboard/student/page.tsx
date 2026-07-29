@@ -86,7 +86,7 @@ export default function StudentDashboard() {
   const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
+  const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [isEditingParentProfile, setIsEditingParentProfile] = useState(false);
   const [parentFormData, setParentFormData] = useState({ name: '', email: '', phone: '', whatsapp: '', address: '' });
@@ -1358,27 +1358,27 @@ export default function StudentDashboard() {
                       <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
                         Hello {activeStudent?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Student'}! <span className="text-4xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
-                      <p className="text-gray-500 text-lg">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
+                      <p className="text-slate-500 text-lg">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
                     </div>
 
                     {/* Profile Completeness Card */}
                     <div 
                       onClick={() => setActiveTab('profile')}
-                      className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm md:w-80 flex-shrink-0 flex items-start gap-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all"
+                      className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-5 shadow-lg shadow-emerald-900/5 md:w-80 flex-shrink-0 flex items-start gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-emerald-200 transition-all duration-300"
                     >
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <div className="w-12 h-12 rounded-xl bg-white shadow-sm text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-50">
                         <User className="w-6 h-6" />
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-start mb-1">
-                          <p className="font-bold text-gray-900 text-sm">Strengthen your profile</p>
+                          <p className="font-bold text-gray-900 text-sm tracking-tight">Strengthen your profile</p>
                         </div>
-                        <p className="text-xs text-gray-500 mb-3 leading-snug">You're {profileCompleteness}% there! Add missing details to stand out.</p>
+                        <p className="text-xs text-slate-500 mb-3 leading-snug font-medium">You're {profileCompleteness}% there! Add missing details to stand out.</p>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-[#00a992] rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
+                          <div className="flex-1 h-2 bg-emerald-100/50 rounded-full overflow-hidden shadow-inner">
+                            <div className="h-full bg-gradient-to-r from-[#00a992] to-teal-400 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
                           </div>
-                          <span className="text-xs font-bold text-[#00a992]">{profileCompleteness}%</span>
+                          <span className="text-xs font-bold text-emerald-600">{profileCompleteness}%</span>
                         </div>
                       </div>
                     </div>
@@ -1389,18 +1389,18 @@ export default function StudentDashboard() {
                     
                     {/* Left: My Teachers */}
                     <div className="lg:col-span-2 space-y-4">
-                      <h2 className="text-xl font-bold text-gray-900">My Teachers</h2>
+                      <h2 className="text-xl font-bold text-gray-900 tracking-tight">My Teachers</h2>
                       
                       {myActiveTeachers.length === 0 ? (
-                        <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
-                          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                        <div className="bg-gradient-to-b from-white to-slate-50 border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
+                          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-100/50">
                             <BookOpen className="w-10 h-10 text-emerald-500" />
                           </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">No teachers chosen yet</h3>
-                          <p className="text-gray-500 max-w-sm mb-8">Explore our catalog of verified tutors and find the perfect match to start your learning journey.</p>
+                          <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">No teachers chosen yet</h3>
+                          <p className="text-slate-500 max-w-sm mb-8 font-medium">Explore our catalog of verified tutors and find the perfect match to start your learning journey.</p>
                           <button 
                             onClick={() => setActiveTab('new_tuition')}
-                            className="bg-[#00a992] text-white px-8 py-3.5 rounded-xl font-bold hover:bg-[#008f7b] transition-all shadow-lg shadow-[#00a992]/20 flex items-center gap-2"
+                            className="bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
                           >
                             <Globe className="w-5 h-5" /> Explore Teachers
                           </button>
@@ -1408,23 +1408,23 @@ export default function StudentDashboard() {
                       ) : (
                         <div className="grid gap-4">
                           {myActiveTeachers.slice(0, 3).map((cls: any) => (
-                            <div key={cls.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                            <div key={cls.id} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
                               <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0">
+                                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0 border border-emerald-100/50 shadow-sm">
                                   {cls.teacher?.charAt(0) || 'T'}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-gray-900 truncate">{cls.teacher}</h4>
-                                  <p className="text-sm text-gray-500 truncate">{cls.subject}</p>
+                                  <h4 className="font-bold text-gray-900 truncate tracking-tight">{cls.teacher}</h4>
+                                  <p className="text-sm text-slate-500 truncate font-medium">{cls.subject}</p>
                                 </div>
                               </div>
-                              <button onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 flex-shrink-0">
+                              <button onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }} className="text-slate-700 font-bold text-sm bg-slate-100 px-5 py-2.5 rounded-xl hover:bg-slate-200 hover:text-slate-900 flex-shrink-0 transition-colors">
                                 View
                               </button>
                             </div>
                           ))}
                           {myActiveTeachers.length > 3 && (
-                            <button onClick={() => setActiveTab('my_teachers')} className="text-sm font-bold text-gray-500 hover:text-[#00a992] py-2 text-center w-full">
+                            <button onClick={() => setActiveTab('my_teachers')} className="text-sm font-bold text-slate-500 hover:text-[#00a992] py-2 text-center w-full transition-colors">
                               View all {myActiveTeachers.length} teachers →
                             </button>
                           )}
@@ -1434,12 +1434,12 @@ export default function StudentDashboard() {
 
                     {/* Right: Recommended Teachers */}
                     <div className="space-y-3">
-                        <h2 className="text-xl font-bold text-gray-900">Recommended Teachers</h2>
+                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Teachers</h2>
                         {studentGroups.length > 0 && (
                           <div className="flex flex-wrap items-center gap-2">
-                            <label className="text-xs font-bold text-gray-500 whitespace-nowrap">Finding tutors for:</label>
+                            <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Finding tutors for:</label>
                             <select 
-                              className="w-32 sm:w-48 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-[#00a992] focus:outline-none focus:ring-1 focus:ring-[#00a992] truncate"
+                              className="w-32 sm:w-48 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-[#00a992] focus:outline-none focus:ring-1 focus:ring-[#00a992] truncate transition-colors hover:bg-slate-100 cursor-pointer"
                               value={activeGroupId || activeGroup?.id || ''}
                               onChange={(e) => setActiveGroupId(e.target.value)}
                             >
@@ -1450,13 +1450,13 @@ export default function StudentDashboard() {
                           </div>
                         )}
                       
-                      <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
+                      <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                         {computedRecommendedTutors.length === 0 ? (
                           <div className="text-center py-10">
-                            <p className="text-gray-500 text-sm">No recommendations yet.</p>
+                            <p className="text-slate-500 text-sm font-medium">No recommendations yet.</p>
                           </div>
                         ) : (
-                          <div className="divide-y divide-gray-50">
+                          <div className="divide-y divide-gray-50/50">
                             {computedRecommendedTutors.filter((tutor: any) => {
                                const matchGroup = (app: any) => {
                                  if (app.groupId) return app.groupId === activeGroup?.id;
@@ -1486,25 +1486,25 @@ export default function StudentDashboard() {
                               else if (activeAppForGroup) labelText = 'Busy with Another Demo';
 
                               return (
-                                <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative">
+                                <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative hover:bg-slate-50 px-2 -mx-2 rounded-2xl transition-colors">
                                   {isLocked && (
-                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-end pr-2 rounded-lg pointer-events-none">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-10 flex items-center justify-end pr-4 rounded-2xl pointer-events-none">
+                                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                             {labelText}
                                         </span>
                                     </div>
                                   )}
-                                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-700 text-xs flex-shrink-0">
+                                  <div className="w-8 h-8 rounded-full bg-orange-50/80 border border-orange-100 flex items-center justify-center font-bold text-orange-600 text-xs flex-shrink-0 shadow-sm">
                                     #{index + 1}
                                   </div>
-                                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">
+                                  <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0 shadow-sm">
                                     {tutor.name?.charAt(0) || 'T'}
                                   </div>
                                   <div className="flex-1 min-w-0 overflow-hidden">
-                                    <h4 className="font-bold text-gray-900 text-sm truncate">{tutor.name || 'Tutor'}</h4>
-                                    <p className="text-xs text-gray-500 truncate">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
+                                    <h4 className="font-bold text-gray-900 text-sm truncate tracking-tight">{tutor.name || 'Tutor'}</h4>
+                                    <p className="text-xs text-slate-500 truncate font-medium">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
                                   </div>
-                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-gray-700 font-bold text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 z-0 flex-shrink-0">
+                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-slate-700 font-bold text-xs bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 hover:text-slate-900 z-0 flex-shrink-0 transition-colors">
                                     View
                                   </button>
                                 </div>
@@ -1599,11 +1599,11 @@ export default function StudentDashboard() {
                       else if (activeAppForGroup) subText = 'Active demo with another tutor';
                       
                       return (
-                        <div key={teacher.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-[#00a992]/30 transition-all flex flex-col h-full relative overflow-hidden">
+                        <div key={teacher.id} className="bg-white rounded-3xl shadow-lg shadow-gray-200/40 border border-gray-100 hover:shadow-xl hover:shadow-gray-300/50 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
                           {isLocked && (
-                            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-6 text-center">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isRed ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                                <Lock className={`w-6 h-6 ${isRed ? 'text-red-600' : 'text-emerald-600'}`} />
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm ${isRed ? 'bg-red-50' : 'bg-emerald-50'}`}>
+                                <Lock className={`w-6 h-6 ${isRed ? 'text-red-500' : 'text-emerald-500'}`} />
                               </div>
                               <h4 className="font-bold text-gray-900 mb-1">{labelText}</h4>
                               <p className="text-sm text-gray-600 font-medium">
@@ -1611,39 +1611,39 @@ export default function StudentDashboard() {
                               </p>
                             </div>
                           )}
-                          <div className="bg-[#00a992] p-6 flex items-center justify-between">
+                          <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               {teacher.rank && (
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-300 text-gray-800' : teacher.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-300 text-gray-800' : teacher.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
                                   #{teacher.rank}
                                 </div>
                               )}
-                              <h3 className="text-xl font-bold text-white truncate">{teacher.name}</h3>
+                              <h3 className="text-xl font-bold text-white tracking-tight truncate">{teacher.name}</h3>
                             </div>
-                            <span className="px-3 py-1 bg-white/20 text-white text-xs font-bold rounded-full border border-white/30">
+                            <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded-full border border-white/30 shadow-sm">
                               {teacher.mode || 'Online'}
                             </span>
                           </div>
                           <div className="p-6 flex flex-col flex-grow">
                             {teacher.teachingApproach && (
-                              <p className="text-sm text-gray-600 mb-4 overflow-hidden leading-relaxed">{teacher.teachingApproach}</p>
+                              <p className="text-sm text-gray-600 mb-5 overflow-hidden leading-relaxed">{teacher.teachingApproach}</p>
                             )}
-                          <div className="space-y-2 text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 flex-grow">
-                            {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-gray-700">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
-                            {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-gray-700">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
-                            {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-gray-700">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
-                            {teacher.experience && <p><strong className="text-gray-700">Experience:</strong> {teacher.experience}</p>}
+                          <div className="space-y-2 text-sm text-slate-600 mb-6 bg-slate-50 p-5 rounded-2xl border border-slate-100/60 flex-grow shadow-inner">
+                            {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-slate-900">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
+                            {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-slate-900">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
+                            {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-slate-900">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
+                            {teacher.experience && <p><strong className="text-slate-900">Experience:</strong> {teacher.experience}</p>}
                             {teacher.mode !== 'Online' && teacher.locations && (
-                              <p><strong className="text-gray-700">📍 Location:</strong> {teacher.locations} {teacher.travelKm ? `(Travels up to ${teacher.travelKm}km)` : ''}</p>
+                              <p><strong className="text-slate-900">📍 Location:</strong> {teacher.locations} {teacher.travelKm ? `(Travels up to ${teacher.travelKm}km)` : ''}</p>
                             )}
-                            <p><strong className="text-gray-700">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
+                            <p><strong className="text-slate-900">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
                           </div>
                           
                           <div className="flex flex-col gap-3 mt-auto">
                             {!hasProfile ? (
                               <button 
                                 onClick={() => setActiveTab('profile')}
-                                className="w-full bg-[#00a992] text-white hover:bg-emerald-600 font-bold py-3 rounded-xl transition-colors shadow-md shadow-[#00a992]/20 flex items-center justify-center gap-2 text-sm"
+                                className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 text-white hover:from-[#009b86] hover:to-teal-600 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 text-sm transform hover:scale-[1.02] active:scale-[0.98]"
                               >
                                 <User className="w-4 h-4" /> View Teacher
                               </button>
@@ -1656,7 +1656,7 @@ export default function StudentDashboard() {
                                     type="number"
                                     min={getTutorBasePrice(teacher) ? Math.ceil(getTutorBasePrice(teacher) * 0.6) : 0}
                                     max={getTutorBasePrice(teacher) || undefined}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
                                     placeholder={getTutorBasePrice(teacher) ? `e.g. ${getTutorBasePrice(teacher)}` : "e.g. 500"}
                                     value={negotiationOffer[teacher.id] || ''}
                                     onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
@@ -1666,11 +1666,11 @@ export default function StudentDashboard() {
                                   )}
                                 </div>
                                 {isHired ? (
-                                  <button disabled className="w-full bg-emerald-100 text-emerald-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                  <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200">
                                     <CheckCircle2 className="w-4 h-4" /> Already Hired
                                   </button>
                                 ) : isPending ? (
-                                  <button disabled className="w-full bg-orange-100 text-orange-800 font-bold py-3 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                  <button disabled className="w-full bg-orange-50 text-orange-700 font-bold py-3.5 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-orange-200">
                                     Pending
                                   </button>
                                 ) : (
@@ -1678,7 +1678,7 @@ export default function StudentDashboard() {
                                     <div className="flex gap-2">
                                       <button 
                                         onClick={() => setSelectedViewUser(teacher)}
-                                        className="w-1/3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center"
+                                        className="w-1/3 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 font-bold py-3.5 rounded-xl transition-all text-sm flex items-center justify-center active:scale-[0.98]"
                                       >
                                         View
                                       </button>
@@ -1686,16 +1686,17 @@ export default function StudentDashboard() {
                                         <button
                                           disabled={requestLoading}
                                           onClick={() => handleRequestTutor(teacher)}
-                                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold disabled:opacity-50 transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
                                         >
-                                          {requestLoading ? 'Requesting...' : 'Negotiate'}
+                                          {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Make Offer'}
                                         </button>
                                       ) : (
                                         <button
+                                          disabled={requestLoading}
                                           onClick={() => { handleDirectRequestDemo(teacher); }}
-                                          className={`flex-1 py-3 px-3 rounded-xl text-sm font-bold transition-colors ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
                                         >
-                                          Request Demo
+                                          {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Request Demo'}
                                         </button>
                                       )}
                                     </div>
@@ -1778,229 +1779,236 @@ export default function StudentDashboard() {
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Requests & Offers</h2>
                 </div>
                 {(displayRequests?.length ?? 0) > 0 ? (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {displayRequests?.map((neg: any) => {
                       const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
                       return (
-                      <div key={neg.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
-                            <div>
-                              <div className="flex items-center gap-3 mb-1">
-                                <h4 className="font-bold text-lg text-gray-900">Tutor: {neg.tutorName}</h4>
-                                <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded-md border border-blue-100">For: {studentForApp.name}</span>
+                      <div key={neg.id} className="bg-gradient-to-br from-white to-slate-50 p-6 rounded-3xl border border-gray-100 shadow-lg shadow-slate-200/50 flex flex-col h-full hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300">
+                            
+                            {/* Card Header */}
+                            <div className="mb-4">
+                              <div className="flex items-start justify-between gap-3 mb-2">
+                                <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">Tutor: {neg.tutorName}</h4>
+                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider flex-shrink-0">For: {studentForApp.name}</span>
                               </div>
-                              <p className="text-sm text-gray-500 mb-1">{neg.category}</p>
-                              {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-medium text-emerald-600">Technologies: {neg.technologies.join(', ')}</p>}
-                              {neg.category === 'languages' && neg.languagesTaught && neg.languagesTaught.length > 0 && <p className="text-sm font-medium text-emerald-600">Languages: {neg.languagesTaught.join(', ')}</p>}
-                              {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-medium text-emerald-600">Subjects: {neg.subjects.join(', ')}</p>}
-                                                  <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 mt-4 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{neg.category}</p>
+                              <div className="space-y-1">
+                                {neg.category === 'programming' && neg.technologies && neg.technologies.length > 0 && <p className="text-sm font-semibold text-slate-600"><span className="text-slate-400 font-medium">Tech:</span> {neg.technologies.join(', ')}</p>}
+                                {neg.category === 'languages' && neg.languagesTaught && neg.languagesTaught.length > 0 && <p className="text-sm font-semibold text-slate-600"><span className="text-slate-400 font-medium">Lang:</span> {neg.languagesTaught.join(', ')}</p>}
+                                {(!neg.category || neg.category === 'school') && neg.subjects && neg.subjects.length > 0 && <p className="text-sm font-semibold text-slate-600"><span className="text-slate-400 font-medium">Subj:</span> {neg.subjects.join(', ')}</p>}
+                              </div>
+                            </div>
+
+                            <div className="h-px w-full bg-slate-100 my-4"></div>
+
+                            {/* Status Section */}
+                            <div className="flex-1 flex flex-col mb-5">
                                 {neg.status === 'demo_booking_phase' && neg.proposedDate ? (
-                                  <div className="text-left w-full sm:w-auto bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-                                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Proposed Schedule</p>
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                                      <span className="text-sm font-semibold text-gray-800">{new Date(neg.proposedDate).toLocaleDateString()} at {neg.proposedTime?.split('||')[0] || neg.proposedTime}</span>
+                                  <div className="w-full bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200/50 mb-auto">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Schedule</p>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Calendar className="w-4 h-4 text-emerald-600" />
+                                      <span className="text-sm font-bold text-slate-800">{new Date(neg.proposedDate).toLocaleDateString()} at {neg.proposedTime?.split('||')[0] || neg.proposedTime}</span>
                                     </div>
                                     {neg.mode === 'online' && neg.proposedTime?.includes('||') && (
-                                      <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-blue-100/50">
+                                      <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-200/50">
                                         <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-gray-600">Platform:</span>
-                                          <span className="text-gray-800">{neg.proposedTime.split('||')[1]}</span>
+                                          <span className="font-bold text-slate-500">Platform:</span>
+                                          <span className="text-slate-800 font-medium">{neg.proposedTime.split('||')[1]}</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-gray-600">Link:</span>
-                                          <a href={neg.proposedTime.split('||')[2]} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate max-w-[150px]">{neg.proposedTime.split('||')[2]}</a>
+                                          <span className="font-bold text-slate-500">Link:</span>
+                                          <a href={neg.proposedTime.split('||')[2]} target="_blank" rel="noreferrer" className="text-blue-600 font-medium hover:underline truncate max-w-full">{neg.proposedTime.split('||')[2]}</a>
                                         </div>
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="text-center w-full sm:w-auto">
-                                    <p className="text-xs font-bold text-gray-400 uppercase">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                                    <p className="text-2xl font-black text-emerald-600">₹{neg.finalPrice || neg.currentOffer}</p>
+                                  <div className="text-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-auto">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
+                                    <p className="text-2xl font-black text-emerald-600 tracking-tight">₹{neg.finalPrice || neg.currentOffer}</p>
                                   </div>
-                                )}                  </div>
+                                )}                  
+                            </div>
                               
-                              {/* Request Specific Status UI */}
-                              {neg.status === 'declined' ? (
-                                <div className="flex gap-3 items-center w-full sm:w-auto">
-                                  <div className="w-full sm:w-auto bg-red-50 px-5 py-3 rounded-xl border border-red-100 text-center">
-                                    <p className="text-sm font-black text-red-600 uppercase tracking-wide">Declined</p>
-                                  </div>
-                                </div>
-                              ) : neg.status === 'tuition_started' ? (
-                                <div className="flex gap-3 items-center w-full sm:w-auto">
-                                  <div className="w-full sm:w-auto bg-emerald-50 px-5 py-3 rounded-xl border border-emerald-100 text-center">
-                                    <p className="text-sm font-black text-emerald-600 uppercase tracking-wide">Fees Paid</p>
-                                  </div>
-                                </div>
-                              ) : neg.status === 'negotiating' && (
-                                neg.lastUpdatedBy === 'tutor' ? (
-                                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                    <button 
-                                      onClick={() => {
-                                        handleNegotiationAction(neg.id, 'request_demo', neg.currentOffer);
-                                      }}
-                                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-                                    >
-                                      Accept & Request Demo
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        setModalConfig({
-                                          isOpen: true,
-                                          type: 'price',
-                                          title: 'Counter Offer',
-                                          description: 'Propose a new monthly fee for this tutor.',
-                                          placeholder: 'e.g. 500',
-                                          initialValue: neg.currentOffer?.toString() || '',
-                                          min: neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6),
-                                          max: neg.absoluteMax || (neg.initialBudget || 0),
-                                          onSubmit: (val: string) => {
-                                            setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                          handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
-                                          }
-                                        });
-                                      }}
-                                      className="w-full sm:w-auto bg-white border-2 border-gray-200 hover:border-emerald-500 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
-                                    >
-                                      Counter Offer
-                                    </button>
-                                    <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                      className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
-                                    >
-                                      Decline
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex gap-3 items-center w-full sm:w-auto">
-                                    <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                      <p className="text-sm font-semibold text-gray-600">Waiting for tutor response...</p>
+                              {/* Request Specific Status UI (Buttons/Labels) */}
+                              <div className="mt-auto space-y-2">
+                                {neg.status === 'declined' ? (
+                                    <div className="w-full bg-red-50/50 px-4 py-3 rounded-2xl border border-red-100 text-center">
+                                      <p className="text-sm font-black text-red-600 uppercase tracking-widest">Declined</p>
                                     </div>
-                                    <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                      className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors"
-                                    >
-                                      Withdraw Request
-                                    </button>
-                                  </div>
-                                )
-                              )}
-
-                              {/* Direct Payment / Demo Statuses */}
-                              {neg.status === 'demo_requested_by_teacher' && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'accept_demo')}
-                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" /> Accept Demo
-                                  </button>
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </div>
-                              )}
-                              {neg.status === 'demo_requested_by_student' && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                  <div className="w-full sm:w-auto bg-blue-50 px-5 py-3 rounded-xl border border-blue-100 text-center">
-                                    <p className="text-sm font-semibold text-blue-600">Waiting for Teacher to Accept</p>
-                                  </div>
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
-                                  >
-                                    Withdraw Request
-                                  </button>
-                                </div>
-                              )}
-                              {neg.status === 'demo_pending_payment' && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                  <div className="w-full sm:w-auto bg-orange-50 px-5 py-3 rounded-xl border border-orange-100 text-center">
-                                    <p className="text-sm font-semibold text-orange-600">Waiting for Teacher to Pay Fee</p>
-                                  </div>
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
-                                  >
-                                    Withdraw Request
-                                  </button>
-                                </div>
-                              )}
-                              {neg.status === 'demo_booking_phase' && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                  {neg.proposedDate && neg.lastUpdatedBy === 'teacher' ? (
+                                ) : neg.status === 'tuition_started' ? (
+                                    <div className="w-full bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100 text-center shadow-sm">
+                                      <p className="text-sm font-black text-emerald-600 uppercase tracking-widest">Fees Paid</p>
+                                    </div>
+                                ) : neg.status === 'negotiating' && (
+                                  neg.lastUpdatedBy === 'tutor' ? (
                                     <>
                                       <button 
-                                        onClick={() => handleNegotiationAction(neg.id, 'accept_demo_date')}
-                                        className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                        onClick={() => {
+                                          handleNegotiationAction(neg.id, 'request_demo', neg.currentOffer);
+                                        }}
+                                        className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all"
                                       >
-                                        <CheckCircle2 className="w-4 h-4" /> Accept Proposed Date
+                                        Accept & Request Demo
                                       </button>
                                       <button 
                                         onClick={() => {
                                           setModalConfig({
                                             isOpen: true,
-                                            type: 'demo_booking',
-                                            title: 'Counter-Offer Date',
-                                            description: 'Suggest a different date and time for the demo class.',
-                                            placeholder: '',
-                                            initialValue: '',
-                                            isOnline: neg.mode === 'online',
-                                            onSubmit: (val: string, date?: string, time?: string) => {
+                                            type: 'price',
+                                            title: 'Counter Offer',
+                                            description: 'Propose a new monthly fee for this tutor.',
+                                            placeholder: 'e.g. 500',
+                                            initialValue: neg.currentOffer?.toString() || '',
+                                            min: neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6),
+                                            max: neg.absoluteMax || (neg.initialBudget || 0),
+                                            onSubmit: (val: string) => {
                                               setModalConfig(prev => ({ ...prev, isOpen: false }));
-                                              handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
+                                            handleNegotiationAction(neg.id, 'counter_price', parseInt(val), neg);
                                             }
                                           });
                                         }}
-                                        className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-700 hover:border-emerald-500 px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2"
+                                        className="w-full bg-white border-2 border-slate-200 hover:border-[#00a992] hover:bg-emerald-50/50 text-slate-700 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                       >
-                                        <Calendar className="w-4 h-4" /> Change requested Date/Time
+                                        Counter Offer
+                                      </button>
+                                      <button 
+                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                      >
+                                        Decline
                                       </button>
                                     </>
                                   ) : (
-                                    <div className="w-full sm:w-auto bg-gray-50 px-4 py-3 rounded-xl border border-gray-100 text-center">
-                                      <p className="text-sm font-semibold text-gray-600">Waiting for Teacher to propose date...</p>
+                                    <>
+                                      <div className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-100 text-center mb-2">
+                                        <p className="text-sm font-semibold text-slate-500">Waiting for tutor response...</p>
+                                      </div>
+                                      <button 
+                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                      >
+                                        Withdraw Request
+                                      </button>
+                                    </>
+                                  )
+                                )}
+
+                                {/* Direct Payment / Demo Statuses */}
+                                {neg.status === 'demo_requested_by_teacher' && (
+                                  <>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'accept_demo')}
+                                      className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" /> Accept Demo
+                                    </button>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                    >
+                                      Decline
+                                    </button>
+                                  </>
+                                )}
+                                {neg.status === 'demo_requested_by_student' && (
+                                  <>
+                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center mb-2">
+                                      <p className="text-sm font-semibold text-blue-600">Waiting for Teacher to Accept</p>
                                     </div>
-                                  )}
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
-                                  >
-                                    Cancel Demo
-                                  </button>
-                                </div>
-                              )}
-                              {neg.status === 'demo_scheduled' && (
-                                <div className="flex gap-3 items-center w-full sm:w-auto">
-                                  <div className="w-full sm:w-auto bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 text-center">
-                                    <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Wait for it to complete.</p>
-                                  </div>
-                                </div>
-                              )}
-                              {neg.status === 'waiting_for_parent_decision' && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                                  <button 
-                                    onClick={() => {
-                                      const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
-                                      setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: neg.finalPrice || neg.currentOffer, budget: neg.budget, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []), tutorName: neg.tutorName });
-                                    }}
-                                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg transform hover:scale-105 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" /> Hire Teacher
-                                  </button>
-                                  <button 
-                                    onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                    className="w-full sm:w-auto bg-red-50 text-red-600 hover:bg-red-100 px-5 py-3 rounded-xl font-bold text-sm transition-colors"
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                    >
+                                      Withdraw Request
+                                    </button>
+                                  </>
+                                )}
+                                {neg.status === 'demo_pending_payment' && (
+                                  <>
+                                    <div className="w-full bg-orange-50 px-4 py-3 rounded-2xl border border-orange-100 text-center mb-2 shadow-sm">
+                                      <p className="text-sm font-semibold text-orange-600">Waiting for Teacher to Pay Fee</p>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                    >
+                                      Withdraw Request
+                                    </button>
+                                  </>
+                                )}
+                                {neg.status === 'demo_booking_phase' && (
+                                  <>
+                                    {neg.proposedDate && neg.lastUpdatedBy === 'teacher' ? (
+                                      <>
+                                        <button 
+                                          onClick={() => handleNegotiationAction(neg.id, 'accept_demo_date')}
+                                          className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" /> Accept Proposed Date
+                                        </button>
+                                        <button 
+                                          onClick={() => {
+                                            setModalConfig({
+                                              isOpen: true,
+                                              type: 'demo_booking',
+                                              title: 'Counter-Offer Date',
+                                              description: 'Suggest a different date and time for the demo class.',
+                                              placeholder: '',
+                                              initialValue: '',
+                                              initialDate: neg.proposedDate || '',
+                                              initialTime: neg.proposedTime?.split('||')[0] || '',
+                                              isOnline: neg.mode === 'online',
+                                              onSubmit: (val: string, date?: string, time?: string) => {
+                                                setModalConfig(prev => ({ ...prev, isOpen: false }));
+                                                handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
+                                              }
+                                            });
+                                          }}
+                                          className="w-full bg-white border-2 border-slate-200 hover:border-[#00a992] hover:bg-emerald-50/50 text-slate-700 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                        >
+                                          <Calendar className="w-4 h-4" /> Change requested Date/Time
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <div className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-100 text-center mb-2">
+                                        <p className="text-sm font-semibold text-slate-500">Waiting for Teacher to propose date...</p>
+                                      </div>
+                                    )}
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                    >
+                                      Cancel Demo
+                                    </button>
+                                  </>
+                                )}
+                                {neg.status === 'demo_scheduled' && (
+                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center">
+                                      <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Wait for it to complete.</p>
+                                    </div>
+                                )}
+                                {neg.status === 'waiting_for_parent_decision' && (
+                                  <>
+                                    <button 
+                                      onClick={() => {
+                                        const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                        setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: neg.finalPrice || neg.currentOffer, budget: neg.budget, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []), tutorName: neg.tutorName });
+                                      }}
+                                      className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" /> Hire Teacher
+                                    </button>
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                           </div>
                           );
                         })}
@@ -2021,17 +2029,17 @@ export default function StudentDashboard() {
               <div className="space-y-12">
                 {/* Demo Teachers Section */}
                 <div>
-                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Demo Teachers</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Demo Teachers</h2>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {data?.demoClasses?.map((cls: any) => {
                       const phone = cls.tutorDetails?.phone || cls.tutorDetails?.whatsapp;
                       const email = cls.tutorDetails?.email;
                       return (
                       <li 
                         key={cls.id} 
-                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(59,130,246,0.1)] hover:border-blue-200 transition-all duration-300 group overflow-hidden flex flex-col"
+                        className="relative bg-gradient-to-br from-white to-slate-50 rounded-3xl p-6 shadow-lg shadow-slate-200/50 border border-gray-100 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1 transition-all duration-300 group overflow-hidden flex flex-col"
                       >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-blue-100/20 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-blue-100/30 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
                         
                         <div className="flex flex-col h-full gap-5">
                           <div className="flex items-start justify-between gap-4">
@@ -2040,54 +2048,56 @@ export default function StudentDashboard() {
                                 {cls.teacher?.charAt(0) || 'T'}
                               </div>
                               <div>
-                                <h3 className="text-xl font-black text-gray-900 tracking-tight truncate max-w-[150px] sm:max-w-[200px]">{cls.teacher}</h3>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[150px]">{cls.teacher}</h3>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                                  <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md border border-blue-100/50 uppercase tracking-wider">Demo Phase</span>
-                                  <span className="text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100 truncate max-w-[120px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
+                                  <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-md border border-blue-100/50 uppercase tracking-wider">Demo Phase</span>
+                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
                                 </div>
                               </div>
                             </div>
                             
-                            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm whitespace-nowrap bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border-blue-200/50">
+                            <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm whitespace-nowrap bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border-blue-200/50">
                               {cls.status.replace(/_/g, ' ')}
                             </span>
                           </div>
 
-                          <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
+                          <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent my-1" />
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
+                          <div className="grid grid-cols-1 gap-y-4 text-sm flex-grow">
                             {cls.demoDate && cls.demoTime && (
-                              <div className="col-span-full bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
+                              <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
                                   <Calendar className="w-4 h-4" />
                                 </div>
                                 <div>
-                                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Demo Schedule</p>
-                                  <p className="font-bold text-gray-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
+                                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Demo Schedule</p>
+                                  <p className="font-bold text-slate-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
                                 </div>
                               </div>
                             )}
-                            {phone && (
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
-                                  <p className="font-semibold text-gray-700 truncate">{phone}</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {phone && (
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
+                                  <div className="overflow-hidden">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate">{phone}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {email && (
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
-                                  <p className="font-semibold text-gray-700 truncate" title={email}>{email}</p>
+                              )}
+                              {email && (
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0"><Mail className="w-3.5 h-3.5" /></div>
+                                  <div className="overflow-hidden">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate" title={email}>{email}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                           
-                          <div className="mt-2 flex gap-2">
+                          <div className="mt-4 flex gap-2">
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2099,19 +2109,21 @@ export default function StudentDashboard() {
                                   setSelectedViewUser(viewUser);
                                   setSelectedViewApp(cls);
                                 }}
-                                className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                className="w-full bg-white border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >
-                                View
+                                View Details
                             </button>
                           </div>
                         </div>
                       </li>
                     );})}
                     {(!data?.demoClasses || data?.demoClasses?.length === 0) && (
-                      <li className="col-span-full p-8 bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
-                        <Calendar className="w-8 h-8 text-gray-300 mb-2" />
-                        <h3 className="text-lg font-bold text-gray-900 mb-1">No active demos</h3>
-                        <p className="text-gray-500 text-sm">Wait for a teacher to accept and schedule a demo.</p>
+                      <li className="col-span-full p-12 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                          <Calendar className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">No active demos</h3>
+                        <p className="text-slate-500 text-sm max-w-sm">Wait for a teacher to accept and schedule a demo class.</p>
                       </li>
                     )}
                   </ul>
@@ -2119,12 +2131,12 @@ export default function StudentDashboard() {
 
                 {/* Active Teachers Section */}
                 <div>
-                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Active Teachers</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Active Teachers</h2>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
-                        className="relative bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
+                        className="relative bg-gradient-to-br from-white to-slate-50 rounded-3xl p-6 shadow-lg shadow-slate-200/50 border border-gray-100 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
                         onClick={() => {
                           if (cls.tutorDetails) {
                             setSelectedViewUser(cls.tutorDetails);
@@ -2134,26 +2146,26 @@ export default function StudentDashboard() {
                       >
                         
                         {/* Decorative background element */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-50 to-emerald-100/20 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-50 to-emerald-100/30 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
                         
                         <div className="flex flex-col h-full gap-5">
                           {/* Header section */}
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#00a992] to-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-emerald-500/30 flex-shrink-0">
+                              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#00a992] to-teal-500 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-emerald-500/30 flex-shrink-0">
                                 {cls.teacher?.charAt(0) || 'T'}
                               </div>
                               <div>
-                                <h3 className="text-xl font-black text-gray-900 tracking-tight truncate max-w-[150px] sm:max-w-[200px]">{cls.teacher}</h3>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[150px]">{cls.teacher}</h3>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                                  <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider">{cls.subject}</span>
-                                  <span className="text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100 truncate max-w-[120px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
+                                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider">{cls.subject}</span>
+                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
                                 </div>
                               </div>
                             </div>
                             
                             {/* Status Badge */}
-                            <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm whitespace-nowrap ${
+                            <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm whitespace-nowrap ${
                               cls.status === 'confirmed' || cls.status === 'tuition_started'
                                 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 text-emerald-700 border-emerald-200/50' 
                                 : 'bg-gradient-to-r from-orange-50 to-orange-100/50 text-orange-700 border-orange-200/50'
@@ -2163,55 +2175,55 @@ export default function StudentDashboard() {
                           </div>
 
                           {/* Divider */}
-                          <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent my-1" />
+                          <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent my-1" />
 
                           {/* Details section */}
                           {cls.status === 'tuition_started' && cls.tutorDetails ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
                               {cls.tutorDetails.phone && (
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-4 h-4" /></div>
+                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Phone className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.tutorDetails.phone}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate">{cls.tutorDetails.phone}</p>
                                   </div>
                                 </div>
                               )}
                               {cls.tutorDetails.email && (
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Mail className="w-4 h-4" /></div>
+                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Mail className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.tutorDetails.email}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate" title={cls.tutorDetails.email}>{cls.tutorDetails.email}</p>
                                   </div>
                                 </div>
                               )}
                               {cls.tutorDetails.qualification && (
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><GraduationCap className="w-4 h-4" /></div>
+                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><GraduationCap className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Degree</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.tutorDetails.qualification}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Degree</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate">{cls.tutorDetails.qualification}</p>
                                   </div>
                                 </div>
                               )}
                               {cls.tutorDetails.experience && (
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Star className="w-4 h-4" /></div>
+                                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0"><Star className="w-3.5 h-3.5" /></div>
                                   <div className="overflow-hidden">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Experience</p>
-                                    <p className="font-semibold text-gray-700 truncate">{cls.tutorDetails.experience}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Exp.</p>
+                                    <p className="font-semibold text-slate-700 text-xs truncate">{cls.tutorDetails.experience}</p>
                                   </div>
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <div className="flex-grow flex items-center justify-center p-4 bg-gray-50/50 rounded-2xl border border-gray-100 border-dashed">
-                              <p className="text-sm font-medium text-gray-500 text-center">Contact details will be revealed once the tuition is active.</p>
+                            <div className="flex-grow flex items-center justify-center p-4 bg-slate-50/70 rounded-2xl border border-slate-200 border-dashed">
+                              <p className="text-sm font-medium text-slate-500 text-center">Contact details will be revealed once the tuition is active.</p>
                             </div>
                           )}
 
-                          <div className="mt-2 flex gap-2">
+                          <div className="mt-4 flex gap-2">
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2223,30 +2235,30 @@ export default function StudentDashboard() {
                                   setSelectedViewUser(viewUser);
                                   setSelectedViewApp(cls);
                                 }}
-                                className="w-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"
+                                className="w-full bg-white border-2 border-slate-200 hover:border-[#00a992] hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >
-                                View
+                                View Details
                             </button>
                           </div>
 
                           {/* Action Button */}
                           {cls.status === 'demo_requested_by_teacher' && (
-                            <div className="mt-auto flex flex-col gap-2">
-                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'accept_demo'); }} className="w-full bg-[#00a992] text-white hover:bg-[#008f7b] py-3.5 rounded-xl font-bold shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2">
+                            <div className="mt-2 flex flex-col gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'accept_demo'); }} className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white py-3.5 rounded-xl font-bold shadow-md shadow-emerald-500/25 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
                                 Accept Demo
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'decline'); }} className="w-full bg-red-50 text-red-600 hover:bg-red-100 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'decline'); }} className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
                                 Decline
                               </button>
                             </div>
                           )}
                           {cls.status === 'demo_requested_by_student' && (
-                            <div className="mt-auto w-full bg-blue-50 text-blue-600 py-3.5 rounded-xl font-bold text-center border border-blue-100">
+                            <div className="mt-2 w-full bg-blue-50 text-blue-600 py-3.5 rounded-xl font-bold text-center border border-blue-100">
                               Waiting for Teacher to Accept
                             </div>
                           )}
                           {cls.status === 'demo_pending_payment' && (
-                            <div className="mt-auto w-full bg-orange-50 text-orange-600 py-3.5 rounded-xl font-bold text-center border border-orange-100">
+                            <div className="mt-2 w-full bg-orange-50 text-orange-600 py-3.5 rounded-xl font-bold text-center border border-orange-100">
                               Waiting for Teacher to Pay
                             </div>
                           )}
@@ -2254,12 +2266,12 @@ export default function StudentDashboard() {
                       </li>
                     ))}
                     {(!data?.upcomingClasses || data?.upcomingClasses?.length === 0) && (
-                      <li className="col-span-full p-12 bg-white rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
-                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                          <BookOpen className="w-10 h-10 text-gray-300" />
+                      <li className="col-span-full p-12 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                          <BookOpen className="w-8 h-8 text-slate-300" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">No active classes</h3>
-                        <p className="text-gray-500 max-w-sm">You haven't hired any teachers yet. Explore our recommended tutors to get started!</p>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">No active classes</h3>
+                        <p className="text-slate-500 max-w-sm">You haven't hired any teachers yet. Explore our recommended tutors to get started!</p>
                       </li>
                     )}
                   </ul>
@@ -2818,9 +2830,26 @@ export default function StudentDashboard() {
                 
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                   <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                    Professional Details
+                    Contact & Professional Details
                   </h4>
+                  {(!selectedViewApp || !['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status)) ? (
+                    <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-100 flex items-center justify-center">
+                      <p className="text-sm font-bold text-orange-600 text-center">Contact details will be revealed once the demo is booked or tuition is active.</p>
+                    </div>
+                  ) : null}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {selectedViewApp && ['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status) && (selectedViewUser.phone || selectedViewUser.whatsapp || selectedViewUser.phoneNumber) && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone Number</p>
+                        <p className="font-bold text-gray-800">{selectedViewUser.phone || selectedViewUser.whatsapp || selectedViewUser.phoneNumber}</p>
+                      </div>
+                    )}
+                    {selectedViewApp && ['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status) && selectedViewUser.email && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
+                        <p className="font-bold text-gray-800 break-all">{selectedViewUser.email}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Experience</p>
                       <p className="font-bold text-gray-800">{selectedViewUser.experience || 'Not specified'}</p>

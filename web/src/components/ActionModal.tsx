@@ -11,6 +11,8 @@ interface ActionModalProps {
   placeholder: string;
   type: "price" | "timing" | "demo_booking";
   initialValue?: string;
+  initialDate?: string;
+  initialTime?: string;
   min?: number;
   max?: number;
   isOnline?: boolean;
@@ -25,13 +27,15 @@ export default function ActionModal({
   placeholder,
   type,
   initialValue = "",
+  initialDate = "",
+  initialTime = "",
   min,
   max,
   isOnline = false,
 }: ActionModalProps) {
   const [value, setValue] = useState(initialValue);
-  const [dateValue, setDateValue] = useState("");
-  const [timeValue, setTimeValue] = useState("");
+  const [dateValue, setDateValue] = useState(initialDate);
+  const [timeValue, setTimeValue] = useState(initialTime);
   const [platform, setPlatform] = useState("Google Meet");
   const [linkValue, setLinkValue] = useState("");
 
@@ -39,8 +43,10 @@ export default function ActionModal({
   useEffect(() => {
     if (isOpen) {
       setValue(initialValue);
+      setDateValue(initialDate);
+      setTimeValue(initialTime);
     }
-  }, [isOpen, initialValue]);
+  }, [isOpen, initialValue, initialDate, initialTime]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
