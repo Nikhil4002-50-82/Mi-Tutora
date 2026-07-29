@@ -460,6 +460,30 @@ export default function StudentDashboard() {
           if (tutor.gender !== genderPref) return false;
       }
 
+      let studentNeeds: string[] = [];
+      let teacherOffers: string[] = [];
+      
+      if (studentCat === 'school') {
+        studentNeeds = getDetail(scoringContext, 'subjects') || getDetail(scoringContext, 'combinedSubjects') || [];
+        teacherOffers = tutor.subjects || [];
+      } else if (studentCat === 'programming') {
+        studentNeeds = getDetail(scoringContext, 'technologies') || getDetail(scoringContext, 'combinedTechnologies') || [];
+        teacherOffers = tutor.technologies || [];
+      } else if (studentCat === 'languages') {
+        studentNeeds = getDetail(scoringContext, 'languages') || getDetail(scoringContext, 'combinedLanguages') || [];
+        teacherOffers = tutor.languagesTaught || tutor.languages || [];
+      }
+      
+      if (studentNeeds.length > 0) {
+        if (teacherOffers.length === 0) return false;
+        const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const allSubjectsMatched = studentNeeds.every((need:string) => {
+          const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
+        });
+        if (!allSubjectsMatched) return false;
+      }
+
       return true;
   });
 

@@ -932,6 +932,30 @@ export default function TeacherDashboard() {
           if (activeTeacher?.gender !== genderPref) return false;
       }
 
+      let studentNeeds: string[] = [];
+      let teacherOffers: string[] = [];
+      
+      if (studentCat === 'school') {
+        studentNeeds = getDetail(studentGroup, 'subjects') || getDetail(studentGroup, 'combinedSubjects') || [];
+        teacherOffers = activeTeacher?.subjects || [];
+      } else if (studentCat === 'programming') {
+        studentNeeds = getDetail(studentGroup, 'technologies') || getDetail(studentGroup, 'combinedTechnologies') || [];
+        teacherOffers = activeTeacher?.technologies || [];
+      } else if (studentCat === 'languages') {
+        studentNeeds = getDetail(studentGroup, 'languages') || getDetail(studentGroup, 'combinedLanguages') || [];
+        teacherOffers = activeTeacher?.languagesTaught || activeTeacher?.languages || [];
+      }
+      
+      if (studentNeeds.length > 0) {
+        if (teacherOffers.length === 0) return false;
+        const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const allSubjectsMatched = studentNeeds.every((need:string) => {
+          const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
+        });
+        if (!allSubjectsMatched) return false;
+      }
+
       return true;
   });
 

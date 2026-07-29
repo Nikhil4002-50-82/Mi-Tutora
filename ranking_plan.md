@@ -21,6 +21,8 @@ For a match to appear in the Recommended tab, the following conditions must be m
    - If a group prefers "Male", only Male teachers are shown.
    - If a group has "No Preference", both genders are shown.
    - Teachers, in turn, will only see groups that match their gender or have "No Preference".
+5. **Subject / Technology / Language Match**:
+   - The teacher must explicitly offer **ALL** of the specific subjects (e.g., Mathematics, Science), technologies (e.g., React, Node.js), or languages (e.g., French, Spanish) that the student group requires. If even one required subject is missing from the teacher's profile, they are filtered out of the Recommended tab.
 
 *If a match survives these strict filters, it is then sorted using the Point-Based Ranking System (below).*
 
