@@ -132,6 +132,16 @@ export default function TeacherDashboard() {
     const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', user.uid)));
     const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
+    const hiredAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', '==', 'tuition_started')));
+    const globallyHiredGroupIds = new Set();
+    const globallyHiredStudentIds = new Set();
+    hiredAppsSnap.docs.forEach(d => {
+      const data = d.data();
+      if (data.groupId) globallyHiredGroupIds.add(data.groupId);
+      if (data.studentId) globallyHiredStudentIds.add(data.studentId);
+      if (data.studentIds) data.studentIds.forEach((sid: string) => globallyHiredStudentIds.add(sid));
+    });
+
     let availableStudentsRaw: any[] = [];
     try {
       const requestsSnap = await getDocs(collection(db, 'students'));
@@ -164,8 +174,8 @@ export default function TeacherDashboard() {
     }, {});
 
     const availableGroupsRaw = Object.values(groupedStudentsMap).filter((g: any) => {
-      const app = applications.find((a: any) => (a.groupId === g.id || g.students.some((s:any) => s.id === a.studentId)) && a.status === 'tuition_started');
-      if (app) return false;
+      if (globallyHiredGroupIds.has(g.id)) return false;
+      if (g.students.some((s: any) => globallyHiredStudentIds.has(s.id))) return false;
       return true;
     }).map((g: any) => ({
       ...g,
@@ -1431,28 +1441,15 @@ export default function TeacherDashboard() {
                           const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                           const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
                           
-                          const isLocked = !!lockedApp || !!offerApp;
+                          const isLocked = false;
                           const isRed = !!lockedApp;
                           const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
-                          const labelText = isRed ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received'));
-                          const subText = isRed ? (lockedApp?.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable') : (isDemoPhase ? 'Demo in progress...' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Waiting for response...' : 'Waiting to analyze...'));
+                          const labelText = isRed ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : (offerApp ? 'Offer Received' : '')));
 
                           return (
                             <div key={group.id} className="bg-white rounded-3xl shadow-lg shadow-gray-200/40 border border-gray-100 hover:shadow-xl hover:shadow-gray-300/50 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full overflow-hidden relative group">
-                              {isLocked && (
-                                <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 shadow-sm ${isRed ? 'bg-red-50' : 'bg-emerald-50'}`}>
-                                    <Lock className={`w-5 h-5 ${isRed ? 'text-red-500' : 'text-emerald-500'}`} />
-                                  </div>
-                                  <h4 className="font-bold text-gray-900 text-sm mb-1">{labelText}</h4>
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    {subText}
-                                  </p>
-                                </div>
-                              )}
-                              
                               <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-5 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
                                   {group.rank && (
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${group.rank === 1 ? 'bg-yellow-400 text-yellow-900' : group.rank === 2 ? 'bg-gray-300 text-gray-800' : group.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
                                       #{group.rank}
@@ -1460,9 +1457,15 @@ export default function TeacherDashboard() {
                                   )}
                                   <h3 className="text-lg font-bold text-white tracking-tight truncate">{parentName}</h3>
                                 </div>
-                                <span className="px-2 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold rounded border border-white/30 uppercase tracking-wider flex-shrink-0 shadow-sm">
-                                  {group.category || 'Student'}
-                                </span>
+                                {labelText ? (
+                                  <span className={`px-2 py-1 text-[9px] font-black rounded border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
+                                    {labelText}
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold rounded border border-white/30 uppercase tracking-wider flex-shrink-0 shadow-sm">
+                                    {group.category || 'Student'}
+                                  </span>
+                                )}
                               </div>
                               
                               <div className="p-6 flex flex-col flex-grow">
@@ -2041,7 +2044,7 @@ export default function TeacherDashboard() {
                           {/* Details section */}
                           {(() => {
                             const primaryStudent = cls.studentDetails || cls.app?.studentsList?.[0];
-                            return cls.status === 'confirmed' && primaryStudent ? (
+                            return ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'confirmed', 'tuition_started', 'accepted'].includes(cls.status) && primaryStudent ? (
                               <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
                                 {(primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone) && (
                                   <a href={`tel:${primaryStudent.phoneNumber || primaryStudent.whatsappNumber || primaryStudent.parentDetails?.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
@@ -2362,7 +2365,7 @@ export default function TeacherDashboard() {
             <div className="p-8 sm:p-10 overflow-y-auto">
               <div className="space-y-8">
                 {/* Contact Information Block */}
-                {(!selectedViewApp || !['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status)) ? (
+                {(!selectedViewApp || !['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status)) ? (
                   <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 flex items-center justify-center">
                     <p className="text-sm font-bold text-orange-600 text-center">Contact details will be revealed once the demo is booked or tuition is active.</p>
                   </div>
@@ -2487,7 +2490,18 @@ export default function TeacherDashboard() {
               const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
               const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) return null;
+              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) {
+                let message = 'Currently unavailable for new requests.';
+                if (isHired) message = 'This student has already been hired.';
+                else if (cooldownApp) message = `Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days.`;
+                else if (hasNegotiation || isPending || selectedViewApp) message = 'You already have an active request or demo with this student.';
+                
+                return (
+                  <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center text-gray-500 font-medium text-sm">
+                    {message}
+                  </div>
+                );
+              }
               
               return (
                 <div className="mt-6 pt-6 border-t border-gray-100">

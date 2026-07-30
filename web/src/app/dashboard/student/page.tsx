@@ -1471,18 +1471,20 @@ export default function StudentDashboard() {
                                 return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
                               };
                               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
                               const offerApp = activeAppForGroup?.tutorId === tutor.id ? activeAppForGroup : undefined;
                               
                               const teacherLimit = tutor.isSubscribed ? 15 : 5;
                               const teacherPendingCount = tutor.pendingRequests?.length || 0;
                               const isTeacherFull = teacherPendingCount >= teacherLimit;
 
-                              const isLocked = !!activeAppForGroup || isTeacherFull; 
+                              const isLocked = !!activeAppForGroup || !!hiredAppForGroup || isTeacherFull; 
                               const isRed = isTeacherFull || (isLocked && !offerApp); 
                               const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                               
                               let labelText = '';
                               if (isTeacherFull) labelText = 'Queue Full';
+                              else if (hiredAppForGroup) labelText = 'Teacher Assigned';
                               else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
                               else if (activeAppForGroup) labelText = 'Busy with Another Demo';
 
@@ -1574,6 +1576,7 @@ export default function StudentDashboard() {
                       };
                       const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                       const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                      const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
                       const offerApp = activeAppForGroup?.tutorId === teacher.id ? activeAppForGroup : undefined;
                       
                       const teacherLimit = teacher.isSubscribed ? 15 : 5;
@@ -1583,19 +1586,21 @@ export default function StudentDashboard() {
                       const isPending = offerApp && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(offerApp.status);
                       const isHired = offerApp && ['tuition_started'].includes(offerApp.status);
                       
-                      const isLocked = !!lockedApp || !!activeAppForGroup || isTeacherFull;
+                      const isLocked = !!lockedApp || isTeacherFull;
                       const isRed = !!lockedApp || isTeacherFull || (!!activeAppForGroup && !offerApp);
                       const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                       
                       let labelText = '';
                       if (isTeacherFull) labelText = 'Queue Full';
                       else if (lockedApp) labelText = 'Locked';
+                      else if (hiredAppForGroup) labelText = 'Teacher Assigned';
                       else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
                       else if (activeAppForGroup) labelText = 'Busy with Another Demo';
                       
                       let subText = '';
                       if (isTeacherFull) subText = 'Teacher is unavailable';
                       else if (lockedApp) subText = lockedApp.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable';
+                      else if (hiredAppForGroup) subText = 'This group already has a teacher';
                       else if (offerApp) subText = isDemoPhase ? 'Demo in progress...' : (offerApp.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...');
                       else if (activeAppForGroup) subText = 'Active demo with another tutor';
                       
@@ -1613,7 +1618,7 @@ export default function StudentDashboard() {
                             </div>
                           )}
                           <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
                               {teacher.rank && (
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-300 text-gray-800' : teacher.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
                                   #{teacher.rank}
@@ -1621,9 +1626,15 @@ export default function StudentDashboard() {
                               )}
                               <h3 className="text-xl font-bold text-white tracking-tight truncate">{teacher.name}</h3>
                             </div>
-                            <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded-full border border-white/30 shadow-sm">
-                              {teacher.mode || 'Online'}
-                            </span>
+                            {!isLocked && labelText ? (
+                              <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
+                                {labelText}
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded-full border border-white/30 shadow-sm">
+                                {teacher.mode || 'Online'}
+                              </span>
+                            )}
                           </div>
                           <div className="p-6 flex flex-col flex-grow">
                             {teacher.teachingApproach && (
@@ -2179,7 +2190,7 @@ export default function StudentDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent my-1" />
 
                           {/* Details section */}
-                          {cls.status === 'tuition_started' && cls.tutorDetails ? (
+                          {['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(cls.status) && cls.tutorDetails ? (
                             <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm flex-grow">
                               {cls.tutorDetails.phone && (
                                 <a href={`tel:${cls.tutorDetails.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
@@ -2220,7 +2231,7 @@ export default function StudentDashboard() {
                             </div>
                           ) : (
                             <div className="flex-grow flex items-center justify-center p-4 bg-slate-50/70 rounded-2xl border border-slate-200 border-dashed">
-                              <p className="text-sm font-medium text-slate-500 text-center">Contact details will be revealed once the tuition is active.</p>
+                              <p className="text-sm font-medium text-slate-500 text-center">Contact details will be revealed once the demo is scheduled.</p>
                             </div>
                           )}
 
@@ -2856,19 +2867,19 @@ export default function StudentDashboard() {
                   <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                     Contact & Professional Details
                   </h4>
-                  {(!selectedViewApp || !['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status)) ? (
+                  {(!selectedViewApp || !['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status)) ? (
                     <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-100 flex items-center justify-center">
-                      <p className="text-sm font-bold text-orange-600 text-center">Contact details will be revealed once the demo is booked or tuition is active.</p>
+                      <p className="text-sm font-bold text-orange-600 text-center">Contact details will be revealed once the demo is scheduled.</p>
                     </div>
                   ) : null}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {selectedViewApp && ['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status) && (selectedViewUser.phone || selectedViewUser.whatsapp || selectedViewUser.phoneNumber) && (
+                    {selectedViewApp && ['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status) && (selectedViewUser.phone || selectedViewUser.whatsapp || selectedViewUser.phoneNumber) && (
                       <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone Number</p>
                         <p className="font-bold text-gray-800">{selectedViewUser.phone || selectedViewUser.whatsapp || selectedViewUser.phoneNumber}</p>
                       </div>
                     )}
-                    {selectedViewApp && ['demo_booked', 'tuition_started', 'confirmed'].includes(selectedViewApp.status) && selectedViewUser.email && (
+                    {selectedViewApp && ['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status) && selectedViewUser.email && (
                       <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
                         <p className="font-bold text-gray-800 break-all">{selectedViewUser.email}</p>
@@ -2993,15 +3004,16 @@ export default function StudentDashboard() {
                 return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
               };
               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+              const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
               const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['negotiating'].includes(app.status));
               const isPending = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
               const isHired = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['tuition_started'].includes(app.status));
               const cooldownApp = data?.applications?.find((app: any) => app.tutorId === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
-              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp || activeAppForGroup) {
+              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp || activeAppForGroup || hiredAppForGroup) {
                 return (
                   <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center text-gray-500 font-medium text-sm">
-                    {activeAppForGroup && activeAppForGroup.tutorId !== selectedViewUser.id ? 'You have an active demo with another tutor for this group.' : 'Currently unavailable for new requests.'}
+                    {hiredAppForGroup ? 'A teacher has already been hired for this group.' : (activeAppForGroup && activeAppForGroup.tutorId !== selectedViewUser.id ? 'You have an active demo with another tutor for this group.' : 'Currently unavailable for new requests.')}
                   </div>
                 );
               }
