@@ -1887,17 +1887,87 @@ export default function TeacherDashboard() {
 
             {/* TAB: SUBSCRIPTIONS */}
             {activeTab === 'subscriptions' && (
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Subscriptions</h2>
-                <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 text-center">
-                  <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <CreditCard className="w-8 h-8 text-emerald-500" />
+              <div className="space-y-8 pb-10">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">Subscriptions</h1>
+                    <p className="text-slate-500 font-medium mt-1">Upgrade your plan to send more requests and grow your business.</p>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Upgrade Your Plan</h3>
-                  <p className="text-gray-500 mb-6 max-w-md mx-auto">Increase your daily request limit from 5 to 15, and unlock premium features to grow your teaching business faster.</p>
-                  <button className="bg-[#00a992] hover:bg-[#008f7b] text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-[#00a992]/20">
-                    View Pricing (Coming Soon)
-                  </button>
+                </div>
+
+                {/* Current Plan Widget */}
+                <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Current Plan</p>
+                    <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                      Free <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md">Active</span>
+                    </h3>
+                  </div>
+                  <div className="text-right max-w-xs w-full">
+                    <p className="text-sm font-bold text-gray-900 mb-2">{dailyRequestsCount || 0} / 5 Requests Used This Week</p>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#00a992] rounded-full" style={{ width: `${Math.min(((dailyRequestsCount || 0) / 5) * 100, 100)}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center max-w-4xl mx-auto mt-8">
+                  {/* Free Plan */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm hover:shadow-md transition-all flex flex-col h-full">
+                    <h3 className="text-2xl font-black text-gray-900 mb-2">Basic</h3>
+                    <p className="text-slate-500 font-medium mb-6">Perfect for getting started.</p>
+                    <div className="text-4xl font-black text-gray-900 mb-8">
+                      Free <span className="text-lg text-slate-400 font-medium tracking-normal">/forever</span>
+                    </div>
+                    
+                    <ul className="space-y-4 mb-8 flex-1">
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                        <span className="text-gray-700 font-medium">Up to 5 requests per week</span>
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                        <span className="text-gray-700 font-medium">Standard profile visibility</span>
+                      </li>
+                    </ul>
+                    
+                    <button className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50" disabled>
+                      Current Plan
+                    </button>
+                  </div>
+
+                  {/* Pro Plan */}
+                  <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col h-full transform scale-105 border border-emerald-900/50">
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                      <Star className="w-32 h-32 text-emerald-300" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-2xl font-black text-white">Pro</h3>
+                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Recommended</span>
+                      </div>
+                      <p className="text-emerald-100/80 font-medium mb-6">For serious tutors looking to scale.</p>
+                      <div className="text-4xl font-black text-white mb-8">
+                        ₹499 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/month</span>
+                      </div>
+                      
+                      <ul className="space-y-4 mb-8 flex-1">
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-white font-medium text-lg">Up to 15 requests per week</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-white font-medium text-lg">Priority matching algorithm</span>
+                        </li>
+                      </ul>
+                      
+                      <button onClick={() => toast("Payments coming soon!", { icon: '🚧' })} className="w-full bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] font-black py-4 px-6 rounded-xl transition-all shadow-lg shadow-emerald-900/50 hover:shadow-emerald-900/80 active:scale-95">
+                        Upgrade to Pro
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -2135,6 +2205,31 @@ export default function TeacherDashboard() {
                   </div>
                 )}
                 
+                <div className="mt-12 pt-8 border-t border-slate-100">
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl p-8 border border-indigo-100 shadow-lg shadow-indigo-900/5 relative overflow-hidden group">
+                    <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-indigo-100/50 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
+                    <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-indigo-900 mb-2 tracking-tight flex items-center gap-2">
+                          <CreditCard className="w-5 h-5" /> Subscription Plan
+                        </h3>
+                        <p className="text-sm text-indigo-700/80 font-medium max-w-md">
+                          You are currently on the <strong className="text-indigo-900">Free</strong> plan. Upgrade to Pro to send up to 15 requests per week and grow your business faster.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setActiveTab('subscriptions');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-indigo-600/20 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all whitespace-nowrap"
+                      >
+                        View Subscriptions
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mt-12 pt-8 border-t border-red-50">
                   <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-3xl p-8 border border-red-100 shadow-lg shadow-red-900/5 relative overflow-hidden group">
                     <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-red-100/50 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
