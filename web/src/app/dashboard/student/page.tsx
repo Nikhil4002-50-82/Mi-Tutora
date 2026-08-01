@@ -1553,10 +1553,6 @@ export default function StudentDashboard() {
                                   <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200">
                                     <CheckCircle2 className="w-4 h-4" /> Already Hired
                                   </button>
-                                ) : isPending ? (
-                                  <button disabled className="w-full bg-orange-50 text-orange-700 font-bold py-3.5 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-orange-200">
-                                    Pending
-                                  </button>
                                 ) : (
                                   <div className="flex flex-col gap-2 mt-auto">
                                     <div className="flex gap-2">
@@ -1568,17 +1564,29 @@ export default function StudentDashboard() {
                                       </button>
                                       {negotiationOffer[teacher.id] ? (
                                         <button
-                                          disabled={requestLoading}
-                                          onClick={() => handleRequestTutor(teacher)}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
+                                          disabled={requestLoading && !offerApp}
+                                          onClick={() => {
+                                            if (!!offerApp) {
+                                              toast.error("You already have an active request or offer with this teacher.");
+                                              return;
+                                            }
+                                            handleRequestTutor(teacher);
+                                          }}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                         >
                                           {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Make Offer'}
                                         </button>
                                       ) : (
                                         <button
-                                          disabled={requestLoading}
-                                          onClick={() => { handleDirectRequestDemo(teacher); }}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
+                                          disabled={requestLoading && !offerApp}
+                                          onClick={() => { 
+                                            if (!!offerApp) {
+                                              toast.error("You already have an active request or offer with this teacher.");
+                                              return;
+                                            }
+                                            handleDirectRequestDemo(teacher); 
+                                          }}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                         >
                                           {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Request Demo'}
                                         </button>
