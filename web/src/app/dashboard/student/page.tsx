@@ -2492,6 +2492,10 @@ export default function StudentDashboard() {
                         if(editingStudentId) setEditingStudentId('');
                         mutate();
                       }} 
+                      onCancel={() => {
+                        if(activeStudentId === 'new') setActiveStudentId('');
+                        if(editingStudentId) setEditingStudentId('');
+                      }}
                     />
                   </div>
                 ) : (

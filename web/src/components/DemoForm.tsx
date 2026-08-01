@@ -14,6 +14,7 @@ interface Props {
   isDashboard?: boolean;
   hasProfile?: boolean;
   onSuccess?: () => void;
+  onCancel?: () => void;
   activeStudentId?: string;
   initialData?: any;
   parentOnly?: boolean;
@@ -29,6 +30,7 @@ export default function DemoForm({
   isDashboard = false,
   hasProfile = false,
   onSuccess,
+  onCancel,
   activeStudentId,
   initialData,
   parentOnly = false,
@@ -104,6 +106,8 @@ export default function DemoForm({
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [formData, setFormData] = useState(getInitialFormData());
   const [shouldSubmitGroup, setShouldSubmitGroup] = useState(false);
+  const [showStudentNumberPopup, setShowStudentNumberPopup] = useState(hasProfile && !parentOnly && (!activeStudentId || activeStudentId === 'new'));
+  const [tempStudentCount, setTempStudentCount] = useState(1);
 
   useEffect(() => {
     if (isDashboard && !initialData) {
@@ -935,20 +939,6 @@ export default function DemoForm({
             </div>
           )}
 
-          {(!activeStudentId || activeStudentId === 'new') && !parentOnly && (
-            <div>
-              <label className="block text-sm font-semibold mb-2">👥 Number of Students</label>
-              <select
-                value={formData.numberOfStudents}
-                onChange={(e) => updateNumberOfStudents(parseInt(e.target.value))}
-                className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
-              >
-                {[1, 2, 3, 4, 5].map(num => (
-                  <option key={num} value={num}>{num} Student{num > 1 ? 's' : ''}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {!parentOnly && (
             <>
@@ -1208,22 +1198,13 @@ export default function DemoForm({
 
     return (
       <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
-        <h3 className="text-2xl font-bold border-b pb-4">Details for Student</h3>
+        <h3 className="text-2xl font-bold border-b pb-4">
+          {(!activeStudentId || activeStudentId === 'new') && formData.numberOfStudents > 1
+            ? `Details for Student (${sIndex + 1}/${formData.numberOfStudents})`
+            : 'Details for Student'}
+        </h3>
         
-        {sIndex === 0 && hasProfile && (!activeStudentId || activeStudentId === 'new') && !parentOnly && (
-          <div className="mb-6">
-            <label className="block text-sm font-semibold mb-2">👥 Number of Students to Add</label>
-            <select
-              value={formData.numberOfStudents}
-              onChange={(e) => updateNumberOfStudents(parseInt(e.target.value))}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white"
-            >
-              {[1, 2, 3, 4, 5].map(num => (
-                <option key={num} value={num}>{num} Student{num > 1 ? 's' : ''}</option>
-              ))}
-            </select>
-          </div>
-        )}
+
         
         <div className="mb-6">
           <label className="block text-sm font-semibold mb-2">📚 Category *</label>
@@ -1461,7 +1442,69 @@ export default function DemoForm({
   }
 
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto">
+    <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto relative">
+      {showStudentNumberPopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl shadow-teal-900/20 animate-in zoom-in-95 duration-300 border border-slate-100 relative overflow-hidden">
+            {/* Decorative background circle */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-teal-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+            
+            <div className="relative">
+              <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-sm border border-teal-100">
+                👨‍🎓
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Add New Students</h3>
+              <p className="text-slate-500 mb-8 font-medium">How many students would you like to register? You can add up to 5 at once.</p>
+              
+              <div className="mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Number of Students</label>
+                <div className="relative">
+                  <select
+                    value={tempStudentCount}
+                    onChange={(e) => setTempStudentCount(parseInt(e.target.value))}
+                    className="w-full border-2 border-slate-200 rounded-xl px-5 py-4 bg-white text-slate-800 font-bold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    {[1, 2, 3, 4, 5].map(num => (
+                      <option key={num} value={num}>{num} {num > 1 ? 'Students' : 'Student'}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onCancel) {
+                      onCancel();
+                    } else {
+                      router.back();
+                    }
+                  }}
+                  className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateNumberOfStudents(tempStudentCount);
+                    setShowStudentNumberPopup(false);
+                  }}
+                  className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-teal-500/25 hover:-translate-y-1 active:scale-95 flex justify-center items-center gap-2"
+                >
+                  Continue
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {hasProfile && !isEditing ? (
         renderProfileView()
       ) : (
