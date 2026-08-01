@@ -2435,7 +2435,7 @@ export default function StudentDashboard() {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover/header:scale-110 transition-transform duration-700" />
                             <div className="relative z-10">
                               <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 line-clamp-1">
-                                Group {idx + 1}: {group.name.replace(/^Group:\s*/i, '')}
+                                Group {idx + 1}
                               </h3>
                               <p className="text-xs font-bold text-teal-100 uppercase tracking-widest mt-1 flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-teal-300" /> {group.category}

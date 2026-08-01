@@ -1268,10 +1268,6 @@ export default function TeacherDashboard() {
                                         <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-xl shadow-none text-sm cursor-not-allowed border border-emerald-200">
                                           Active Student
                                         </button>
-                                      ) : isPending ? (
-                                        <button disabled className="w-full bg-orange-50 text-orange-700 font-bold py-3.5 rounded-xl shadow-none text-sm cursor-not-allowed border border-orange-200">
-                                          Pending
-                                        </button>
                                       ) : (
                                         <div className="flex flex-col gap-2">
                                           <div className="flex gap-2">
@@ -1283,18 +1279,28 @@ export default function TeacherDashboard() {
                                             </button>
                                             {negotiationOffer[group.id] ? (
                                               <button 
-                                                onClick={() => handleSendOffer(group)}
-                                                disabled={offerLoading}
-                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all shadow-lg text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
+                                                onClick={() => {
+                                                  if (!!offerApp) {
+                                                    toast.error("You already have an active request or offer sent to this group.");
+                                                    return;
+                                                  }
+                                                  handleSendOffer(group);
+                                                }}
+                                                disabled={offerLoading && !offerApp}
+                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all text-sm ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                               >
-                                                {offerLoading ? 'Sending...' : 'Make Offer'}
+                                                {offerLoading && !offerApp ? 'Sending...' : 'Make Offer'}
                                               </button>
                                             ) : (
                                               <button
                                                 onClick={() => {
+                                                  if (!!offerApp) {
+                                                    toast.error("You already have an active request or offer sent to this group.");
+                                                    return;
+                                                  }
                                                   handleDirectRequestDemo(group);
                                                 }}
-                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all shadow-lg text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]'}`}
+                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all text-sm ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                               >
                                                 Request Demo
                                               </button>
