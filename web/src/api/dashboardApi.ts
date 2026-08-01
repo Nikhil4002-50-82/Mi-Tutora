@@ -485,6 +485,73 @@ export const fetchTeacherDashboardData = async () => {
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupId || app.studentId)));
 
+  let totalRevenue = 0;
+  let demoFeesPaid = 0;
+  let activeMRR = 0;
+  const ledgerEntries: any[] = [];
+
+  applicationsWithSubjects.forEach((app: any) => {
+    // Track Demo Fee (Teacher Outflow)
+    // If the application reached demo_scheduled or beyond, the teacher paid the demo fee.
+    const hasPassedDemoPhase = ['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status);
+    if (hasPassedDemoPhase) {
+      const dFee = 100; // Estimated fallback demo fee
+      demoFeesPaid += dFee;
+      ledgerEntries.push({
+        id: `${app.id}_demo`,
+        date: app.createdAt || Date.now(), // Approximate date
+        studentName: app.studentName || 'Student',
+        subject: app.category || 'General',
+        amount: dFee,
+        type: 'demo_fee_paid',
+        isOutflow: true
+      });
+    }
+
+    // Track First Month Fee (Teacher Inflow)
+    if (app.status === 'tuition_started') {
+      const fFee = app.finalPrice || 0;
+      totalRevenue += fFee;
+      activeMRR += fFee;
+      ledgerEntries.push({
+        id: `${app.id}_first_month`,
+        date: app.updatedAt || Date.now(), // Approximate start date
+        studentName: app.studentName || 'Student',
+        subject: app.category || 'General',
+        amount: fFee,
+        type: 'first_month_received',
+        isOutflow: false
+      });
+    }
+
+    // Track Subsequent Manual Payments
+    if (app.subsequentPayments && Array.isArray(app.subsequentPayments)) {
+      app.subsequentPayments.forEach((pmt: any, index: number) => {
+        totalRevenue += pmt.amount;
+        ledgerEntries.push({
+          id: `${app.id}_manual_${index}`,
+          date: pmt.date || Date.now(),
+          studentName: app.studentName || 'Student',
+          subject: app.category || 'General',
+          amount: pmt.amount,
+          type: 'manual_payment',
+          isOutflow: false
+        });
+      });
+    }
+  });
+
+  // Sort ledger by date descending
+  ledgerEntries.sort((a, b) => b.date - a.date);
+
+  const earningsData = {
+    totalRevenue,
+    demoFeesPaid,
+    netRevenue: totalRevenue - demoFeesPaid,
+    activeMRR,
+    ledgerEntries
+  };
+
   return {
     user,
     userData,
@@ -501,6 +568,7 @@ export const fetchTeacherDashboardData = async () => {
     allNegotiations,
     allNotifications,
     recommendedNegotiations,
+    earningsData,
     demoClasses: applicationsWithSubjects.filter((app: any) => ['demo_booking_phase', 'demo_scheduled'].includes(app.status)).map((app: any) => ({
       id: app.id,
       app: app,

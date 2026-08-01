@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -87,6 +87,7 @@ export default function TeacherDashboard() {
   const [payingClass, setPayingClass] = useState<any>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [postPaymentPopup, setPostPaymentPopup] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR(
@@ -321,6 +322,29 @@ export default function TeacherDashboard() {
       toast.error(e.message || "Payment failed");
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleMarkAsPaid = async (app: any) => {
+    setActionLoading(app.id);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      
+      await updateDoc(doc(db, 'applications', app.id), {
+        subsequentPayments: arrayUnion({
+          amount: app.finalPrice || 0,
+          date: Date.now()
+        }),
+        updatedAt: Date.now()
+      });
+      
+      toast.success("Payment marked as received!");
+      mutate();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to mark payment as received");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -595,6 +619,7 @@ export default function TeacherDashboard() {
     { id: 'requests', label: 'Requests & Offers', icon: Handshake },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'my_students', label: 'My Students', icon: BookOpen },
+    { id: 'earnings', label: 'Earnings', icon: IndianRupee },
     { id: 'referrals', label: 'Referrals', icon: Gift },
   ];
 
@@ -942,32 +967,50 @@ export default function TeacherDashboard() {
               return (
                 <div className="flex flex-col gap-8 h-full pb-10">
                   {/* Hero Section */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+                    <div className="md:col-span-5 flex flex-col justify-center">
                       <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
                         Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! <span className="text-4xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
-                      <p className="text-slate-500 text-lg">Nice to have you back, what an exciting day! Get ready to continue your teaching journey.</p>
+                      <p className="text-slate-500 text-lg leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
                     </div>
 
-                    {/* Profile Completeness Card */}
-                    <div 
-                      onClick={() => setActiveTab('profile')}
-                      className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-5 shadow-lg shadow-emerald-900/5 md:w-80 flex-shrink-0 flex items-start gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-emerald-200 transition-all duration-300"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-white shadow-sm text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-50">
-                        <User className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-1">
-                          <p className="font-bold text-gray-900 text-sm tracking-tight">Strengthen your profile</p>
-                        </div>
-                        <p className="text-xs text-slate-500 mb-3 leading-snug font-medium">You're {profileCompleteness}% there! Add missing details to stand out.</p>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-emerald-100/50 rounded-full overflow-hidden shadow-inner">
-                            <div className="h-full bg-gradient-to-r from-[#00a992] to-teal-400 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
+                    <div className="md:col-span-7 flex flex-col sm:flex-row gap-4 justify-end">
+                      {/* Earnings Mini Widget */}
+                      <div 
+                        onClick={() => setActiveTab('earnings')}
+                        className="flex-1 bg-gradient-to-br from-white to-emerald-50/30 border border-emerald-100/60 rounded-3xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-emerald-200 transition-all duration-300 cursor-pointer flex flex-col justify-between group"
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-100/50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                            <IndianRupee className="w-5 h-5" />
                           </div>
-                          <span className="text-xs font-bold text-emerald-600">{profileCompleteness}%</span>
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">View All</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
+                          <h3 className="text-2xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
+                          <p className="text-xs text-emerald-600 font-semibold mt-1">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'} Active MRR</p>
+                        </div>
+                      </div>
+
+                      {/* Profile Completeness Card */}
+                      <div 
+                        onClick={() => setActiveTab('profile')}
+                        className="flex-1 bg-gradient-to-br from-white to-slate-50 border border-gray-200 rounded-3xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-white shadow-sm text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 flex flex-col justify-end">
+                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-1">Strengthen Profile</p>
+                          <p className="text-xs text-slate-500 mb-3 font-medium">You're {profileCompleteness}% there!</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                              <div className="h-full bg-slate-400 rounded-full" style={{ width: `${profileCompleteness}%` }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-slate-600">{profileCompleteness}%</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1927,6 +1970,121 @@ export default function TeacherDashboard() {
                   ) : (
                     <div className="p-8 text-center text-gray-500 font-medium">You haven't referred anyone yet.</div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: EARNINGS */}
+            {activeTab === 'earnings' && (
+              <div className="space-y-8 pb-10">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">Earnings & Ledger</h1>
+                    <p className="text-slate-500 font-medium mt-1">Track your income, demo fees, and payment history.</p>
+                  </div>
+                </div>
+
+                {/* Analytics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Net Revenue */}
+                  <div className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100/50 text-emerald-600 flex items-center justify-center border border-emerald-100 mb-4">
+                      <IndianRupee className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
+                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
+                  </div>
+
+                  {/* First Month Gross */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
+                      <TrendingUp className="w-6 h-6 text-emerald-500" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gross Inflow</p>
+                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.totalRevenue?.toLocaleString() || '0'}</h3>
+                  </div>
+
+                  {/* Demo Fees Paid */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
+                      <TrendingDown className="w-6 h-6 text-orange-500" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Demo Fees Paid</p>
+                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.demoFeesPaid?.toLocaleString() || '0'}</h3>
+                  </div>
+
+                  {/* Active MRR */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-blue-50/50 text-blue-600 flex items-center justify-center border border-blue-100 mb-4">
+                      <CalendarDays className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Active Monthly (MRR)</p>
+                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'}</h3>
+                  </div>
+                </div>
+
+                {/* Ledger & Active Tuitions */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                  {/* Ledger */}
+                  <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                      <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                        Transaction Ledger
+                      </h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto custom-scrollbar">
+                      {data?.earningsData?.ledgerEntries?.length > 0 ? (
+                        data.earningsData.ledgerEntries.map((entry: any) => (
+                          <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${entry.isOutflow ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                {entry.isOutflow ? <TrendingDown className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 text-sm">{entry.studentName}</p>
+                                <p className="text-xs text-slate-500 font-medium capitalize mt-0.5">{entry.type.replace(/_/g, ' ')} • {new Date(entry.date).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-bold ${entry.isOutflow ? 'text-orange-600' : 'text-emerald-600'}`}>
+                                {entry.isOutflow ? '-' : '+'}₹{entry.amount?.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-gray-500 font-medium text-sm">No transactions found.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Active Tuitions */}
+                  <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                      <h3 className="font-bold text-gray-900 text-lg">Active Tuitions</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto custom-scrollbar">
+                      {data?.upcomingClasses?.length > 0 ? (
+                        data.upcomingClasses.map((cls: any) => (
+                          <div key={cls.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <div>
+                              <p className="font-bold text-gray-900 text-sm">{cls.student}</p>
+                              <p className="text-xs text-slate-500 font-medium mt-0.5">{cls.subject} • ₹{cls.app.finalPrice}/mo</p>
+                            </div>
+                            <button
+                              onClick={() => handleMarkAsPaid(cls.app)}
+                              disabled={actionLoading === cls.id}
+                              className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === cls.id ? 'Marking...' : 'Mark Paid (Manual)'}
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-gray-500 font-medium text-sm">No active tuitions yet.</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
