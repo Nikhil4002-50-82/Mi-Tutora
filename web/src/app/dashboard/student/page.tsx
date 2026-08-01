@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2 } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -98,7 +98,13 @@ export default function StudentDashboard() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [showGroupManager, setShowGroupManager] = useState(false);
+
+  const [modifiedGroupQueue, setModifiedGroupQueue] = useState<string[]>([]);
+  const [showPreferencesPrompt, setShowPreferencesPrompt] = useState(false);
+  const [pendingGroupSaveData, setPendingGroupSaveData] = useState<any[]>([]);
+  const [isSavingGroups, setIsSavingGroups] = useState(false);
+  const [viewingGroupDetails, setViewingGroupDetails] = useState<any>(null);
+  
   const [groupSettingsModalOpen, setGroupSettingsModalOpen] = useState(false);
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<any>(null);
   const [newlyCreatedGroupId, setNewlyCreatedGroupId] = useState<string | null>(null);
@@ -370,6 +376,93 @@ export default function StudentDashboard() {
         category: g.categories[0]
       }));
   }, [allStudents]);
+
+  const executeGroupSave = async (saveData: any[], openModalAfter: boolean) => {
+    setIsSavingGroups(true);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
+      const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+      
+      const newGroupIds = new Set<string>();
+
+      for (const student of saveData) {
+        await updateDoc(doc(db, 'students', student.id), {
+          groupId: student.groupId
+        });
+        if (student.groupId) {
+          newGroupIds.add(student.groupId);
+        }
+      }
+      
+      for (const groupId of Array.from(newGroupIds)) {
+          const groupRef = doc(db, 'groups', groupId);
+          const groupSnap = await getDoc(groupRef);
+          
+          if (!groupSnap.exists()) {
+            const sampleStudent = saveData.find(s => s.groupId === groupId);
+            const oldStudentData = allStudents.find((s:any) => s.id === sampleStudent?.id);
+            let oldGroupData: any = {};
+            if (oldStudentData && oldStudentData.groupId) {
+              const oldGroupSnap = await getDoc(doc(db, 'groups', oldStudentData.groupId));
+              if (oldGroupSnap.exists()) oldGroupData = oldGroupSnap.data();
+            }
+            
+            await setDoc(groupRef, {
+                id: groupId,
+                parentId: data?.user?.uid,
+                mode: oldGroupData.mode || '',
+                area: oldGroupData.area || '',
+                city: oldGroupData.city || '',
+                latitude: oldGroupData.latitude || null,
+                longitude: oldGroupData.longitude || null,
+                teacherGenderPreference: oldGroupData.teacherGenderPreference || 'No Preference',
+                preferredTimeRange: oldGroupData.preferredTimeRange || '',
+                daysPerWeek: oldGroupData.daysPerWeek || '',
+                specificDays: oldGroupData.specificDays || [],
+                createdAt: Date.now(),
+                status: 'active'
+            });
+            setNewlyCreatedGroupId(groupId);
+          }
+          
+          const groupStudents = saveData.filter(s => s.groupId === groupId).map(s => s.id);
+          await updateDoc(groupRef, { studentIds: groupStudents });
+          await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
+      }
+
+      const allGroupsQuery = query(collection(db, 'groups'), where('parentId', '==', data?.user?.uid));
+      const allGroupsSnap = await getDocs(allGroupsQuery);
+      for (const groupDoc of allGroupsSnap.docs) {
+          const reqData = groupDoc.data();
+          if (reqData.id && !newGroupIds.has(reqData.id)) {
+            await deleteDoc(doc(db, 'groups', reqData.id));
+            const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', reqData.id));
+            const requestSnap = await getDocs(requestQuery);
+            for(const r of requestSnap.docs) await deleteDoc(r.ref);
+          }
+      }
+
+      toast.success("Groups updated successfully!");
+      mutate();
+      
+      if (openModalAfter && modifiedGroupQueue.length > 0) {
+        const nextGroupId = modifiedGroupQueue[0];
+        const nextGroup = studentGroups.find((g:any) => g.id === nextGroupId) || { id: nextGroupId, name: `Group` };
+        const requestDoc = data?.groups?.find((g: any) => g.id === nextGroupId) || data?.tuitionRequests?.find((req: any) => req.groupId === nextGroupId) || data?.myRequest;
+        setSelectedGroupForSettings({ ...nextGroup, requestDoc });
+        setGroupSettingsModalOpen(true);
+      } else {
+        setModifiedGroupQueue([]);
+        setActiveTab('profile');
+      }
+    } catch (error) {
+      console.error("Error saving groups:", error);
+      toast.error("Failed to save group changes.");
+    } finally {
+      setIsSavingGroups(false);
+    }
+  };
 
   useEffect(() => {
     if (newlyCreatedGroupId && studentGroups && studentGroups.length > 0) {
@@ -1771,6 +1864,52 @@ export default function StudentDashboard() {
               </div>
             )}
 
+            {/* TAB: MANAGE GROUPS */}
+            {activeTab === 'manage_groups' && (
+              <div className="space-y-8 animate-in fade-in duration-300 h-full">
+                <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/40 border border-slate-100 min-h-[600px] relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-teal-50 rounded-full blur-3xl opacity-60 pointer-events-none translate-x-1/3 -translate-y-1/3"></div>
+                  
+                  <div className="mb-8 flex items-center gap-4 relative z-10">
+                    <button 
+                      onClick={() => setActiveTab('profile')}
+                      className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 shadow-sm"
+                    >
+                      <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <div>
+                      <h2 className="text-3xl font-black text-slate-900 tracking-tight">Manage Groups</h2>
+                      <p className="text-slate-500 font-medium mt-1">Organize your students into logical groups</p>
+                    </div>
+                  </div>
+                  
+                  <GroupManager 
+                    students={allStudents}
+                    title=""
+                    subtitle="Drag and drop students to change their group assignments. Click save when you are done."
+                    onSave={(groupedStudents) => {
+                        const modifiedGroupIds = new Set<string>();
+                        for (const student of groupedStudents) {
+                          const oldStudent = allStudents.find((s:any) => s.id === student.id);
+                          if (oldStudent?.groupId !== student.groupId) {
+                            if (student.groupId) modifiedGroupIds.add(student.groupId);
+                          }
+                        }
+
+                        if (modifiedGroupIds.size > 0) {
+                          setPendingGroupSaveData(groupedStudents);
+                          setModifiedGroupQueue(Array.from(modifiedGroupIds));
+                          setShowPreferencesPrompt(true);
+                        } else {
+                          executeGroupSave(groupedStudents, false);
+                        }
+                    }}
+                    onCancel={() => setActiveTab('profile')}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* TAB: REQUESTS */}
             {activeTab === 'requests' && (() => {
               const displayRequests = activeRequestViewId 
@@ -2448,6 +2587,12 @@ export default function StudentDashboard() {
                   {hasProfile && (
                     <div className="flex gap-3">
                       <button 
+                        onClick={() => setActiveTab('manage_groups')}
+                        className="bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all flex items-center gap-2"
+                      >
+                        <Users className="w-4 h-4" /> Manage Groups
+                      </button>
+                      <button 
                         onClick={() => {
                           setActiveStudentId('new');
                         }}
@@ -2479,6 +2624,7 @@ export default function StudentDashboard() {
                       category={selectedCategory} 
                       activeStudentId={editingStudentId || activeStudentId} 
                       defaultIsEditing={!!editingStudentId}
+                      existingGroups={studentGroups}
                       initialData={(() => {
                         const activeId = editingStudentId || activeStudentId;
                         if (activeId !== 'new' && activeId !== '') {
@@ -2499,155 +2645,82 @@ export default function StudentDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {studentGroups.map((group: any, idx: number) => {
                       const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupId === group.id) || data?.myRequest; // Fallback
                       
                       return (
-                        <div key={group.id} className="relative bg-white/80 backdrop-blur-md rounded-3xl shadow-xl shadow-teal-900/5 border border-white/50 hover:shadow-2xl hover:shadow-teal-900/10 transition-all duration-300 overflow-hidden group">
-                          <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
-                            <div className="absolute top-0 right-1/4 w-40 h-40 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+                        <div key={group.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg hover:shadow-teal-900/5 transition-all duration-300 flex flex-col h-full">
+                          {/* Header */}
+                          <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-5 flex justify-between items-center relative overflow-hidden group/header">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover/header:scale-110 transition-transform duration-700" />
                             <div className="relative z-10">
-                              <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                              <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 line-clamp-1">
                                 Group {idx + 1}: {group.name.replace(/^Group:\s*/i, '')}
                               </h3>
-                              <p className="text-sm font-medium text-emerald-100/90 capitalize mt-1 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" /> {group.category}
+                              <p className="text-xs font-bold text-teal-100 uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-teal-300" /> {group.category}
                               </p>
                             </div>
-                            <button
-                              onClick={() => {
-                                setSelectedGroupForSettings({ ...group, requestDoc });
-                                setGroupSettingsModalOpen(true);
-                              }}
-                              className="relative z-10 bg-white border border-emerald-100 text-emerald-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-50 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto"
-                            >
-                              <Settings className="w-4 h-4" /> Group Preferences
-                            </button>
+                            <div className="relative z-10 flex flex-shrink-0 ml-3">
+                              <span className="text-xs font-bold text-teal-900 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-lg shadow-sm">
+                                ₹{group.totalBudget}/mo
+                              </span>
+                            </div>
                           </div>
-                          
-                          <div className="p-6 sm:p-8 bg-slate-50/50">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2"><Users className="w-4 h-4" /> Students in this group</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+
+                          {/* Student List */}
+                          <div className="p-5 flex-grow">
+                            <ul className="space-y-1">
                               {group.students.map((s: any) => (
-                                <div key={s.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-lg hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-300">
-                                  <div className="flex justify-between items-start mb-4">
-                                    <h5 className="text-lg font-bold text-slate-800 tracking-tight">{s.name}</h5>
-                                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">₹{s.budget}/mo</span>
-                                  </div>
-                                  <div className="space-y-2 text-sm text-slate-600 flex-grow bg-slate-50 p-4 rounded-xl border border-slate-100/60 shadow-inner">
-                                    {s.classLevel && <p><strong className="text-slate-900">Class:</strong> {s.classLevel}</p>}
-                                    {s.board && <p><strong className="text-slate-900">Board:</strong> {s.board}</p>}
-                                    {s.subjects && s.subjects.length > 0 && <p className="truncate" title={s.subjects.join(', ')}><strong className="text-slate-900">Subjects:</strong> {s.subjects.join(', ')}</p>}
-                                    {s.technologies && s.technologies.length > 0 && <p className="truncate" title={s.technologies.join(', ')}><strong className="text-slate-900">Tech:</strong> {s.technologies.join(', ')}</p>}
-                                    {s.languages && s.languages.length > 0 && <p className="truncate" title={s.languages.join(', ')}><strong className="text-slate-900">Lang:</strong> {s.languages.join(', ')}</p>}
-                                  </div>
-                                  <div className="flex gap-3 mt-5 pt-5 border-t border-slate-100">
+                                <li key={s.id} className="group/student flex justify-between items-center p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                  <span className="font-medium text-slate-700 flex items-center gap-2">
+                                    <User className="w-4 h-4 text-slate-400" /> {s.name}
+                                  </span>
+                                  <div className="flex gap-1 opacity-0 group-hover/student:opacity-100 transition-opacity">
                                     <button 
                                       onClick={() => setEditingStudentId(s.id)}
-                                      className="flex-1 text-emerald-700 font-bold hover:text-emerald-800 hover:bg-emerald-100 transition-colors bg-emerald-50 py-2.5 rounded-xl text-sm border border-emerald-100/50"
+                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                                      title="Edit Student"
                                     >
-                                      Edit
+                                      <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button 
                                       onClick={() => setStudentToRemove(s)}
-                                      className="w-10 flex items-center justify-center text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                       title="Remove Student"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
-                                </div>
+                                </li>
                               ))}
-                            </div>
+                            </ul>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="flex border-t border-slate-100 bg-slate-50/50">
+                            <button
+                              onClick={() => {
+                                setViewingGroupDetails({ ...group, index: idx + 1 });
+                              }}
+                              className="flex-1 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 border-r border-slate-100"
+                            >
+                              <Info className="w-4 h-4" /> View Details
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedGroupForSettings({ ...group, requestDoc });
+                                setGroupSettingsModalOpen(true);
+                              }}
+                              className="flex-1 py-3 text-sm font-bold text-slate-600 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <Settings className="w-4 h-4" /> Preferences
+                            </button>
                           </div>
                         </div>
                       );
                     })}
-                  </div>
-                )}
-
-                {allStudents.length > 1 && !editingStudentId && activeStudentId !== 'new' && (
-                  <div className="mt-12">
-                    <div className="bg-white rounded-3xl shadow-xl overflow-hidden min-h-[600px] border border-gray-100">
-                      <GroupManager 
-                        students={allStudents}
-                        title="Manage Groups"
-                        subtitle="Drag and drop students to change their group assignments. Click save when you are done."
-                        onSave={async (groupedStudents) => {
-                          try {
-                            const { db } = await import('@/utils/firebase/client');
-                            const { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
-                            const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
-                            
-                            const newGroupIds = new Set<string>();
-
-                            for (const student of groupedStudents) {
-                              await updateDoc(doc(db, 'students', student.id), {
-                                groupId: student.groupId
-                              });
-                              if (student.groupId) {
-                                newGroupIds.add(student.groupId);
-                              }
-                            }
-                            
-                            for (const groupId of Array.from(newGroupIds)) {
-                               const groupRef = doc(db, 'groups', groupId);
-                               const groupSnap = await getDoc(groupRef);
-                               
-                               if (!groupSnap.exists()) {
-                                  const sampleStudent = groupedStudents.find(s => s.groupId === groupId);
-                                  const oldStudentData = allStudents.find(s => s.id === sampleStudent?.id);
-                                  let oldGroupData: any = {};
-                                  if (oldStudentData && oldStudentData.groupId) {
-                                    const oldGroupSnap = await getDoc(doc(db, 'groups', oldStudentData.groupId));
-                                    if (oldGroupSnap.exists()) oldGroupData = oldGroupSnap.data();
-                                  }
-                                  
-                                  await setDoc(groupRef, {
-                                     id: groupId,
-                                     parentId: data?.user?.uid,
-                                     mode: oldGroupData.mode || '',
-                                     area: oldGroupData.area || '',
-                                     city: oldGroupData.city || '',
-                                     latitude: oldGroupData.latitude || null,
-                                     longitude: oldGroupData.longitude || null,
-                                     teacherGenderPreference: oldGroupData.teacherGenderPreference || 'No Preference',
-                                     preferredTimeRange: oldGroupData.preferredTimeRange || '',
-                                     daysPerWeek: oldGroupData.daysPerWeek || '',
-                                     specificDays: oldGroupData.specificDays || [],
-                                     createdAt: Date.now(),
-                                     status: 'active'
-                                  });
-                                  toast.info("New group created and preferences transferred!");
-                                  setNewlyCreatedGroupId(groupId);
-                               }
-                               
-                               const groupStudents = groupedStudents.filter(s => s.groupId === groupId).map(s => s.id);
-                               await updateDoc(groupRef, { studentIds: groupStudents });
-                               await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
-                            }
-
-                            const allGroupsQuery = query(collection(db, 'groups'), where('parentId', '==', data?.user?.uid));
-                            const allGroupsSnap = await getDocs(allGroupsQuery);
-                            for (const groupDoc of allGroupsSnap.docs) {
-                               const reqData = groupDoc.data();
-                               if (reqData.id && !newGroupIds.has(reqData.id)) {
-                                 await deleteDoc(doc(db, 'groups', reqData.id));
-                                 const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', reqData.id));
-                                 const requestSnap = await getDocs(requestQuery);
-                                 for(const r of requestSnap.docs) await deleteDoc(r.ref);
-                               }
-                            }
-
-                            toast.success("Groups updated successfully!");
-                            mutate(); // Refresh data
-                          } catch (e: any) {
-                            toast.error("Failed to update groups: " + e.message);
-                          }
-                        }}
-                      />
-                    </div>
                   </div>
                 )}
 
@@ -3236,18 +3309,120 @@ export default function StudentDashboard() {
       )}
 
       </main>
+      
+      {showPreferencesPrompt && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+             <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mb-5">
+               <Settings className="w-6 h-6 text-teal-600" />
+             </div>
+             <h3 className="text-xl font-bold text-slate-900 mb-2">Update Group Preferences?</h3>
+             <p className="text-slate-600 mb-8 font-medium">You have modified the students in {modifiedGroupQueue.length} group(s). Would you like to review and update their group preferences (e.g., preferred timings, teacher gender) now?</p>
+             <div className="flex gap-4">
+               <button 
+                 onClick={() => { 
+                   setShowPreferencesPrompt(false); 
+                   executeGroupSave(pendingGroupSaveData, false);
+                 }} 
+                 disabled={isSavingGroups}
+                 className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 active:scale-95 transition-all disabled:opacity-50"
+               >
+                 No, Skip
+               </button>
+               <button 
+                 onClick={() => { 
+                    setShowPreferencesPrompt(false);
+                    executeGroupSave(pendingGroupSaveData, true);
+                 }} 
+                 disabled={isSavingGroups}
+                 className="flex-1 px-4 py-3 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 active:scale-95 transition-all shadow-lg shadow-teal-500/25 disabled:opacity-50"
+               >
+                 Yes, Update
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
+
       <GroupSettingsModal 
         isOpen={groupSettingsModalOpen}
         onClose={() => {
           setGroupSettingsModalOpen(false);
           setSelectedGroupForSettings(null);
+          
+          if (modifiedGroupQueue.length > 0) {
+             const nextQueue = modifiedGroupQueue.slice(1);
+             if (nextQueue.length > 0) {
+                setTimeout(() => {
+                   const nextId = nextQueue[0];
+                   const nextGroup = studentGroups.find((g:any) => g.id === nextId) || { id: nextId, name: `Group` };
+                   const requestDoc = data?.groups?.find((g: any) => g.id === nextId) || data?.tuitionRequests?.find((req: any) => req.groupId === nextId) || data?.myRequest;
+                   setSelectedGroupForSettings({ ...nextGroup, requestDoc });
+                   setGroupSettingsModalOpen(true);
+                   setModifiedGroupQueue(nextQueue);
+                }, 300);
+             } else {
+                setModifiedGroupQueue([]);
+                setActiveTab('profile');
+             }
+          }
         }}
         groupId={selectedGroupForSettings?.id}
         category={selectedGroupForSettings?.category}
         parentId={(data?.user?.uid || '') as string}
         initialData={selectedGroupForSettings?.requestDoc}
         onSave={() => mutate()}
+        studentNames={(() => {
+          if (!selectedGroupForSettings?.id) return [];
+          const source = pendingGroupSaveData.length > 0 ? pendingGroupSaveData : allStudents;
+          return source.filter(s => s.groupId === selectedGroupForSettings.id).map(s => s.name);
+        })()}
       />
+      
+      {isSavingGroups && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
+          <Loader2 className="w-12 h-12 text-teal-400 animate-spin mb-4" />
+          <h3 className="text-xl font-bold text-white">Setting up your groups...</h3>
+          <p className="text-teal-100/70 font-medium mt-2">Please wait a moment.</p>
+        </div>
+      )}
+
+      {viewingGroupDetails && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-4xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900">Group {viewingGroupDetails.index}: Student Details</h3>
+                <p className="text-slate-500 font-medium">{viewingGroupDetails.name}</p>
+              </div>
+              <button onClick={() => setViewingGroupDetails(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto flex-grow pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {viewingGroupDetails.students.map((s: any) => (
+                  <div key={s.id} className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <h5 className="text-lg font-bold text-slate-800 tracking-tight">{s.name}</h5>
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md">₹{s.budget}/mo</span>
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-600">
+                      {s.classLevel && <p><strong className="text-slate-900">Class:</strong> {s.classLevel}</p>}
+                      {s.board && <p><strong className="text-slate-900">Board:</strong> {s.board}</p>}
+                      {s.subjects && s.subjects.length > 0 && <p><strong className="text-slate-900">Subjects:</strong> {s.subjects.join(', ')}</p>}
+                      {s.technologies && s.technologies.length > 0 && <p><strong className="text-slate-900">Tech:</strong> {s.technologies.join(', ')}</p>}
+                      {s.languages && s.languages.length > 0 && <p><strong className="text-slate-900">Lang:</strong> {s.languages.join(', ')}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <WhatsAppButton />
     </div>
   );

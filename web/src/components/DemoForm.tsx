@@ -12,13 +12,14 @@ import { MapPin, Loader2 } from 'lucide-react';
 interface Props {
   category?: string;
   isDashboard?: boolean;
-  hasProfile?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
   activeStudentId?: string;
   initialData?: any;
+  existingGroups?: any[];
   parentOnly?: boolean;
   defaultIsEditing?: boolean;
+  hasProfile?: boolean;
 }
 
 export const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
@@ -33,6 +34,7 @@ export default function DemoForm({
   onCancel,
   activeStudentId,
   initialData,
+  existingGroups = [],
   parentOnly = false,
   defaultIsEditing = false,
 }: Props) {
@@ -108,6 +110,8 @@ export default function DemoForm({
   const [shouldSubmitGroup, setShouldSubmitGroup] = useState(false);
   const [showStudentNumberPopup, setShowStudentNumberPopup] = useState(hasProfile && !parentOnly && (!activeStudentId || activeStudentId === 'new'));
   const [tempStudentCount, setTempStudentCount] = useState(1);
+  const [selectedExistingGroup, setSelectedExistingGroup] = useState('');
+  const [showModifyPrompt, setShowModifyPrompt] = useState(false);
 
   useEffect(() => {
     if (isDashboard && !initialData) {
@@ -370,16 +374,20 @@ export default function DemoForm({
     if (e) e.preventDefault();
     
     if (!parentOnly && !skipGroupingCheck) {
-      if (formData.numberOfStudents > 1 && formData.step < formData.numberOfStudents + 1) {
+      if (formData.step < formData.numberOfStudents + 1) {
         setFormData(prev => ({ ...prev, step: prev.step + 1 }));
         return;
       }
-      if (formData.numberOfStudents > 1 && formData.step === formData.numberOfStudents + 1) {
+      if (formData.step === formData.numberOfStudents + 1) {
+        if (formData.numberOfStudents === 1 && existingGroups.length === 0) {
+           setFormData(prev => {
+             const newStudents = [...prev.students];
+             newStudents[0].groupId = `indv_${newStudents[0].id || Date.now()}`;
+             return { ...prev, students: newStudents, step: prev.step + 2 };
+           });
+           return;
+        }
         setFormData(prev => ({ ...prev, step: prev.step + 1 })); // Move to grouping step
-        return;
-      }
-      if (formData.numberOfStudents === 1 && formData.step < formData.numberOfStudents + 1) {
-        setFormData(prev => ({ ...prev, step: prev.step + 1 }));
         return;
       }
     }
@@ -833,7 +841,7 @@ export default function DemoForm({
     );
   };
 
-  const isGroupPreferencesStep = !parentOnly && formData.step === (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2);
+  const isGroupPreferencesStep = !parentOnly && formData.step === formData.numberOfStudents + 3;
 
   const renderFormStep = () => {
     if (formData.step === 1) {
@@ -1410,33 +1418,126 @@ export default function DemoForm({
     );
   };
 
-  const isGroupingStep = formData.numberOfStudents > 1 && !parentOnly && formData.step === formData.numberOfStudents + 2;
+  const isGroupingStep = !parentOnly && formData.step === formData.numberOfStudents + 2;
 
   if (isGroupingStep) {
-    const tempStudents = formData.students.slice(0, formData.numberOfStudents).map((s: any, index: number) => ({
-      id: s.id || `temp_${index}`,
-      name: s.fullName || s.name || `Student ${index + 1}`,
-      category: s.category,
-      groupId: s.groupId || 'unassigned',
-      ...s
-    }));
-    
+    const handleGroupingStrategy = (strategy: string, existingGroupId?: string) => {
+      const newStudents = [...formData.students];
+      if (strategy === 'together') {
+        const newGroupId = `new_group_${Date.now()}`;
+        for (let i = 0; i < formData.numberOfStudents; i++) {
+          newStudents[i].groupId = newGroupId;
+        }
+        setFormData(prev => ({ ...prev, students: newStudents, step: prev.step + 1 }));
+      } else if (strategy === 'separate') {
+        for (let i = 0; i < formData.numberOfStudents; i++) {
+          newStudents[i].groupId = `indv_${newStudents[i].id || Date.now()}_${i}`;
+        }
+        setFormData(prev => ({ ...prev, students: newStudents, step: prev.step + 1 }));
+      } else if (strategy === 'existing' && existingGroupId) {
+        for (let i = 0; i < formData.numberOfStudents; i++) {
+          newStudents[i].groupId = existingGroupId;
+        }
+        setFormData(prev => ({ ...prev, students: newStudents, step: prev.step + 1 }));
+      }
+    };
+
     return (
-      <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto min-h-[600px]">
-        <GroupManager 
-          students={tempStudents}
-          onSave={(groupedStudents) => {
-            const newStudents = [...formData.students];
-            groupedStudents.forEach((gs) => {
-              const originalIndex = tempStudents.findIndex(ts => ts.id === gs.id);
-              if (originalIndex !== -1) {
-                newStudents[originalIndex] = { ...(newStudents[originalIndex] as any), groupId: gs.groupId };
-              }
-            });
-            setFormData(prev => ({ ...prev, students: newStudents, step: prev.step + 1 }));
-          }}
-          onCancel={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
-        />
+      <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-3xl mx-auto animate-in slide-in-from-right-8 duration-300">
+        <div className="text-center mb-10">
+           <div className="w-20 h-20 bg-teal-50 text-teal-600 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-5 shadow-sm border border-teal-100 transform -rotate-3">
+             🤝
+           </div>
+           <h3 className="text-3xl font-black text-slate-800 mb-3 tracking-tight">How should we group these students?</h3>
+           <p className="text-slate-500 font-medium text-lg max-w-md mx-auto">Choose a grouping strategy below to proceed to setting their study preferences.</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+           {formData.numberOfStudents > 1 && (
+             <button type="button" onClick={() => handleGroupingStrategy('together')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 hover:shadow-lg hover:shadow-teal-900/5 transition-all text-left group relative overflow-hidden bg-white">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
+                <div className="text-4xl mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left">👨‍👩‍👧‍👦</div>
+                <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Group them together</h4>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">They will share the same teacher, timings, budget, and study mode.</p>
+             </button>
+           )}
+           <button type="button" onClick={() => handleGroupingStrategy('separate')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 hover:shadow-lg hover:shadow-teal-900/5 transition-all text-left group relative overflow-hidden bg-white">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
+              <div className="text-4xl mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left">🧑‍🎓</div>
+              <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Keep them separate</h4>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">Set individual study preferences and find separate teachers for each student.</p>
+           </button>
+        </div>
+
+        {existingGroups && existingGroups.length > 0 && (
+           <div className="p-6 sm:p-8 rounded-3xl border-2 border-slate-100 bg-slate-50/50 relative overflow-hidden">
+             <div className="absolute -top-10 -right-10 text-9xl opacity-[0.03] pointer-events-none">🏢</div>
+             <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Add to an existing group</h4>
+             <p className="text-sm text-slate-500 font-medium mb-5">Add the newly created {formData.numberOfStudents > 1 ? 'students' : 'student'} to one of your active groups.</p>
+             
+             <div className="flex flex-col sm:flex-row gap-4 relative z-10">
+               <div className="relative flex-1">
+                 <select 
+                   className="w-full border-2 border-slate-200 rounded-2xl px-5 py-4 font-bold text-slate-700 focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all appearance-none cursor-pointer bg-white"
+                   onChange={(e) => setSelectedExistingGroup(e.target.value)}
+                   value={selectedExistingGroup}
+                 >
+                   <option value="">Select a group...</option>
+                   {existingGroups.map(g => (
+                     <option key={g.id} value={g.id}>{g.name || 'Existing Group'} - {g.category}</option>
+                   ))}
+                 </select>
+                 <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                   ▼
+                 </div>
+               </div>
+               <button 
+                 type="button" 
+                 disabled={!selectedExistingGroup}
+                 onClick={() => setShowModifyPrompt(true)}
+                 className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-8 py-4 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg active:scale-95"
+               >
+                 Select
+               </button>
+             </div>
+           </div>
+        )}
+
+        {showModifyPrompt && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl shadow-teal-900/20 animate-in zoom-in-95 duration-300 relative overflow-hidden border border-slate-100">
+               <div className="absolute -top-24 -right-24 w-48 h-48 bg-teal-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+               
+               <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-sm border border-teal-100">
+                 ⚙️
+               </div>
+               <h3 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Review Preferences?</h3>
+               <p className="text-slate-500 font-medium mb-8 leading-relaxed">Would you like to review and modify the study preferences (time, mode, budget) for this existing group, or keep the current settings?</p>
+               
+               <div className="flex gap-4">
+                 <button 
+                   type="button"
+                   onClick={() => {
+                      handleGroupingStrategy('existing', selectedExistingGroup);
+                      setShouldSubmitGroup(true); 
+                   }}
+                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 rounded-xl transition-all active:scale-95"
+                 >
+                   Keep Current
+                 </button>
+                 <button 
+                   type="button"
+                   onClick={() => {
+                      handleGroupingStrategy('existing', selectedExistingGroup);
+                   }}
+                   className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-teal-500/25 active:scale-95 hover:-translate-y-0.5"
+                 >
+                   Review
+                 </button>
+               </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

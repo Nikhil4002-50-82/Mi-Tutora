@@ -280,4 +280,3 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `walletBalance` | `number` |
 
 ---
-

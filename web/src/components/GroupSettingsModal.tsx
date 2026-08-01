@@ -12,6 +12,7 @@ interface GroupSettingsModalProps {
   initialData: any;
   parentId: string;
   onSave: () => void;
+  studentNames?: string[];
 }
 
 export default function GroupSettingsModal({
@@ -21,7 +22,8 @@ export default function GroupSettingsModal({
   category,
   initialData,
   parentId,
-  onSave
+  onSave,
+  studentNames = []
 }: GroupSettingsModalProps) {
   const [formData, setFormData] = useState({
     mode: '',
@@ -225,14 +227,20 @@ export default function GroupSettingsModal({
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-[#00a992] p-6 text-white shrink-0 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black">Group Preferences</h2>
-            <p className="text-emerald-100 font-medium text-sm mt-1">Update settings for this group of students.</p>
+        <div className="bg-[#00a992] p-6 text-white shrink-0">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-tight">Group Preferences</h2>
+              <p className="text-teal-50 font-medium mt-1">
+                {studentNames.length > 0 
+                  ? `Updating settings for: ${studentNames.join(', ')}`
+                  : 'Update settings for this group of students.'}
+              </p>
+            </div>
+            <button onClick={onClose} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition-colors">
+              <X className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <button onClick={onClose} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition-colors">
-            <X className="w-5 h-5 text-white" />
-          </button>
         </div>
 
         <div className="p-6 overflow-y-auto flex-grow">
