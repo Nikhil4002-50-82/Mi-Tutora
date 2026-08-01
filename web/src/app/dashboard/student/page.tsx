@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2 } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -2214,71 +2214,116 @@ export default function StudentDashboard() {
             {/* TAB: REFERRALS */}
             {activeTab === 'referrals' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">Refer & Earn</h2>
-                <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden mb-8">
-                  <div className="absolute top-0 right-0 p-8 opacity-10">
-                    <Gift className="w-48 h-48" />
-                  </div>
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                    <div className="max-w-md">
-                      <h3 className="text-2xl font-black mb-4">Invite Friends & Earn</h3>
-                      <p className="text-emerald-100 mb-8 text-lg font-medium">Share your unique referral code. Earn 25% of the initial company margin (approx. 10% of total course value) when your friend books their first class!</p>
-                      
-                      <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl inline-block mb-4">
-                        <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Referral Code</p>
-                        <div className="flex items-center gap-4">
-                          <span className="text-3xl font-black tracking-widest text-white">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
-                          <button onClick={() => {
-                            navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
-                            toast.success("Code copied!");
-                          }} className="bg-white text-[#063831] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors">
-                            Copy
-                          </button>
+                <div className="flex flex-col mb-10">
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Refer & Earn</h2>
+                  <p className="text-slate-500 font-medium mt-2">Invite your friends and earn rewards when they join.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                  {/* Glassmorphic Hero Card */}
+                  <div className="lg:col-span-2 bg-gradient-to-br from-[#063831] via-[#0a4d44] to-[#04241f] rounded-3xl p-8 sm:p-10 text-white shadow-2xl shadow-teal-900/20 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-700">
+                      <Gift className="w-64 h-64 -rotate-12 translate-x-12 -translate-y-12" />
+                    </div>
+                    {/* Glowing Orbs */}
+                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-emerald-500/30 rounded-full blur-[80px]" />
+                    <div className="absolute bottom-0 right-10 w-48 h-48 bg-teal-400/20 rounded-full blur-[60px]" />
+                    
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                      <div className="max-w-md mb-8">
+                        <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-100 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-emerald-400/20 backdrop-blur-md">
+                          <Gift className="w-3.5 h-3.5" /> REWARD PROGRAM
                         </div>
+                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-emerald-300">Earn together.</span></h3>
+                        <p className="text-emerald-50/80 text-base sm:text-lg font-medium leading-relaxed">
+                          Share your unique referral code. Earn 25% of the initial company margin (approx. 10% of total course value) when your friend books their first class!
+                        </p>
+                      </div>
+                      
+                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl inline-flex flex-col sm:flex-row sm:items-center gap-6 justify-between transform transition-all hover:bg-white/15">
+                        <div>
+                          <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Unique Code</p>
+                          <span className="text-3xl sm:text-4xl font-black tracking-widest text-white drop-shadow-md">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
+                        </div>
+                        <button onClick={() => {
+                          navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
+                          toast.success("Code copied to clipboard!");
+                        }} className="w-full sm:w-auto bg-white text-[#063831] px-6 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2">
+                          <Copy className="w-4 h-4" /> Copy Code
+                        </button>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="bg-white rounded-3xl p-6 shadow-2xl text-gray-900 w-full md:w-72 flex-shrink-0">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Wallet Balance</p>
-                      <h4 className="text-4xl font-black text-[#002B20] mb-6">₹{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}</h4>
-                      <p className="text-xs text-gray-500 mb-4 font-medium leading-relaxed">
-                        Use balance to get discounts on your courses, or withdraw to bank (Min ₹1000).
+                  {/* Wallet Card */}
+                  <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between group hover:shadow-2xl transition-all duration-300">
+                    <div>
+                      <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center mb-6 text-teal-600 group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Wallet Balance</p>
+                      <h4 className="text-5xl font-black text-gray-900 mb-4 tracking-tight flex items-baseline gap-1">
+                        <span className="text-2xl text-slate-400">₹</span>{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}
+                      </h4>
+                      <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">
+                        Use balance to get discounts on your courses, or withdraw directly to your bank account.
                       </p>
-                      <button 
-                        onClick={() => setWithdrawModal(true)}
-                        disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
-                        className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Withdraw Funds
-                      </button>
                     </div>
+                    <button 
+                      onClick={() => setWithdrawModal(true)}
+                      disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
+                      className="w-full py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 shadow-lg shadow-gray-900/20 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ArrowRight className="w-4 h-4" /> Withdraw Funds (Min ₹1000)
+                    </button>
                   </div>
                 </div>
 
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Your Referrals</h3>
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                  {(data?.referrals?.length ?? 0) > 0 ? (
-                    <ul className="divide-y divide-gray-100">
-                      {data?.referrals?.map((ref: any) => (
-                        <li key={ref.id} className="p-5 flex justify-between items-center">
-                          <div>
-                            <p className="font-bold text-gray-900">{ref.referredUserName || 'Unknown User'}</p>
-                            <p className="text-sm text-gray-500 capitalize">{ref.referralType}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              ref.status === 'rewarded' ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'
-                            }`}>
-                              {ref.status}
-                            </span>
-                            {ref.estimatedReward > 0 && <p className="text-sm font-bold text-gray-900 mt-1">₹{ref.estimatedReward}</p>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="p-8 text-center text-gray-500 font-medium">You haven't referred anyone yet.</div>
-                  )}
+                {/* Referrals List */}
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-emerald-600" /> Your Referrals
+                  </h3>
+                  <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                    {(data?.referrals?.length ?? 0) > 0 ? (
+                      <ul className="divide-y divide-slate-100">
+                        {data?.referrals?.map((ref: any) => (
+                          <li key={ref.id} className="p-5 sm:p-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-slate-50 transition-colors group">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-black text-lg shadow-inner">
+                                {(ref.referredUserName?.[0] || '?').toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 text-lg group-hover:text-emerald-700 transition-colors">{ref.referredUserName || 'Unknown User'}</p>
+                                <p className="text-sm text-slate-500 font-medium mt-0.5 flex items-center gap-1.5 capitalize">
+                                  {ref.referralType === 'teacher' ? <GraduationCap className="w-3.5 h-3.5" /> : <BookOpen className="w-3.5 h-3.5" />}
+                                  {ref.referralType}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-xl">
+                              <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${
+                                ref.status === 'rewarded' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}>
+                                {ref.status === 'rewarded' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                {ref.status === 'pending' && <Clock className="w-3.5 h-3.5" />}
+                                {ref.status}
+                              </span>
+                              {ref.estimatedReward > 0 && <p className="text-base font-black text-gray-900">₹{ref.estimatedReward} <span className="text-xs font-bold text-slate-400">Reward</span></p>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="p-12 text-center flex flex-col items-center justify-center">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                          <Users className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <h4 className="text-lg font-bold text-gray-900 mb-2">No referrals yet</h4>
+                        <p className="text-slate-500 font-medium max-w-sm">Share your code above with friends to start earning rewards when they join.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
