@@ -1726,8 +1726,13 @@ export default function StudentDashboard() {
                             {/* Card Header */}
                             <div className="mb-4">
                               <div className="flex items-start justify-between gap-3 mb-2">
-                                <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">Tutor: {neg.tutorName}</h4>
-                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider flex-shrink-0">For: {studentForApp.name}</span>
+                                <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight flex-1 min-w-0 break-words">Tutor: {neg.tutorName}</h4>
+                                <span 
+                                  className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider truncate max-w-[50%] flex-shrink-0"
+                                  title={`For: ${studentForApp.name}`}
+                                >
+                                  For: {studentForApp.name.replace(/^Group:\s*/i, 'Group ')}
+                                </span>
                               </div>
                               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{neg.category}</p>
                               <div className="space-y-1">
