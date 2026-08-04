@@ -1463,7 +1463,27 @@ export default function TeacherDashboard() {
                               
                               {/* Request Specific Status UI (Buttons/Labels) */}
                               <div className="mt-auto space-y-2">
-                                {neg.status === 'declined' ? (
+                                {(() => {
+                                  const leadId = neg.groupId || neg.studentId;
+                                  const lockInfo = data?.globalLocks?.[leadId];
+                                  const isLockedByOther = lockInfo && lockInfo.unlockDate > Date.now() && lockInfo.tutorId !== data?.user?.uid;
+                                  
+                                  if (neg.status !== 'declined' && neg.status !== 'tuition_started' && isLockedByOther) {
+                                    const formattedDate = new Date(lockInfo.unlockDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                    return (
+                                      <button 
+                                        disabled
+                                        className="w-full bg-gray-200 text-gray-500 px-5 py-3.5 rounded-xl font-bold text-sm cursor-not-allowed flex flex-col items-center justify-center gap-1"
+                                      >
+                                        <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Waitlisted</span>
+                                        <span className="text-[10px] font-normal leading-tight px-2 text-center">Another teacher has paid demo fees.<br/>Locked until {formattedDate}</span>
+                                      </button>
+                                    );
+                                  }
+
+                                  return (
+                                    <>
+                                      {neg.status === 'declined' ? (
                                     <div className="w-full bg-red-50/50 px-4 py-3 rounded-2xl border border-red-100 text-center">
                                       <p className="text-sm font-black text-red-600 uppercase tracking-widest">Declined</p>
                                     </div>
@@ -1631,6 +1651,9 @@ export default function TeacherDashboard() {
                                     </div>
                                   </>
                                 )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                           </div>
                         ))}

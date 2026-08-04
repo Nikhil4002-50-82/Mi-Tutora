@@ -278,6 +278,33 @@ export const fetchTeacherDashboardData = async () => {
     if (data.studentIds) data.studentIds.forEach((sid: string) => globallyHiredStudentIds.add(sid));
   });
 
+  const lockedAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])));
+  const globalLocks: Record<string, { unlockDate: number, tutorId: string }> = {};
+  
+  lockedAppsSnap.docs.forEach(d => {
+    const data = d.data();
+    const gId = data.groupId || data.studentId;
+    if (gId) {
+      let unlockDate = Date.now() + 14 * 24 * 60 * 60 * 1000;
+      if (data.status === 'demo_scheduled' || data.status === 'waiting_for_parent_decision') {
+        if (data.demoDate) {
+          const demoDateObj = new Date(data.demoDate);
+          const timeParts = data.demoTime ? data.demoTime.split('||')[0].split(':') : [0, 0];
+          if (timeParts.length >= 2) {
+            demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+          }
+          unlockDate = demoDateObj.getTime() + 48 * 60 * 60 * 1000;
+        }
+      } else {
+         const paidDate = data.updatedAt || data.createdAt || Date.now();
+         unlockDate = paidDate + 14 * 24 * 60 * 60 * 1000;
+      }
+      if (!globalLocks[gId] || unlockDate > globalLocks[gId].unlockDate) {
+         globalLocks[gId] = { unlockDate, tutorId: data.tutorId };
+      }
+    }
+  });
+
   let availableStudentsRaw: any[] = [];
   try {
     const requestsSnap = await getDocs(collection(db, 'students'));
@@ -555,6 +582,7 @@ export const fetchTeacherDashboardData = async () => {
   return {
     user,
     userData,
+    globalLocks,
     profile: tutorData,
     teacherCategories,
     availableStudents: matchedGroups,

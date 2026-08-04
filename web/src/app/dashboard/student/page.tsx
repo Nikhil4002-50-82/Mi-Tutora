@@ -881,7 +881,7 @@ export default function StudentDashboard() {
   const handleAppointTutor = async (appId: string) => {
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove, getDocs, query, collection, where, addDoc } = await import('firebase/firestore');
       await updateDoc(doc(db, 'applications', appId), { status: 'tuition_started', startDate: new Date().toLocaleDateString('en-GB') });
       
       const app = data?.applications?.find((a: any) => a.id === appId);
@@ -890,6 +890,42 @@ export default function StudentDashboard() {
         if (app.studentIds) {
           for (const sid of app.studentIds) {
             await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+          }
+        }
+        
+        const qGroupId = app.groupId || app.studentId;
+        if (qGroupId) {
+          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
+          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
+          
+          const docsToProcess = new Map();
+          otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
+          otherAppsSnap2.docs.forEach(d => docsToProcess.set(d.id, d));
+          
+          for (const [docId, docSnap] of Array.from(docsToProcess.entries())) {
+             if (docId !== appId && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
+                await updateDoc(doc(db, 'applications', docId), {
+                   status: 'declined',
+                   reason: 'student_hired_another_tutor',
+                   declinedAt: Date.now(),
+                   updatedAt: Date.now()
+                });
+                const d = docSnap.data();
+                if (d.tutorId) {
+                   await updateDoc(doc(db, 'tutors', d.tutorId), { pendingRequests: arrayRemove(docId) });
+                   const { addDoc } = await import('firebase/firestore');
+                   await addDoc(collection(db, 'notifications'), {
+                      userId: d.tutorId,
+                      type: 'application_declined',
+                      title: 'Update on Student Lead',
+                      message: 'This student has hired another tutor',
+                      read: false,
+                      createdAt: Date.now(),
+                      applicationId: docId,
+                      role: 'teacher'
+                   }).catch(console.error);
+                }
+             }
           }
         }
       }
@@ -932,6 +968,42 @@ export default function StudentDashboard() {
         for (const sid of payingClass.studentIds) {
           await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(payingClass.id) });
         }
+      }
+
+      const qGroupId = payingClass.groupId || payingClass.studentId;
+      if (qGroupId) {
+          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
+          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
+          
+          const docsToProcess = new Map();
+          otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
+          otherAppsSnap2.docs.forEach(d => docsToProcess.set(d.id, d));
+          
+          for (const [docId, docSnap] of Array.from(docsToProcess.entries())) {
+             if (docId !== payingClass.id && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
+                await updateDoc(doc(db, 'applications', docId), {
+                   status: 'declined',
+                   reason: 'student_hired_another_tutor',
+                   declinedAt: Date.now(),
+                   updatedAt: Date.now()
+                });
+                const d = docSnap.data();
+                if (d.tutorId) {
+                   await updateDoc(doc(db, 'tutors', d.tutorId), { pendingRequests: arrayRemove(docId) });
+                   const { addDoc } = await import('firebase/firestore');
+                   await addDoc(collection(db, 'notifications'), {
+                      userId: d.tutorId,
+                      type: 'application_declined',
+                      title: 'Update on Student Lead',
+                      message: 'This student has hired another tutor',
+                      read: false,
+                      createdAt: Date.now(),
+                      applicationId: docId,
+                      role: 'teacher'
+                   }).catch(console.error);
+                }
+             }
+          }
       }
 
       toast.success("Payment completed successfully!");
@@ -1796,7 +1868,29 @@ export default function StudentDashboard() {
                               
                               {/* Request Specific Status UI (Buttons/Labels) */}
                               <div className="mt-auto space-y-2">
-                                {neg.status === 'declined' ? (
+                                {(() => {
+                                  const leadId = neg.groupId || neg.studentId;
+                                  const activeLockApp = data?.applications?.find((app: any) => 
+                                    (app.groupId || app.studentId) === leadId && 
+                                    ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status)
+                                  );
+                                  const isLockedByOtherTutor = activeLockApp && activeLockApp.id !== neg.id;
+                                  
+                                  if (neg.status !== 'declined' && neg.status !== 'tuition_started' && isLockedByOtherTutor) {
+                                    return (
+                                      <button 
+                                        disabled
+                                        className="w-full bg-gray-200 text-gray-500 px-5 py-3.5 rounded-xl font-bold text-sm cursor-not-allowed flex flex-col items-center justify-center gap-1"
+                                      >
+                                        <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Demo in Progress</span>
+                                        <span className="text-[10px] font-normal leading-tight px-2 text-center">Demo in progress with another teacher</span>
+                                      </button>
+                                    );
+                                  }
+
+                                  return (
+                                    <>
+                                      {neg.status === 'declined' ? (
                                     <div className="w-full bg-red-50/50 px-4 py-3 rounded-2xl border border-red-100 text-center">
                                       <p className="text-sm font-black text-red-600 uppercase tracking-widest">Declined</p>
                                     </div>
@@ -1971,6 +2065,9 @@ export default function StudentDashboard() {
                                     </button>
                                   </>
                                 )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                           </div>
                           );
