@@ -5,9 +5,22 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateReferralCode } from '@/utils/referral';
+import { 
+  User, 
+  MapPin, 
+  GraduationCap, 
+  BookOpen, 
+  Loader2, 
+  CheckCircle2, 
+  ArrowRight,
+  Plus,
+  Trash2,
+  Users,
+  Briefcase
+} from 'lucide-react';
+import { generateCustomId } from '@/utils/idGenerator';
 import { toast } from 'sonner';
 import GroupManager from '@/components/GroupManager';
-import { MapPin, Loader2 } from 'lucide-react';
 
 interface Props {
   category?: string;
@@ -421,9 +434,19 @@ export default function DemoForm({
         await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
       }
 
-      const parentDocRef = doc(db, 'parents', user.uid);
+      let customParentId = user.uid;
+      const pQuery = query(collection(db, 'parents'), where('authUid', '==', user.uid));
+      const pSnap = await getDocs(pQuery);
+      if (!pSnap.empty) {
+        customParentId = pSnap.docs[0].id;
+      } else {
+        customParentId = generateCustomId('MTP');
+      }
+
+      const parentDocRef = doc(db, 'parents', customParentId);
       await setDoc(parentDocRef, { 
-        id: user.uid, 
+        id: customParentId, 
+        authUid: user.uid,
         name: formData.parentName,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
@@ -486,7 +509,7 @@ export default function DemoForm({
         const groupRef = doc(db, 'groups', groupId);
         await setDoc(groupRef, {
            id: groupId,
-           parentId: user.uid,
+           parentId: customParentId,
            mode: groupPref.mode || '',
            area: combinedAddress,
            city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
@@ -551,10 +574,11 @@ export default function DemoForm({
         const studentDocs = [];
         for (let i = 0; i < formData.numberOfStudents; i++) {
            const s = formData.students[i];
-           const newStudentRef = doc(collection(db, 'students'));
+           const newStudentId = generateCustomId('MTS');
+           const newStudentRef = doc(db, 'students', newStudentId);
            let tempGroupId = (s as any).groupId || 'unassigned';
            if (tempGroupId === 'unassigned') {
-              tempGroupId = `indv_${newStudentRef.id}`;
+              tempGroupId = generateCustomId('MTG');
            }
            studentDocs.push({
              ref: newStudentRef,
@@ -562,7 +586,7 @@ export default function DemoForm({
                id: newStudentRef.id,
                guardianName: formData.parentName,
                dob: '',
-               parentId: user.uid,
+               parentId: customParentId,
                category: s.category || '',
                name: s.fullName,
                gender: s.gender,
@@ -614,7 +638,7 @@ export default function DemoForm({
            const groupRef = doc(db, 'groups', gId);
            await setDoc(groupRef, {
               id: gId,
-              parentId: user.uid,
+              parentId: customParentId,
               studentIds,
               mode: groupPref.mode || '',
               area: combinedAddress,
@@ -644,11 +668,12 @@ export default function DemoForm({
               budget: s.data.budget,
            }));
            
-           const newRequestRef = doc(collection(db, 'tuition_requests'));
+           const newRequestId = generateCustomId('REQ');
+           const newRequestRef = doc(db, 'tuition_requests', newRequestId);
            await setDoc(newRequestRef, {
               id: newRequestRef.id,
               groupId: gId,
-              parentId: user.uid,
+              parentId: customParentId,
               category: groupStudents[0].data.category,
               mode: groupPref.mode || '',
               area: combinedAddress,

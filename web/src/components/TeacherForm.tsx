@@ -198,7 +198,7 @@ export default function TeacherForm({
 
     try {
       const { auth, db } = await import('@/utils/firebase/client');
-      const { doc, setDoc, getDoc, updateDoc } = await import('firebase/firestore');
+      const { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
       
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
@@ -209,12 +209,18 @@ export default function TeacherForm({
       const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.fullName, user.uid);
       await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
+      // Find the tutor document using authUid
+      const q = query(collection(db, 'tutors'), where('authUid', '==', user.uid));
+      const tutorSnap = await getDocs(q);
+      if (tutorSnap.empty) throw new Error("Tutor profile not found for this user");
+      const tutorDocId = tutorSnap.docs[0].id;
+
       // Update the existing tutor record
       const isOnlineOnlyCategory = formData.category === 'programming' || formData.category === 'languages';
       const actualMode = isOnlineOnlyCategory ? 'Online' : formData.mode;
       
-      await setDoc(doc(db, 'tutors', user.uid), {
-        id: user.uid,
+      await setDoc(doc(db, 'tutors', tutorDocId), {
+        id: tutorDocId,
         category: formData.category,
         name: formData.fullName,
         email: formData.email,

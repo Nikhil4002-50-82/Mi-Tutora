@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import axios from 'axios';
@@ -9,6 +9,7 @@ import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, Graduat
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 import { getFriendlyAuthError } from '@/utils/authErrors';
+import { generateCustomId } from '@/utils/idGenerator';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
@@ -270,9 +271,11 @@ function LoginContent() {
                       roles: [role]
                     });
                     if (role === 'student') {
-                      await setDoc(doc(db, 'parents', user.uid), { id: user.uid });
+                      const parentId = generateCustomId('MTP');
+                      await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid });
                     } else {
-                      await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+                      const tutorId = generateCustomId('MTT');
+                      await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
                     }
                   }
                   

@@ -34,21 +34,23 @@ export const fetchStudentDashboardData = async () => {
     await setDoc(userDocRef, userData);
   }
   
-  const parentDocSnap = await getDoc(doc(db, 'parents', user.uid));
-  const parentData = parentDocSnap.exists() ? parentDocSnap.data() : null;
+  const parentQuery = query(collection(db, 'parents'), where('authUid', '==', user.uid));
+  const parentSnap = await getDocs(parentQuery);
+  const parentData = !parentSnap.empty ? parentSnap.docs[0].data() : null;
+  const parentId = !parentSnap.empty ? parentSnap.docs[0].id : user.uid;
   
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentId', '==', user.uid)));
+  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentId', '==', parentId)));
   const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-  const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentId', '==', user.uid)));
+  const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentId', '==', parentId)));
   const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   students.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
   const myStudent = students.length > 0 ? students[0] : null;
 
-  const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentId', '==', user.uid)));
+  const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentId', '==', parentId)));
   const groups = groupsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-  const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid)));
+  const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentId', '==', parentId)));
   const requests = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   const myRequest = requests.length > 0 ? requests[0] : null;
 
@@ -262,10 +264,12 @@ export const fetchTeacherDashboardData = async () => {
     await setDoc(userDocRef, userData);
   }
 
-  const tutorDocSnap = await getDoc(doc(db, 'tutors', user.uid));
-  const tutorData = tutorDocSnap.exists() ? tutorDocSnap.data() : null;
+  const tutorQuery = query(collection(db, 'tutors'), where('authUid', '==', user.uid));
+  const tutorSnap = await getDocs(tutorQuery);
+  const tutorData = !tutorSnap.empty ? tutorSnap.docs[0].data() : null;
+  const tutorId = !tutorSnap.empty ? tutorSnap.docs[0].id : user.uid;
   
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', user.uid)));
+  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', tutorId)));
   const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
   const hiredAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', '==', 'tuition_started')));

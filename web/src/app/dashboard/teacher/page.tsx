@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, Clock, GraduationCap } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, Clock, GraduationCap } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -108,6 +108,7 @@ export default function TeacherDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [postPaymentPopup, setPostPaymentPopup] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'accept_demo'|'reject', appId: string, studentName: string, payload?: any} | null>(null);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR(
@@ -410,11 +411,14 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
-      const user = auth.currentUser;
-
-      const appRef = await addDoc(collection(db, 'applications'), {
-        tutorId: user?.uid,
+      const { collection, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { generateCustomId } = await import('@/utils/idGenerator');
+      
+      const appId = generateCustomId('APP');
+      const appRef = doc(db, 'applications', appId);
+      await setDoc(appRef, {
+        id: appId,
+        tutorId: data?.profile?.id,
         tutorName: data?.profile?.name,
         requestId: '',
         parentId: student.parentId,
@@ -427,7 +431,7 @@ export default function TeacherDashboard() {
         absoluteMin: student.budget || offerPrice,
         absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
         initiator: 'teacher',
-        lastUpdatedBy: 'tutor',
+        lastUpdatedBy: 'teacher',
         status: 'negotiating',
         source: 'direct',
         category: student.category || 'general',
@@ -436,14 +440,14 @@ export default function TeacherDashboard() {
       });
 
       // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', user?.uid as string), {
-        pendingRequests: arrayUnion(appRef.id)
+      await updateDoc(doc(db, 'tutors', data?.profile?.id), {
+        pendingRequests: arrayUnion(appId)
       });
       // Update the students' pending request queue
       const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
       for (const sid of studentIdsToUpdate) {
         await updateDoc(doc(db, 'students', sid), {
-          pendingRequests: arrayUnion(appRef.id)
+          pendingRequests: arrayUnion(appId)
         });
       }
 
@@ -482,13 +486,17 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
 
       const offerPrice = student.budget || 500;
 
-      const appRef = await addDoc(collection(db, 'applications'), {
-        tutorId: user?.uid,
+      const appId = generateCustomId('APP');
+      const appRef = doc(db, 'applications', appId);
+      await setDoc(appRef, {
+        id: appId,
+        tutorId: data?.profile?.id,
         tutorName: data?.profile?.name,
         requestId: '',
         parentId: student.parentId,
@@ -511,8 +519,8 @@ export default function TeacherDashboard() {
       });
 
       // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', user?.uid as string), {
-        pendingRequests: arrayUnion(appRef.id)
+      await updateDoc(doc(db, 'tutors', data?.profile?.id), {
+        pendingRequests: arrayUnion(appId)
       });
       // Update the students' pending request queue
       const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
@@ -1559,22 +1567,26 @@ export default function TeacherDashboard() {
                                 )}
                                 {neg.status === 'demo_requested_by_student' && (
                                   <>
-                                    <button 
-                                      onClick={() => {
-                                        const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
-                                        setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) });
-                                      }}
-                                      className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
-                                    >
-                                      <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
-                                    </button>
-                                    <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                      className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
-                                    >
-                                      Decline
-                                    </button>
-                                  </>
+                                      <button 
+                                        onClick={() => {
+                                          const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                          const payload = { id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) };
+                                          setActionConfirmModal({ isOpen: true, type: 'accept_demo', appId: neg.id, studentName: displayNames, payload });
+                                        }}
+                                        className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                      >
+                                        <CheckCircle2 className="w-4 h-4" /> Accept & Book Demo
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                          const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                          setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
+                                        }}
+                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                      >
+                                        Decline
+                                      </button>
+                                    </>
                                 )}
                                 {neg.status === 'demo_pending_payment' && (
                                   <>
@@ -2839,6 +2851,47 @@ export default function TeacherDashboard() {
           </div>
         );
       })()}
+      {/* Action Confirm Modal */}
+      {actionConfirmModal?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                {actionConfirmModal.type === 'accept_demo' ? <CheckCircle2 className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-2">
+                {actionConfirmModal.type === 'accept_demo' ? 'Confirm Acceptance' : 'Confirm Rejection'}
+              </h3>
+              <p className="text-slate-500 font-medium mb-8">
+                {actionConfirmModal.type === 'accept_demo' 
+                  ? `Are you sure you want to accept ${actionConfirmModal.studentName} and proceed to pay the demo fee?`
+                  : `Are you sure you want to decline ${actionConfirmModal.studentName}?`}
+              </p>
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setActionConfirmModal(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (actionConfirmModal.type === 'accept_demo') {
+                      setPayingClass(actionConfirmModal.payload);
+                    } else {
+                      handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                    }
+                    setActionConfirmModal(null);
+                  }}
+                  className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
+                >
+                  Yes, Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       </main>
       <WhatsAppButton />

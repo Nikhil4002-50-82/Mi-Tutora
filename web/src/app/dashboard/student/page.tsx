@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -129,6 +129,7 @@ export default function StudentDashboard() {
   const [groupSettingsModalOpen, setGroupSettingsModalOpen] = useState(false);
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<any>(null);
   const [newlyCreatedGroupId, setNewlyCreatedGroupId] = useState<string | null>(null);
+  const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'hire'|'reject', appId: string, teacherName: string} | null>(null);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR(
@@ -152,6 +153,16 @@ export default function StudentDashboard() {
 
 
   const allStudents = data?.students || (data?.myStudent ? [data.myStudent] : []);
+  
+  const hasPendingDues = useMemo(() => {
+    if (!data?.upcomingClasses) return false;
+    return data.upcomingClasses.some((cls: any) => {
+      if (cls.status !== 'tuition_started') return false;
+      if (cls.feePaid === true) return false;
+      const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+      return daysElapsed >= 7;
+    });
+  }, [data?.upcomingClasses]);
   
   const studentGroups = useMemo(() => {
     const acc: any = {};
@@ -648,7 +659,8 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, addDoc, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
       const groupToUse = activeGroup;
@@ -658,10 +670,13 @@ export default function StudentDashboard() {
         return;
       }
 
-      const appRef = await addDoc(collection(db, 'applications'), {
+      const appId = generateCustomId('APP');
+      const appRef = doc(db, 'applications', appId);
+      await setDoc(appRef, {
+        id: appId,
         tutorId: tutor.id,
         tutorName: tutor.name,
-        parentId: user?.uid,
+        parentId: data?.profile?.id || user?.uid,
         groupId: groupToUse.id,
         studentIds: groupToUse.students.map((s: any) => s.id),
         studentName: groupToUse.name,
@@ -743,7 +758,8 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
       const groupToUse = activeGroup;
@@ -755,10 +771,13 @@ export default function StudentDashboard() {
 
       const tutorPrice = getTutorBasePrice(tutor);
 
-      const appRef = await addDoc(collection(db, 'applications'), {
+      const appId = generateCustomId('APP');
+      const appRef = doc(db, 'applications', appId);
+      await setDoc(appRef, {
+        id: appId,
         tutorId: tutor.id,
         tutorName: tutor.name,
-        parentId: user?.uid,
+        parentId: data?.profile?.id || user?.uid,
         groupId: groupToUse.id,
         studentIds: groupToUse.students.map((s: any) => s.id),
         studentName: groupToUse.name,
@@ -882,7 +901,11 @@ export default function StudentDashboard() {
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc, arrayRemove, getDocs, query, collection, where, addDoc } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'applications', appId), { status: 'tuition_started', startDate: new Date().toLocaleDateString('en-GB') });
+      await updateDoc(doc(db, 'applications', appId), { 
+        status: 'tuition_started', 
+        startDate: Date.now(),
+        feePaid: false
+      });
       
       const app = data?.applications?.find((a: any) => a.id === appId);
       if (app) {
@@ -954,21 +977,21 @@ export default function StudentDashboard() {
         await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
       }
 
-      await updateDoc(doc(db, 'applications', payingClass.id), { 
-        status: 'tuition_started', 
-        demoPaymentPaid: true,
-        startDate: new Date().toLocaleDateString('en-GB'),
-        updatedAt: Date.now()
-      });
+      if (payingClass.isRemoval) {
+        await updateDoc(doc(db, 'applications', payingClass.id), { 
+          status: 'declined', 
+          feePaid: true,
+          updatedAt: Date.now()
+        });
+      } else {
+        await updateDoc(doc(db, 'applications', payingClass.id), { 
+          status: 'tuition_started', 
+          feePaid: true,
+          updatedAt: Date.now()
+        });
+      }
 
-      if (payingClass.tutorId) {
-        await updateDoc(doc(db, 'tutors', payingClass.tutorId), { pendingRequests: arrayRemove(payingClass.id) });
-      }
-      if (payingClass.studentIds) {
-        for (const sid of payingClass.studentIds) {
-          await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(payingClass.id) });
-        }
-      }
+      // Note: We no longer auto-decline other applications here because hiring (which auto-declines) happens earlier.
 
       const qGroupId = payingClass.groupId || payingClass.studentId;
       if (qGroupId) {
@@ -1317,6 +1340,25 @@ export default function StudentDashboard() {
 
               return (
                 <div className="flex flex-col gap-8 h-full pb-10">
+                  {hasPendingDues && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-red-600 font-bold text-xl">
+                          ⚠️
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-red-900 text-sm">Action Required: Pending Dues</h3>
+                          <p className="text-red-700 text-xs font-medium mt-0.5">You have pending monthly fees. Please clear your dues in "My Teachers" to unlock booking features.</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab('my_teachers')}
+                        className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-colors shadow-sm whitespace-nowrap"
+                      >
+                        Go to My Teachers
+                      </button>
+                    </div>
+                  )}
                   {/* Hero Section */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
@@ -1656,31 +1698,33 @@ export default function StudentDashboard() {
                                       </button>
                                       {negotiationOffer[teacher.id] ? (
                                         <button
-                                          disabled={requestLoading && !offerApp}
-                                          onClick={() => {
+                                          disabled={requestLoading || !!offerApp || (dailyRequestsCount >= 5) || hasPendingDues}
+                                          onClick={() => { 
+                                            if (hasPendingDues) { toast.error("Please clear your pending dues first."); return; }
                                             if (!!offerApp) {
                                               toast.error("You already have an active request or offer with this teacher.");
                                               return;
                                             }
                                             handleRequestTutor(teacher);
                                           }}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                         >
-                                          {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Make Offer'}
+                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Make Offer')}
                                         </button>
                                       ) : (
                                         <button
-                                          disabled={requestLoading && !offerApp}
+                                          disabled={(requestLoading && !offerApp) || hasPendingDues}
                                           onClick={() => { 
+                                            if (hasPendingDues) { toast.error("Please clear your pending dues first."); return; }
                                             if (!!offerApp) {
                                               toast.error("You already have an active request or offer with this teacher.");
                                               return;
                                             }
                                             handleDirectRequestDemo(teacher); 
                                           }}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
+                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
                                         >
-                                          {dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Request Demo'}
+                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Request Demo')}
                                         </button>
                                       )}
                                     </div>
@@ -2049,16 +2093,13 @@ export default function StudentDashboard() {
                                 {neg.status === 'waiting_for_parent_decision' && (
                                   <>
                                     <button 
-                                      onClick={() => {
-                                        const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
-                                        setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: neg.finalPrice || neg.currentOffer, budget: neg.budget, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []), tutorName: neg.tutorName });
-                                      }}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'hire', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
                                     >
                                       <CheckCircle2 className="w-4 h-4" /> Hire Teacher
                                     </button>
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Reject
@@ -2317,6 +2358,43 @@ export default function StudentDashboard() {
                               Waiting for Teacher to Accept
                             </div>
                           )}
+                          {cls.status === 'tuition_started' && (() => {
+                            const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+                            const monthlyFee = cls.finalPrice || cls.currentOffer || 0;
+                            const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                            const proratedFee = Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
+                            const isPaid = cls.feePaid === true;
+                            const displayNames = cls.studentName || (cls.studentIds?.length > 1 ? 'Group' : 'Student');
+
+                            return (
+                              <div className="mt-2 flex flex-col gap-2">
+                                {!isPaid && daysElapsed >= 7 && (
+                                  <button 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: false, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                    }} 
+                                    className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 text-white py-3.5 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" /> Pay Monthly Fees
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (daysElapsed < 7) {
+                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: proratedFee, isProrated: true, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                    } else {
+                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                    }
+                                  }} 
+                                  className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                                >
+                                  Remove Teacher
+                                </button>
+                              </div>
+                            );
+                          })()}
                           {cls.status === 'demo_pending_payment' && (
                             <div className="mt-2 w-full bg-orange-50 text-orange-600 py-3.5 rounded-xl font-bold text-center border border-orange-100">
                               Waiting for Teacher to Pay
@@ -3007,8 +3085,7 @@ export default function StudentDashboard() {
                   <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
                     <button 
                       onClick={() => {
-                        const displayNames = selectedViewApp.studentName || (selectedViewApp.studentIds?.length > 1 ? 'Group' : 'Student');
-                        setPayingClass({ id: selectedViewApp.id, studentName: displayNames, finalPrice: selectedViewApp.finalPrice || selectedViewApp.currentOffer, budget: selectedViewApp.budget, studentsList: selectedViewApp.studentsList || (selectedViewApp.studentDetails ? [selectedViewApp.studentDetails] : []), tutorName: selectedViewApp.tutorName });
+                        setActionConfirmModal({ isOpen: true, type: 'hire', appId: selectedViewApp.id, teacherName: selectedViewApp.tutorName || 'the teacher' });
                         setSelectedViewUser(null);
                         setSelectedViewApp(null);
                       }}
@@ -3018,7 +3095,7 @@ export default function StudentDashboard() {
                     </button>
                     <button 
                       onClick={() => {
-                        handleNegotiationAction(selectedViewApp.id, 'decline');
+                        setActionConfirmModal({ isOpen: true, type: 'reject', appId: selectedViewApp.id, teacherName: selectedViewApp.tutorName || 'the teacher' });
                         setSelectedViewUser(null);
                         setSelectedViewApp(null);
                       }}
@@ -3154,6 +3231,48 @@ export default function StudentDashboard() {
               >
                 {isRemovingStudent ? 'Removing...' : 'Yes, Remove'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Confirm Modal */}
+      {actionConfirmModal?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${actionConfirmModal.type === 'hire' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                {actionConfirmModal.type === 'hire' ? <CheckCircle2 className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-2">
+                {actionConfirmModal.type === 'hire' ? 'Confirm Hiring' : 'Confirm Rejection'}
+              </h3>
+              <p className="text-slate-500 font-medium mb-8">
+                {actionConfirmModal.type === 'hire' 
+                  ? `Are you sure you want to hire ${actionConfirmModal.teacherName}? Your 1-week trial will begin today.`
+                  : `Are you sure you want to reject ${actionConfirmModal.teacherName}?`}
+              </p>
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setActionConfirmModal(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (actionConfirmModal.type === 'hire') {
+                      handleAppointTutor(actionConfirmModal.appId);
+                    } else {
+                      handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                    }
+                    setActionConfirmModal(null);
+                  }}
+                  className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'hire' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
+                >
+                  Yes, Confirm
+                </button>
+              </div>
             </div>
           </div>
         </div>

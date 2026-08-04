@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 const logo = '/imports/logo.png';
 import { getFriendlyAuthError } from '@/utils/authErrors';
+import { generateCustomId } from '@/utils/idGenerator';
 
 function SignupContent() {
   const [email, setEmail] = useState('');
@@ -70,9 +71,11 @@ function SignupContent() {
 
         // Insert into parents or tutors
         if (role === 'student') {
-          await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: name });
+          const parentId = generateCustomId('MTP');
+          await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: name });
         } else {
-          await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: name, email: email });
+          const tutorId = generateCustomId('MTT');
+          await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: name, email: email });
         }
         
         const { sendEmailVerification } = await import('firebase/auth');
@@ -119,9 +122,11 @@ function SignupContent() {
           roles.push(role);
           
           if (role === 'student') {
-            await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: user.displayName || '' });
+            const parentId = generateCustomId('MTP');
+            await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: user.displayName || '' });
           } else {
-            await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+            const tutorId = generateCustomId('MTT');
+            await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
           }
         }
         userRole = role;
@@ -160,9 +165,11 @@ function SignupContent() {
         }
 
         if (role === 'student') {
-          await setDoc(doc(db, 'parents', user.uid), { id: user.uid, name: user.displayName || '' });
+          const parentId = generateCustomId('MTP');
+          await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: user.displayName || '' });
         } else {
-          await setDoc(doc(db, 'tutors', user.uid), { id: user.uid, name: user.displayName || '', email: user.email });
+          const tutorId = generateCustomId('MTT');
+          await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
         }
       }
       
