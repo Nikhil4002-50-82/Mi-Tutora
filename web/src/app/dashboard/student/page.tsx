@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -1425,7 +1425,7 @@ export default function StudentDashboard() {
                                   <p className="text-sm text-slate-500 truncate font-medium">{cls.subject}</p>
                                 </div>
                               </div>
-                              <button onClick={() => { if(cls.tutorDetails) setSelectedViewUser(cls.tutorDetails); else setActiveTab('my_teachers'); }} className="text-slate-700 font-bold text-sm bg-slate-100 px-5 py-2.5 rounded-xl hover:bg-slate-200 hover:text-slate-900 flex-shrink-0 transition-colors">
+                              <button onClick={() => { if(cls.tutorDetails) { setSelectedViewUser(cls.tutorDetails); setSelectedViewApp(cls.app); } else setActiveTab('my_teachers'); }} className="text-slate-700 font-bold text-sm bg-slate-100 px-5 py-2.5 rounded-xl hover:bg-slate-200 hover:text-slate-900 flex-shrink-0 transition-colors">
                                 View
                               </button>
                             </div>
@@ -2208,7 +2208,7 @@ export default function StudentDashboard() {
                                     feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                   };
                                   setSelectedViewUser(viewUser);
-                                  setSelectedViewApp(cls);
+                                  setSelectedViewApp(cls.app);
                                 }}
                                 className="w-full bg-white border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >
@@ -2241,7 +2241,7 @@ export default function StudentDashboard() {
                         onClick={() => {
                           if (cls.tutorDetails) {
                             setSelectedViewUser(cls.tutorDetails);
-                            setSelectedViewApp(cls);
+                            setSelectedViewApp(cls.app);
                           }
                         }}
                       >
@@ -2334,7 +2334,7 @@ export default function StudentDashboard() {
                                     feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                   };
                                   setSelectedViewUser(viewUser);
-                                  setSelectedViewApp(cls);
+                                  setSelectedViewApp(cls.app);
                                 }}
                                 className="w-full bg-white border-2 border-slate-200 hover:border-[#00a992] hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >
@@ -3053,7 +3053,7 @@ export default function StudentDashboard() {
                 <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
-                      {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Amount Paid' : 'Amount to be Paid') : 'Total Budget'}
+                      {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Agreed Monthly Fee' : 'Amount to be Paid') : 'Total Budget'}
                     </p>
                     <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.feeRange || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
                   </div>
@@ -3067,6 +3067,57 @@ export default function StudentDashboard() {
                     )}
                   </div>
                 </div>
+
+                {selectedViewApp && selectedViewApp.status === 'tuition_started' && (
+                  <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                    <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex justify-between items-center">
+                      Payment Details
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
+                        {selectedViewApp.paymentHistory?.length || 0} Payments Made
+                      </span>
+                    </h4>
+                    
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6 flex justify-between items-center">
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Next Payment Due</p>
+                        <p className="font-black text-gray-900 text-lg">
+                          {selectedViewApp.nextPaymentDate 
+                            ? new Date(selectedViewApp.nextPaymentDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+                            : new Date(selectedViewApp.updatedAt + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
+                        <CalendarDays className="w-6 h-6" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-bold text-gray-800 mb-3">Payment History</p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                        {selectedViewApp.paymentHistory && selectedViewApp.paymentHistory.length > 0 ? (
+                          selectedViewApp.paymentHistory.map((payment: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg hover:border-emerald-200 transition-colors shadow-sm">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                  <TrendingUp className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-gray-900">₹{payment.amount?.toLocaleString()}</p>
+                                  <p className="text-xs font-medium text-slate-500">{new Date(payment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Paid</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-center text-sm font-medium text-gray-500">
+                            No past payments found.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
                   <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
@@ -3490,6 +3541,8 @@ export default function StudentDashboard() {
                     </div>
                   </div>
                 ))}
+                
+
               </div>
             </div>
           </div>

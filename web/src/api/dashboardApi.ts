@@ -220,6 +220,7 @@ export const fetchStudentDashboardData = async () => {
     })),
     upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => ({
       id: app.id,
+      app: app,
       subject: app.category || 'General',
       teacher: app.tutorName || 'Assigned Tutor',
       studentId: app.studentId,

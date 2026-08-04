@@ -109,6 +109,7 @@ export default function TeacherDashboard() {
   const [postPaymentPopup, setPostPaymentPopup] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'accept_demo'|'reject', appId: string, studentName: string, payload?: any} | null>(null);
+  const [selectedPaymentHistoryApp, setSelectedPaymentHistoryApp] = useState<any>(null);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useSWR(
@@ -2242,18 +2243,34 @@ export default function TeacherDashboard() {
                     <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto custom-scrollbar">
                       {data?.upcomingClasses?.length > 0 ? (
                         data.upcomingClasses.map((cls: any) => (
-                          <div key={cls.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                            <div>
+                          <div key={cls.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                            <div className="flex-1">
                               <p className="font-bold text-gray-900 text-sm">{cls.student}</p>
-                              <p className="text-xs text-slate-500 font-medium mt-0.5">{cls.subject} • ₹{cls.app.finalPrice}/mo</p>
+                              <p className="text-xs text-slate-500 font-medium mt-0.5 mb-2">{cls.subject} • ₹{cls.app.finalPrice}/mo</p>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
+                                  Next Due: {cls.app.nextPaymentDate ? new Date(cls.app.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : new Date(cls.app.updatedAt + 30*24*60*60*1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </span>
+                                <span className="text-xs font-bold text-slate-500">
+                                  {cls.app.paymentHistory?.length || 0} Payments Received
+                                </span>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => handleMarkAsPaid(cls.app)}
-                              disabled={actionLoading === cls.id}
-                              className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                            >
-                              {actionLoading === cls.id ? 'Marking...' : 'Mark Paid (Manual)'}
-                            </button>
+                            <div className="flex flex-col sm:items-end gap-2 shrink-0">
+                              <button
+                                onClick={() => setSelectedPaymentHistoryApp(cls.app)}
+                                className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                              >
+                                View History
+                              </button>
+                              <button
+                                onClick={() => handleMarkAsPaid(cls.app)}
+                                disabled={actionLoading === cls.id}
+                                className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                              >
+                                {actionLoading === cls.id ? 'Marking...' : 'Mark Paid'}
+                              </button>
+                            </div>
                           </div>
                         ))
                       ) : (
@@ -2410,8 +2427,60 @@ export default function TeacherDashboard() {
             )}
           </motion.div>
         </div>
-
+      {/* Modals and Overlays */}
       
+      {/* View Payment History Modal */}
+      {selectedPaymentHistoryApp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-900 text-xl">Payment History</h3>
+              <button 
+                onClick={() => setSelectedPaymentHistoryApp(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 mb-6 flex justify-between items-center">
+                <div>
+                  <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">Total Received</p>
+                  <p className="font-black text-emerald-900 text-2xl">
+                    {selectedPaymentHistoryApp.paymentHistory?.length || 0}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-emerald-500">
+                  <IndianRupee className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                {selectedPaymentHistoryApp.paymentHistory && selectedPaymentHistoryApp.paymentHistory.length > 0 ? (
+                  selectedPaymentHistoryApp.paymentHistory.map((payment: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 shadow-sm transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">₹{payment.amount?.toLocaleString()}</p>
+                          <p className="text-xs font-medium text-slate-500">{new Date(payment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">Received</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 px-4 text-center">
+                    <p className="text-slate-400 font-medium text-sm">No payment history available yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Student Profile Modal */}
       {selectedViewUser && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
