@@ -70,12 +70,12 @@ function SignupContent() {
         }
 
         // Insert into parents or tutors
-        if (role === 'student') {
+        if (role === 'parent') {
           const parentId = generateCustomId('MTP');
-          await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: name });
-        } else {
+          await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: name });
+        } else if (role === 'teacher') {
           const tutorId = generateCustomId('MTT');
-          await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: name, email: email });
+          await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: name, email: email });
         }
         
         const { sendEmailVerification } = await import('firebase/auth');
@@ -109,6 +109,7 @@ function SignupContent() {
       
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       let userRole = role;
+      const accountType = role;
       
       if (userDoc.exists()) {
         const data = userDoc.data();
@@ -121,12 +122,12 @@ function SignupContent() {
           });
           roles.push(role);
           
-          if (role === 'student') {
+          if (accountType === 'parent') {
             const parentId = generateCustomId('MTP');
-            await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: user.displayName || '' });
-          } else {
+            await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
+          } else if (accountType === 'teacher') {
             const tutorId = generateCustomId('MTT');
-            await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+            await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
           }
         }
         userRole = role;
@@ -164,12 +165,12 @@ function SignupContent() {
           }
         }
 
-        if (role === 'student') {
+        if (accountType === 'parent') {
           const parentId = generateCustomId('MTP');
-          await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid, name: user.displayName || '' });
-        } else {
+          await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
+        } else if (accountType === 'teacher') {
           const tutorId = generateCustomId('MTT');
-          await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+          await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
         }
       }
       

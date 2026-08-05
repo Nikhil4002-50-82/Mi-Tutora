@@ -209,18 +209,26 @@ export default function TeacherForm({
       const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.fullName, user.uid);
       await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
-      // Find the tutor document using authUid
-      const q = query(collection(db, 'tutors'), where('authUid', '==', user.uid));
-      const tutorSnap = await getDocs(q);
-      if (tutorSnap.empty) throw new Error("Tutor profile not found for this user");
-      const tutorDocId = tutorSnap.docs[0].id;
+      // Find the tutor document using user.uid (since tutorDocId is user.uid now)
+      const tutorDocId = user.uid;
+      const tutorDocRef = doc(db, 'tutors', tutorDocId);
+      const tutorDocSnap = await getDoc(tutorDocRef);
+      
+      let existingTutorId = '';
+      if (tutorDocSnap.exists()) {
+        existingTutorId = tutorDocSnap.data().tutorId || '';
+      } else {
+        const { generateCustomId } = await import('@/utils/idGenerator');
+        existingTutorId = generateCustomId('MTT');
+      }
 
       // Update the existing tutor record
       const isOnlineOnlyCategory = formData.category === 'programming' || formData.category === 'languages';
       const actualMode = isOnlineOnlyCategory ? 'Online' : formData.mode;
       
       await setDoc(doc(db, 'tutors', tutorDocId), {
-        id: tutorDocId,
+        tutorId: existingTutorId,
+        authUid: user.uid,
         category: formData.category,
         name: formData.fullName,
         email: formData.email,

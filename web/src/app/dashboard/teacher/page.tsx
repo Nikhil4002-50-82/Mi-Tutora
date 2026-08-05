@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, Clock, GraduationCap } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, ShieldCheck, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, Clock, GraduationCap, Bookmark, Lightbulb, Loader2, FileText } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -87,6 +87,7 @@ export default function TeacherDashboard() {
   const [selectedViewApp, setSelectedViewApp] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
+  const [isSwitchingTab, setIsSwitchingTab] = useState(false);
   const [subTab, setSubTab] = useState<string>('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -277,7 +278,7 @@ export default function TeacherDashboard() {
       const { db } = await import('@/utils/firebase/client');
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
       
-      const q = query(collection(db, 'applications'), where('tutorId', '==', data.user.uid));
+      const q = query(collection(db, 'applications'), where('tutorDocId', '==', data.user.uid));
       unsubscribe = onSnapshot(q, () => {
         mutate();
       });
@@ -324,8 +325,8 @@ export default function TeacherDashboard() {
       let finalPayingClass = { ...payingClass };
       const studentData = finalPayingClass?.studentsList?.[0] || finalPayingClass?.studentDetails || {};
       
-      if (studentData?.parentId && !studentData?.parentDetails?.phone) {
-        const parentDoc = await getDoc(doc(db, 'parents', studentData.parentId));
+      if (studentData?.parentDocId && !studentData?.parentDetails?.phone) {
+        const parentDoc = await getDoc(doc(db, 'parents', studentData.parentDocId));
         if (parentDoc.exists()) {
            if (finalPayingClass.studentsList) {
              finalPayingClass.studentsList[0].parentDetails = parentDoc.data();
@@ -416,16 +417,16 @@ export default function TeacherDashboard() {
       const { generateCustomId } = await import('@/utils/idGenerator');
       
       const appId = generateCustomId('APP');
-      const appRef = doc(db, 'applications', appId);
+      const appRef = doc(collection(db, 'applications'));
       await setDoc(appRef, {
-        id: appId,
-        tutorId: data?.profile?.id,
+        applicationId: appId,
+        tutorDocId: data?.user?.uid,
         tutorName: data?.profile?.name,
-        requestId: '',
-        parentId: student.parentId,
-        studentId: student.id,
-        groupId: student.id,
-        studentIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
+        requestDocId: '',
+        parentDocId: student.parentDocId || student.parentId,
+        studentDocId: student.id,
+        groupDocId: student.id,
+        studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
         currentOffer: offerPrice,
         initialBudget: student.budget || offerPrice,
@@ -441,14 +442,14 @@ export default function TeacherDashboard() {
       });
 
       // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', data?.profile?.id), {
-        pendingRequests: arrayUnion(appId)
+      await updateDoc(doc(db, 'tutors', data?.user?.uid as string), {
+        pendingRequests: arrayUnion(appRef.id)
       });
       // Update the students' pending request queue
       const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
       for (const sid of studentIdsToUpdate) {
         await updateDoc(doc(db, 'students', sid), {
-          pendingRequests: arrayUnion(appId)
+          pendingRequests: arrayUnion(appRef.id)
         });
       }
 
@@ -494,16 +495,16 @@ export default function TeacherDashboard() {
       const offerPrice = student.budget || 500;
 
       const appId = generateCustomId('APP');
-      const appRef = doc(db, 'applications', appId);
+      const appRef = doc(collection(db, 'applications'));
       await setDoc(appRef, {
-        id: appId,
-        tutorId: data?.profile?.id,
+        applicationId: appId,
+        tutorDocId: data?.user?.uid,
         tutorName: data?.profile?.name,
-        requestId: '',
-        parentId: student.parentId,
-        studentId: student.id,
-        groupId: student.id,
-        studentIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
+        requestDocId: '',
+        parentDocId: student.parentDocId || student.parentId,
+        studentDocId: student.id,
+        groupDocId: student.id,
+        studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
         currentOffer: offerPrice,
         finalPrice: offerPrice,
@@ -520,8 +521,8 @@ export default function TeacherDashboard() {
       });
 
       // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', data?.profile?.id), {
-        pendingRequests: arrayUnion(appId)
+      await updateDoc(doc(db, 'tutors', data?.user?.uid as string), {
+        pendingRequests: arrayUnion(appRef.id)
       });
       // Update the students' pending request queue
       const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
@@ -587,9 +588,9 @@ export default function TeacherDashboard() {
       if (isFinalState) {
         const app = data?.applications?.find((a: any) => a.id === appId);
         if (app) {
-          if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(appId) });
-          if (app.studentIds) {
-            for (const sid of app.studentIds) {
+          if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
+          if (app.studentDocIds) {
+            for (const sid of app.studentDocIds) {
               await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
             }
           }
@@ -653,7 +654,7 @@ export default function TeacherDashboard() {
   ];
 
   const activeTeacher = (data?.profile || data?.user || null) as any;
-  const allStudentsWithScores = (data?.allStudents || []).filter((group: any) => group.parentId !== data?.userData?.id).map((studentGroup: any) => {
+  const allStudentsWithScores = (data?.allStudents || []).filter((group: any) => group.parentDocId !== data?.userData?.id).map((studentGroup: any) => {
     const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
     const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getDetail(studentGroup, 'budget') || 0);
     const teacherFee = parseFloat((activeTeacher as any)?.feeRange || (activeTeacher as any)?.minFee || 0);
@@ -664,7 +665,7 @@ export default function TeacherDashboard() {
     };
   }).sort((a: any, b: any) => {
       const getStatus = (studentId: string) => {
-          const app = data?.applications?.find((app: any) => app.studentId === studentId || app.groupId === studentId);
+          const app = data?.applications?.find((app: any) => app.studentDocId === studentId || app.groupDocId === studentId);
           if (!app) return '';
           if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
               return 'locked';
@@ -962,7 +963,7 @@ export default function TeacherDashboard() {
 
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
-        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12 w-full flex-1">
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 lg:px-12 lg:pt-8 w-full flex-1">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -996,49 +997,56 @@ export default function TeacherDashboard() {
               return (
                 <div className="flex flex-col gap-8 h-full pb-10">
                   {/* Hero Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-                    <div className="md:col-span-5 flex flex-col justify-center">
-                      <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
-                        Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! <span className="text-4xl animate-bounce origin-bottom-right">👋</span>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div className="lg:col-span-6 xl:col-span-7 flex flex-col justify-center">
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
+                        Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
-                      <p className="text-slate-500 text-lg leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
+                      <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
                     </div>
 
-                    <div className="md:col-span-7 flex flex-col sm:flex-row gap-4 justify-end">
+                    <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
                       {/* Earnings Mini Widget */}
                       <div 
                         onClick={() => setActiveTab('earnings')}
-                        className="flex-1 bg-gradient-to-br from-white to-emerald-50/30 border border-emerald-100/60 rounded-3xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-emerald-200 transition-all duration-300 cursor-pointer flex flex-col justify-between group"
+                        className="flex-1 bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group"
                       >
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-100/50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                            <IndianRupee className="w-5 h-5" />
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                              <IndianRupee className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm text-slate-500 font-bold tracking-tight">Net Revenue</span>
                           </div>
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">View All</span>
+                          <span className="text-xs font-bold text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full group-hover:bg-emerald-50 transition-colors">View All</span>
                         </div>
-                        <div>
-                          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
-                          <h3 className="text-2xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
-                          <p className="text-xs text-emerald-600 font-semibold mt-1">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'} Active MRR</p>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <h3 className="text-3xl font-black text-gray-900 tracking-tight">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
+                            <p className="text-xs text-emerald-600 font-bold mt-1">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'} Active MRR</p>
+                          </div>
+                          <TrendingUp className="w-12 h-12 text-emerald-400 opacity-50" strokeWidth={1.5} />
                         </div>
                       </div>
 
                       {/* Profile Completeness Card */}
                       <div 
                         onClick={() => setActiveTab('profile')}
-                        className="flex-1 bg-gradient-to-br from-white to-slate-50 border border-gray-200 rounded-3xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                        className="flex-1 bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-white shadow-sm text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
-                          <User className="w-5 h-5" />
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-gray-900 tracking-tight">Strengthen Profile</span>
                         </div>
                         <div className="flex-1 flex flex-col justify-end">
-                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-1">Strengthen Profile</p>
-                          <p className="text-xs text-slate-500 mb-3 font-medium">You're {profileCompleteness}% there!</p>
+                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-2">You're {profileCompleteness}% there!</p>
                           <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                              <div className="h-full bg-slate-400 rounded-full" style={{ width: `${profileCompleteness}%` }}></div>
+                            <div className="flex-1 h-3 bg-indigo-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
                             </div>
-                            <span className="text-xs font-bold text-slate-600">{profileCompleteness}%</span>
+                            <span className="text-xs font-bold text-gray-900">{profileCompleteness}%</span>
                           </div>
                         </div>
                       </div>
@@ -1046,68 +1054,121 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Split Layout */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
-                    {/* Left: My Students */}
-                    <div className="lg:col-span-2 space-y-4">
-                      <h2 className="text-xl font-bold text-gray-900 tracking-tight">My Students</h2>
-                      
-                      {myActiveStudents.length === 0 ? (
-                        <div className="bg-gradient-to-b from-white to-slate-50 border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
-                          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-100/50">
-                            <Users className="w-10 h-10 text-emerald-500" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">No students chosen yet</h3>
-                          <p className="text-slate-500 max-w-sm mb-8 font-medium">Explore our catalog of students and find the perfect match to start your teaching journey.</p>
-                          <button 
-                            onClick={() => setActiveTab('new_tuition')}
-                            className="bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <Globe className="w-5 h-5" /> Explore Students
-                          </button>
+                    {/* Left Column */}
+                    <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-8">
+                      {/* My Students */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end px-2">
+                          <h2 className="text-xl font-bold text-gray-900 tracking-tight">My Students</h2>
+                          <button onClick={() => setActiveTab('my_students')} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
                         </div>
-                      ) : (
-                        <div className="grid gap-4">
-                          {myActiveStudents.slice(0, 3).map((cls: any) => (
-                            <div key={cls.id} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
-                              <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0 border border-emerald-100/50 shadow-sm">
-                                  {cls.student?.charAt(0) || 'S'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-gray-900 truncate tracking-tight">{cls.student}</h4>
-                                  <p className="text-sm text-slate-500 truncate font-medium">{cls.subject}</p>
-                                </div>
-                              </div>
-                              <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-slate-700 font-bold text-sm bg-slate-100 px-5 py-2.5 rounded-xl hover:bg-slate-200 hover:text-slate-900 flex-shrink-0 transition-colors">
-                                View
-                              </button>
+                        
+                        {myActiveStudents.length === 0 ? (
+                          <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[250px]">
+                            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100/50">
+                              <Users className="w-8 h-8 text-emerald-500" />
                             </div>
-                          ))}
-                          {myActiveStudents.length > 3 && (
-                            <button onClick={() => setActiveTab('my_students')} className="text-sm font-bold text-slate-500 hover:text-[#00a992] py-2 text-center w-full transition-colors">
-                              View all {myActiveStudents.length} students →
+                            <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">No students chosen yet</h3>
+                            <p className="text-slate-500 max-w-sm mb-6 font-medium text-sm">Explore our catalog of students and find the perfect match to start your teaching journey.</p>
+                            <button 
+                              onClick={() => setActiveTab('new_tuition')}
+                              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 px-6 py-2.5 rounded-full font-bold transition-all text-sm"
+                            >
+                              Explore Students
                             </button>
-                          )}
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
+                            {myActiveStudents.slice(0, 3).map((cls: any, idx: number) => (
+                              <div key={cls.id}>
+                                <div className="flex items-center justify-between group py-2">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/50">
+                                      <Users className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-bold text-gray-900 text-base">{cls.student}</h4>
+                                      <p className="text-sm text-slate-500">{cls.subject}</p>
+                                    </div>
+                                  </div>
+                                  <button onClick={() => { if(cls.studentDetails) setSelectedViewUser(cls.studentDetails); else setActiveTab('my_students'); }} className="text-emerald-700 font-bold text-sm bg-emerald-50/50 border border-emerald-100 px-6 py-2 rounded-full hover:bg-emerald-100 transition-colors">
+                                    View
+                                  </button>
+                                </div>
+                                {idx < Math.min(myActiveStudents.length, 3) - 1 && <div className="h-px bg-gray-50 my-2"></div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="space-y-4">
+                        <h2 className="text-xl font-bold text-gray-900 tracking-tight px-2">Quick Actions</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          {[
+                            { id: 'new_tuition', icon: GraduationCap, title: 'Add New Tuition', desc: 'Create a new tuition session', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            { id: 'requests', icon: FileText, title: 'View Requests', desc: 'Check new requests', color: 'text-blue-500', bg: 'bg-blue-50' },
+                            { id: 'notifications', icon: Bell, title: 'Notifications', desc: 'View all recent updates', color: 'text-orange-500', bg: 'bg-orange-50' },
+                            { id: 'earnings', icon: TrendingUp, title: 'My Earnings', desc: 'Track your earnings', color: 'text-indigo-500', bg: 'bg-indigo-50' },
+                          ].map(action => {
+                             const Icon = action.icon;
+                             return (
+                               <div key={action.id} onClick={() => setActiveTab(action.id)} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-6 group">
+                                  <div className={`w-10 h-10 ${action.bg} ${action.color} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                                    <Icon className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-gray-900 text-sm mb-1 leading-tight">{action.title}</h4>
+                                    <p className="text-xs text-slate-500 line-clamp-2">{action.desc}</p>
+                                  </div>
+                                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                               </div>
+                             );
+                          })}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Motivation Banner */}
+                      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100/60 rounded-3xl p-6 flex items-center justify-between shadow-sm">
+                         <div className="flex items-center gap-6">
+                           <div className="w-16 h-16 relative flex-shrink-0 hidden sm:block">
+                             <div className="absolute inset-0 bg-emerald-200 rounded-full animate-pulse blur-xl opacity-50"></div>
+                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-emerald-100 shadow-sm relative z-10 text-2xl">
+                               🏆
+                             </div>
+                           </div>
+                           <div>
+                             <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! 🎉</h3>
+                             <p className="text-sm font-medium text-emerald-700 max-w-md">You're doing amazing! Keep up the excellent teaching and inspiring your students.</p>
+                           </div>
+                         </div>
+                         <div className="hidden md:flex w-12 h-12 bg-emerald-600 rounded-full text-white items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer flex-shrink-0" onClick={() => setActiveTab('my_students')}>
+                           <Star className="w-6 h-6" />
+                         </div>
+                      </div>
                     </div>
 
-                    {/* Right: Recommended Students */}
-                    <div className="space-y-4">
-                      <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Students</h2>
+                    {/* Right Column: Recommended Students */}
+                    <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+                      <div className="flex justify-between items-end px-2">
+                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Students</h2>
+                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
+                      </div>
                       <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                         {computedRecommendedStudents.length === 0 ? (
                           <div className="text-center py-10">
                             <p className="text-slate-500 text-sm font-medium">No recommendations yet.</p>
                           </div>
                         ) : (
-                          <div className="divide-y divide-gray-50/50">
+                          <div className="space-y-6">
                             {computedRecommendedStudents.filter((student: any) => {
-                              const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                              const lockedApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === student.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                               return !lockedApp;
                             }).slice(0, 4).map((student: any, index: number) => {
-                              const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                              const offerApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === student.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               
                               const isLocked = !!offerApp;
                               const isRed = false; 
@@ -1115,37 +1176,36 @@ export default function TeacherDashboard() {
                               const labelText = isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received');
 
                               return (
-                                <div key={student.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative hover:bg-slate-50 px-2 -mx-2 rounded-2xl transition-colors">
+                                <div key={student.id} className="flex items-center gap-4 relative group">
                                   {isLocked && (
-                                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-10 flex items-center justify-end pr-4 rounded-2xl pointer-events-none">
+                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-10 flex items-center justify-end pr-4 rounded-xl pointer-events-none">
                                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                             {labelText}
                                         </span>
                                     </div>
                                   )}
-                                  <div className="w-8 h-8 rounded-full bg-orange-50/80 border border-orange-100 flex items-center justify-center font-bold text-orange-600 text-xs flex-shrink-0 shadow-sm">
-                                    #{student.rank}
+                                  <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center font-bold text-orange-500 text-xs flex-shrink-0">
+                                    #{index + 1}
                                   </div>
-                                  <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0 shadow-sm">
+                                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center font-bold text-emerald-600 text-sm flex-shrink-0">
                                     {student.name?.charAt(0) || 'S'}
                                   </div>
-                                  <div className="flex-1 min-w-0 overflow-hidden">
+                                  <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-gray-900 text-sm truncate tracking-tight">{student.name || 'Student'}</h4>
-                                    <p className="text-xs text-slate-500 truncate font-medium">{student.subjects ? student.subjects.join(', ') : student.category}</p>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">{student.subjects ? student.subjects.join(', ') : student.category}</p>
                                   </div>
-                                  <button onClick={() => setSelectedViewUser(student)} className="text-slate-700 font-bold text-xs bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 hover:text-slate-900 z-0 flex-shrink-0 transition-colors">
+                                  <button onClick={() => setSelectedViewUser(student)} className="text-emerald-700 font-bold text-xs bg-emerald-50/50 border border-emerald-100 px-4 py-2 rounded-full hover:bg-emerald-100 z-0 flex-shrink-0 transition-colors">
                                     View
                                   </button>
                                 </div>
                               );
                             })}
-                            {computedRecommendedStudents.length > 4 && (
-                              <div className="pt-4 mt-2">
-                                <button onClick={() => setActiveTab('new_tuition')} className="w-full text-center text-xs font-bold text-slate-500 hover:text-[#00a992] transition-colors">
-                                  See more recommendations
-                                </button>
-                              </div>
-                            )}
+                            <div className="pt-4 mt-2 border-t border-gray-50 flex justify-between items-center">
+                              <span className="text-xs text-slate-500 font-medium">Find more great students</span>
+                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
+                                <ArrowRight className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1158,24 +1218,79 @@ export default function TeacherDashboard() {
             {activeTab === 'new_tuition' && (
               <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
-                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
-                    {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
-                  </h2>
-                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
+                  <div>
+                    <h2 className="text-3xl sm:text-4xl font-black text-[#111827] tracking-tight">
+                      {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
+                    </h2>
+                    <p className="text-slate-500 mt-1">Find great students who are ready to learn with you.</p>
+                  </div>
+                  <div className="flex bg-gray-100 p-1 rounded-full shadow-inner w-full sm:w-auto overflow-x-auto border border-gray-200">
                     <button 
-                      onClick={() => setTuitionSubTab('all')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => {
+                        if (tuitionSubTab === 'all') return;
+                        setIsSwitchingTab(true);
+                        setTuitionSubTab('all');
+                        setTimeout(() => setIsSwitchingTab(false), 1200);
+                      }} 
+                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                       All
                     </button>
                     <button 
-                      onClick={() => setTuitionSubTab('recommendation')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => {
+                        if (tuitionSubTab === 'recommendation') return;
+                        setIsSwitchingTab(true);
+                        setTuitionSubTab('recommendation');
+                        setTimeout(() => setIsSwitchingTab(false), 1200);
+                      }} 
+                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                       Recommendation
                     </button>
                   </div>
                 </div>
+
+                {isSwitchingTab ? (
+                  <div className="flex flex-col items-center justify-center py-32 animate-in fade-in duration-300">
+                    <Loader2 className="w-12 h-12 text-[#00a992] animate-spin mb-4" />
+                    <h3 className="text-lg font-bold text-gray-900">Finding the perfect match...</h3>
+                    <p className="text-sm text-gray-500 mt-1">Loading {tuitionSubTab === 'all' ? 'all' : 'recommended'} students for you.</p>
+                  </div>
+                ) : (
+                  <div className="animate-in fade-in duration-500">
+                {tuitionSubTab === 'recommendation' ? (
+                  <div className="mb-8 bg-emerald-50 rounded-2xl p-3 sm:p-4 flex items-center justify-between relative overflow-hidden border border-emerald-100 shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-4 z-10">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#00a992] shadow-sm flex-shrink-0">
+                         <Lightbulb className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-base">Smart Recommendations</h4>
+                        <p className="text-xs text-gray-600 mt-0.5">These students match your teaching preferences and subject expertise.</p>
+                      </div>
+                    </div>
+                    <div className="hidden sm:block z-10 mr-6">
+                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                    </div>
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-[#00a992] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                  </div>
+                ) : (
+                  <div className="mb-8 bg-blue-50 rounded-2xl p-3 sm:p-4 flex items-center justify-between relative overflow-hidden border border-blue-100 shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-4 z-10">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
+                         <Globe className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-base">Explore All Students</h4>
+                        <p className="text-xs text-gray-600 mt-0.5">Browse through our complete list of students looking for a tutor.</p>
+                      </div>
+                    </div>
+                    <div className="hidden sm:block z-10 mr-6">
+                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                    </div>
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                  </div>
+                )}
 
                 <div>
                   {data?.teacherCategories?.length > 1 && (
@@ -1202,7 +1317,7 @@ export default function TeacherDashboard() {
                           return data?.teacherCategories?.length > 1 ? s.category === subTab : true;
                         }) || []).sort((a: any, b: any) => {
                           const getStatus = (groupId: string) => {
-                              const app = data?.applications?.find((app: any) => (app.groupId || app.studentId) === groupId);
+                              const app = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === groupId);
                               if (!app) return '';
                               if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
                                   return 'locked';
@@ -1223,11 +1338,11 @@ export default function TeacherDashboard() {
                                 : `Offline • ${firstStudent.area || firstStudent.address || 'Location Hidden'}`;
                           const numStudents = group.students?.length || 1;
 
-                          const lockedApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
-                          const offerApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
+                          const lockedApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                          const offerApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                           
-                          const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
-                          const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === group.id && ['tuition_started'].includes(app.status));
+                          const isPending = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+                          const isHired = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['tuition_started'].includes(app.status));
                           
                           const isLocked = false;
                           const isRed = !!lockedApp;
@@ -1235,56 +1350,66 @@ export default function TeacherDashboard() {
                           const labelText = isRed ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : (offerApp ? 'Offer Received' : '')));
 
                           return (
-                            <div key={group.id} className="bg-white rounded-3xl shadow-lg shadow-gray-200/40 border border-gray-100 hover:shadow-xl hover:shadow-gray-300/50 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full overflow-hidden relative group">
-                              <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-5 flex items-center justify-between">
+                            <div key={group.id} className="bg-white rounded-3xl shadow-md border border-gray-100 flex flex-col h-full overflow-hidden relative group">
+                              {/* Header */}
+                              <div className="bg-[#00a992] p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
                                   {group.rank && (
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${group.rank === 1 ? 'bg-yellow-400 text-yellow-900' : group.rank === 2 ? 'bg-gray-300 text-gray-800' : group.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${group.rank === 1 ? 'bg-yellow-400 text-yellow-900' : group.rank === 2 ? 'bg-gray-200 text-gray-800' : group.rank === 3 ? 'bg-orange-500 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
                                       #{group.rank}
                                     </div>
                                   )}
                                   <h3 className="text-lg font-bold text-white tracking-tight truncate">{parentName}</h3>
                                 </div>
-                                {labelText ? (
-                                  <span className={`px-2 py-1 text-[9px] font-black rounded border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
-                                    {labelText}
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold rounded border border-white/30 uppercase tracking-wider flex-shrink-0 shadow-sm">
-                                    {group.category || 'Student'}
-                                  </span>
-                                )}
+                                <span className="px-3 py-1 border border-white/40 text-white text-[10px] font-bold rounded-full uppercase tracking-wider flex-shrink-0">
+                                  {group.category || 'School'}
+                                </span>
                               </div>
                               
-                              <div className="p-6 flex flex-col flex-grow">
-                                <div className="mb-6">
-                                  <h4 className="font-bold text-gray-900 text-lg mb-3">{group.name || 'Group'}</h4>
-                                  <div className="text-sm text-slate-600 mt-2 grid grid-cols-1 gap-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-100/60 shadow-inner">
-                                    {firstStudent.classLevel && <span><strong className="text-slate-900">Class:</strong> {firstStudent.classLevel}</span>}
-                                    {(!group.category || group.category === 'school') && (firstStudent.subjects?.length ?? 0) > 0 && <span><strong className="text-slate-900">Sub:</strong> {firstStudent.subjects[0]}{firstStudent.subjects.length > 1 ? '...' : ''}</span>}
-                                    {group.category === 'programming' && (firstStudent.technologies?.length ?? 0) > 0 && <span><strong className="text-slate-900">Tech:</strong> {firstStudent.technologies[0]}{firstStudent.technologies.length > 1 ? '...' : ''}</span>}
-                                    {group.category === 'languages' && (firstStudent.languages?.length ?? 0) > 0 && <span><strong className="text-slate-900">Lang:</strong> {firstStudent.languages[0]}{firstStudent.languages.length > 1 ? '...' : ''}</span>}
-                                    <span className="mt-2 pt-3 border-t border-slate-200/60"><strong className="text-slate-900">Budget:</strong> <span className="text-emerald-600 font-bold text-lg">₹{group.budget}<span className="text-sm">/mo</span></span></span>
+                              <div className="p-5 flex flex-col flex-grow">
+                                {/* Group Name */}
+                                <div className="flex items-center gap-2 mb-4 text-gray-900">
+                                  <Users className="w-5 h-5 text-[#00a992]" />
+                                  <h4 className="font-bold text-base">Group: {group.name || 'Student'}</h4>
+                                </div>
+                                
+                                {/* Details Box */}
+                                <div className="bg-emerald-50/50 rounded-2xl p-4 space-y-3 mb-6">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <LayoutDashboard className="w-4 h-4 text-[#00a992]" />
+                                    <span className="text-slate-600 font-bold">Class:</span>
+                                    <span className="text-slate-500">{firstStudent.classLevel || '-'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <BookOpen className="w-4 h-4 text-[#00a992]" />
+                                    <span className="text-slate-600 font-bold">Sub:</span>
+                                    <span className="text-slate-500 truncate">{firstStudent.subjects?.[0] || '-'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Wallet className="w-4 h-4 text-[#00a992]" />
+                                    <span className="text-slate-600 font-bold">Budget:</span>
+                                    <span className="text-[#00a992] font-bold">₹{group.budget}/mo</span>
                                   </div>
                                 </div>
-
-                                <div className="mt-auto space-y-3">
+                                
+                                {/* Actions Area */}
+                                <div className="mt-auto">
                                   {!hasProfile ? (
                                     <button 
                                       onClick={() => setActiveTab('profile')}
-                                      className="w-full bg-gradient-to-r from-[#063831] to-[#04241f] text-white font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] text-sm"
+                                      className="w-full bg-[#00a992] text-white font-bold py-3.5 rounded-full transition-all shadow-md hover:bg-[#00927d] text-sm"
                                     >
                                       Unlock to View
                                     </button>
                                   ) : (
                                     <>
                                       <div className="mb-4">
-                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
+                                        <p className="text-[10px] text-gray-500 leading-tight mb-3">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                                         <input 
                                           type="number"
                                           min={group.budget || 0}
                                           max={group.budget ? Math.floor(group.budget * 1.4) : undefined}
-                                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50 text-sm"
+                                          className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                                           placeholder={group.budget ? `e.g. ${group.budget}` : "Your Offer (₹/mo)"}
                                           value={negotiationOffer[group.id] || ''}
                                           onChange={(e) => setNegotiationOffer({...negotiationOffer, [group.id]: e.target.value})}
@@ -1293,50 +1418,52 @@ export default function TeacherDashboard() {
                                           <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite high compared to the student's budget. They might reject it.</p>
                                         )}
                                       </div>
+                                      
                                       {isHired ? (
-                                        <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-xl shadow-none text-sm cursor-not-allowed border border-emerald-200">
+                                        <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-full shadow-none text-sm cursor-not-allowed border border-emerald-200">
                                           Active Student
                                         </button>
                                       ) : (
-                                        <div className="flex flex-col gap-2">
-                                          <div className="flex gap-2">
+                                        <div className="flex gap-2 mb-4">
+                                          <button 
+                                            onClick={() => setSelectedViewUser(group)}
+                                            className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
+                                          >
+                                            View
+                                          </button>
+                                          {negotiationOffer[group.id] ? (
                                             <button 
-                                              onClick={() => setSelectedViewUser(group)}
-                                              className="w-1/3 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 font-bold py-3.5 rounded-xl transition-all text-sm active:scale-[0.98]"
+                                              onClick={() => {
+                                                if (!!offerApp) {
+                                                  toast.error("You already have an active request or offer sent to this group.");
+                                                  return;
+                                                }
+                                                handleSendOffer(group);
+                                              }}
+                                              disabled={offerLoading && !offerApp}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                             >
-                                              View
+                                              {offerLoading && !offerApp ? 'Sending...' : 'Make Offer'} <ArrowRight className="w-4 h-4" />
                                             </button>
-                                            {negotiationOffer[group.id] ? (
-                                              <button 
-                                                onClick={() => {
-                                                  if (!!offerApp) {
-                                                    toast.error("You already have an active request or offer sent to this group.");
-                                                    return;
-                                                  }
-                                                  handleSendOffer(group);
-                                                }}
-                                                disabled={offerLoading && !offerApp}
-                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all text-sm ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]')}`}
-                                              >
-                                                {offerLoading && !offerApp ? 'Sending...' : 'Make Offer'}
-                                              </button>
-                                            ) : (
-                                              <button
-                                                onClick={() => {
-                                                  if (!!offerApp) {
-                                                    toast.error("You already have an active request or offer sent to this group.");
-                                                    return;
-                                                  }
-                                                  handleDirectRequestDemo(group);
-                                                }}
-                                                className={`flex-1 font-bold py-3.5 rounded-xl transition-all text-sm ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-emerald-500/25 shadow-lg transform hover:scale-[1.02] active:scale-[0.98]')}`}
-                                              >
-                                                Request Demo
-                                              </button>
-                                            )}
-                                          </div>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                if (!!offerApp) {
+                                                  toast.error("You already have an active request or offer sent to this group.");
+                                                  return;
+                                                }
+                                                handleDirectRequestDemo(group);
+                                              }}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                            >
+                                              Request Demo <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                          )}
                                         </div>
                                       )}
+                                      <button className="w-full text-center text-sm font-bold text-emerald-700 flex items-center justify-center gap-2 hover:text-emerald-800 transition-colors">
+                                        <Bookmark className="w-4 h-4" /> Save for later
+                                      </button>
                                     </>
                                   )}
                                 </div>
@@ -1359,6 +1486,8 @@ export default function TeacherDashboard() {
                       )}
                     </div>
                   </div>
+                  </div>
+                )}
                 </div>
             )}
 
@@ -1473,9 +1602,9 @@ export default function TeacherDashboard() {
                               {/* Request Specific Status UI (Buttons/Labels) */}
                               <div className="mt-auto space-y-2">
                                 {(() => {
-                                  const leadId = neg.groupId || neg.studentId;
+                                  const leadId = neg.groupDocId || neg.studentDocId;
                                   const lockInfo = data?.globalLocks?.[leadId];
-                                  const isLockedByOther = lockInfo && lockInfo.unlockDate > Date.now() && lockInfo.tutorId !== data?.user?.uid;
+                                  const isLockedByOther = lockInfo && lockInfo.unlockDate > Date.now() && lockInfo.tutorDocId !== data?.user?.uid;
                                   
                                   if (neg.status !== 'declined' && neg.status !== 'tuition_started' && isLockedByOther) {
                                     const formattedDate = new Date(lockInfo.unlockDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1570,7 +1699,7 @@ export default function TeacherDashboard() {
                                   <>
                                       <button 
                                         onClick={() => {
-                                          const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                          const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
                                           const payload = { id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) };
                                           setActionConfirmModal({ isOpen: true, type: 'accept_demo', appId: neg.id, studentName: displayNames, payload });
                                         }}
@@ -1580,7 +1709,7 @@ export default function TeacherDashboard() {
                                       </button>
                                       <button 
                                         onClick={() => {
-                                          const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                          const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
                                           setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
                                         }}
                                         className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
@@ -1593,7 +1722,7 @@ export default function TeacherDashboard() {
                                   <>
                                     <button 
                                       onClick={() => {
-                                        const displayNames = neg.studentName || (neg.studentIds?.length > 1 ? 'Group' : 'Student');
+                                        const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
                                         setPayingClass({ id: neg.id, studentName: displayNames, finalPrice: 500, studentsList: neg.studentsList || (neg.studentDetails ? [neg.studentDetails] : []) });
                                       }}
                                       className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
@@ -2629,10 +2758,10 @@ export default function TeacherDashboard() {
             
             {/* Actions */}
             {(() => {
-              const hasNegotiation = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['negotiating'].includes(app.status));
-              const isPending = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
-              const isHired = data?.applications?.some((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
-              const cooldownApp = data?.applications?.find((app: any) => (app.groupId || app.studentId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+              const hasNegotiation = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['negotiating'].includes(app.status));
+              const isPending = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+              const isHired = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              const cooldownApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
               if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) {
                 let message = 'Currently unavailable for new requests.';
@@ -2741,17 +2870,17 @@ export default function TeacherDashboard() {
                     await deleteDoc(doc(db, 'users', uid));
                     
                     // Delete all applications for this tutor
-                    const appQ = query(collection(db, 'applications'), where('tutorId', '==', uid));
+                    const appQ = query(collection(db, 'applications'), where('tutorDocId', '==', uid));
                     const appSnap = await getDocs(appQ);
                     for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
                     
                     // Delete tutor requests
-                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('tutorId', '==', uid));
+                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('tutorDocId', '==', uid));
                     const tutorReqSnap = await getDocs(tutorReqQ);
                     for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
 
                     // Delete direct requests
-                    const directReqQ = query(collection(db, 'direct_requests'), where('tutorId', '==', uid));
+                    const directReqQ = query(collection(db, 'direct_requests'), where('tutorDocId', '==', uid));
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 

@@ -443,9 +443,9 @@ export default function DemoForm({
         customParentId = generateCustomId('MTP');
       }
 
-      const parentDocRef = doc(db, 'parents', customParentId);
+      const parentDocRef = doc(db, 'parents', user.uid);
       await setDoc(parentDocRef, { 
-        id: customParentId, 
+        parentDocId: user.uid, 
         authUid: user.uid,
         name: formData.parentName,
         phone: formData.phone,
@@ -506,10 +506,10 @@ export default function DemoForm({
         await updateDoc(studentRef, studentData);
 
         // Update Groups Doc
-        const groupRef = doc(db, 'groups', groupId);
+        const groupRef = doc(db, 'groups', groupId); // groupId passed from frontend is now a UUID
         await setDoc(groupRef, {
-           id: groupId,
-           parentId: customParentId,
+           // groupDocId: groupId, - already handled by foreign keys
+           parentDocId: user.uid,
            mode: groupPref.mode || '',
            area: combinedAddress,
            city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
@@ -575,7 +575,7 @@ export default function DemoForm({
         for (let i = 0; i < formData.numberOfStudents; i++) {
            const s = formData.students[i];
            const newStudentId = generateCustomId('MTS');
-           const newStudentRef = doc(db, 'students', newStudentId);
+           const newStudentRef = doc(collection(db, 'students'));
            let tempGroupId = (s as any).groupId || 'unassigned';
            if (tempGroupId === 'unassigned') {
               tempGroupId = generateCustomId('MTG');
@@ -586,7 +586,7 @@ export default function DemoForm({
                id: newStudentRef.id,
                guardianName: formData.parentName,
                dob: '',
-               parentId: customParentId,
+               parentDocId: user.uid,
                category: s.category || '',
                name: s.fullName,
                gender: s.gender,
@@ -600,7 +600,7 @@ export default function DemoForm({
                budget: parseInt(s.budget) || 0,
                technologies: s.technologies || [],
                languages: s.languages || [],
-               groupId: tempGroupId,
+               groupDocId: tempGroupId,
                createdAt: Date.now()
              },
              frontendStudent: s
@@ -635,11 +635,12 @@ export default function DemoForm({
              }
            }
            
-           const groupRef = doc(db, 'groups', gId);
+           const groupRef = doc(collection(db, 'groups'));
+           const groupDocId = groupRef.id;
            await setDoc(groupRef, {
-              id: gId,
-              parentId: customParentId,
-              studentIds,
+              groupDocId: groupDocId,
+              parentDocId: user.uid,
+              studentDocIds: studentIds,
               mode: groupPref.mode || '',
               area: combinedAddress,
               city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
@@ -669,11 +670,11 @@ export default function DemoForm({
            }));
            
            const newRequestId = generateCustomId('REQ');
-           const newRequestRef = doc(db, 'tuition_requests', newRequestId);
+           const newRequestRef = doc(collection(db, 'tuition_requests'));
            await setDoc(newRequestRef, {
-              id: newRequestRef.id,
-              groupId: gId,
-              parentId: customParentId,
+              requestId: newRequestId,
+              groupDocId: groupDocId,
+              parentDocId: user.uid,
               category: groupStudents[0].data.category,
               mode: groupPref.mode || '',
               area: combinedAddress,

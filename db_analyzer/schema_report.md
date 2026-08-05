@@ -1,9 +1,9 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-07-27T10:46:47.789Z
+Generated on: 2026-08-05T20:30:17.805Z
 
 ## Collection: `admin_activity`
-*Documents sampled: 2*
+*Documents sampled: 6*
 
 | Field Path | Data Type |
 |---|---|
@@ -19,35 +19,34 @@ Generated on: 2026-07-27T10:46:47.789Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 3*
+*Documents sampled: 8*
 
 | Field Path | Data Type |
 |---|---|
 | `absoluteMax` | `number` |
 | `absoluteMin` | `number` |
+| `applicationId` | `string` |
 | `category` | `string` |
 | `createdAt` | `number` |
 | `currentOffer` | `number` |
-| `declinedAt` | `number` |
-| `demoDate` | `string` |
 | `demoHours` | `string` |
 | `demoPaymentPaid` | `boolean` |
-| `demoTime` | `string` |
 | `finalPrice` | `number` |
+| `groupDocId` | `string` |
 | `groupId` | `string` |
 | `initialBudget` | `number` |
-| `initiator` | `string` |
 | `lastUpdatedBy` | `string` |
+| `parentDocId` | `string` |
 | `parentId` | `string` |
-| `proposedDate` | `string` |
-| `proposedTime` | `string` |
-| `reason` | `string` |
 | `requestId` | `string` |
 | `source` | `string` |
 | `status` | `string` |
+| `studentDocId` | `string` |
+| `studentDocIds` | `array of string` |
 | `studentId` | `string` |
 | `studentIds` | `array of string` |
 | `studentName` | `string` |
+| `tutorDocId` | `string` |
 | `tutorId` | `string` |
 | `tutorName` | `string` |
 | `updatedAt` | `number` |
@@ -62,19 +61,26 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `appEnabled` | `boolean` |
 | `disabledMessage` | `string` |
 | `disabledTitle` | `string` |
+| `internationalLeadsEnabled` | `boolean` |
 | `latestVersionName` | `string` |
 | `maintenanceMessage` | `string` |
 | `maintenanceMode` | `boolean` |
 | `maintenanceTitle` | `string` |
+| `marketplaceEnabled` | `boolean` |
 | `minSupportedVersionCode` | `number` |
+| `paymentsEnabled` | `boolean` |
+| `recommendationsEnabled` | `boolean` |
 | `recommendedVersionCode` | `number` |
+| `referralsEnabled` | `boolean` |
+| `reportsEnabled` | `boolean` |
 | `updatedAt` | `timestamp` |
 | `updatedBy` | `string` |
+| `verificationEnabled` | `boolean` |
 
 ---
 
 ## Collection: `groups`
-*Documents sampled: 5*
+*Documents sampled: 17*
 
 | Field Path | Data Type |
 |---|---|
@@ -85,14 +91,16 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `city` | `string` |
 | `createdAt` | `number` |
 | `daysPerWeek` | `string` |
-| `id` | `string` |
+| `groupId` | `string` |
 | `latitude` | `null | number` |
 | `longitude` | `null | number` |
 | `mode` | `string` |
+| `parentDocId` | `string` |
 | `parentId` | `string` |
 | `preferredTimeRange` | `string` |
-| `specificDays` | `array of string` |
+| `specificDays` | `array of string | array` |
 | `status` | `string` |
+| `studentDocIds` | `array of string` |
 | `studentIds` | `array of string` |
 | `teacherGenderPreference` | `string` |
 | `updatedAt` | `number` |
@@ -122,14 +130,31 @@ Generated on: 2026-07-27T10:46:47.789Z
 
 ---
 
+## Collection: `notifications`
+*Documents sampled: 1*
+
+| Field Path | Data Type |
+|---|---|
+| `applicationId` | `string` |
+| `createdAt` | `number` |
+| `message` | `string` |
+| `read` | `boolean` |
+| `role` | `string` |
+| `title` | `string` |
+| `type` | `string` |
+| `userId` | `string` |
+
+---
+
 ## Collection: `parents`
 *Documents sampled: 6*
 
 | Field Path | Data Type |
 |---|---|
+| `authUid` | `string` |
 | `email` | `string` |
-| `id` | `string` |
 | `name` | `string` |
+| `parentId` | `string` |
 | `phone` | `string` |
 | `whatsapp` | `string` |
 
@@ -153,7 +178,7 @@ Generated on: 2026-07-27T10:46:47.789Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 20*
+*Documents sampled: 29*
 
 | Field Path | Data Type |
 |---|---|
@@ -165,16 +190,18 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `dob` | `string` |
 | `email` | `string` |
 | `gender` | `string` |
+| `groupDocId` | `string` |
 | `groupId` | `string` |
 | `guardianName` | `string` |
-| `id` | `string` |
 | `languages` | `array | array of string` |
 | `learningGoal` | `string` |
 | `name` | `string` |
+| `parentDocId` | `string` |
 | `parentId` | `string` |
-| `pendingRequests` | `array of string | array` |
+| `pendingRequests` | `array of string` |
 | `phoneNumber` | `string` |
 | `specialRequirements` | `string` |
+| `studentId` | `string` |
 | `studentType` | `string` |
 | `subjects` | `array of string | array` |
 | `technologies` | `array | array of string` |
@@ -182,62 +209,24 @@ Generated on: 2026-07-27T10:46:47.789Z
 
 ---
 
-## Collection: `tuition_requests`
-*Documents sampled: 7*
-
-| Field Path | Data Type |
-|---|---|
-| `acceptedTutorId` | `string` |
-| `area` | `string` |
-| `category` | `string` |
-| `city` | `string` |
-| `combinedBudget` | `number` |
-| `combinedLanguages` | `array` |
-| `combinedSubjects` | `array | array of string` |
-| `combinedTechnologies` | `array of string | array` |
-| `createdAt` | `number` |
-| `daysPerWeek` | `string` |
-| `groupId` | `string` |
-| `id` | `string` |
-| `latitude` | `null` |
-| `longitude` | `null` |
-| `mode` | `string` |
-| `parentId` | `string` |
-| `preferredTimeRange` | `string` |
-| `specificDays` | `array of string` |
-| `status` | `string` |
-| `studentId` | `string` |
-| `studentsDetails` | `array of object` |
-| `studentsDetails[].board` | `string` |
-| `studentsDetails[].budget` | `number` |
-| `studentsDetails[].classLevel` | `string` |
-| `studentsDetails[].id` | `string` |
-| `studentsDetails[].languages` | `array` |
-| `studentsDetails[].name` | `string` |
-| `studentsDetails[].subjects` | `array | array of string` |
-| `studentsDetails[].technologies` | `array of string | array` |
-| `teacherGenderPreference` | `string` |
-
----
-
 ## Collection: `tutors`
-*Documents sampled: 9*
+*Documents sampled: 14*
 
 | Field Path | Data Type |
 |---|---|
 | `accountStatus` | `string` |
 | `address` | `string` |
 | `area` | `string` |
-| `boards` | `array of string` |
+| `authUid` | `string` |
+| `boards` | `array of string | array` |
 | `category` | `string` |
 | `city` | `string` |
-| `classes` | `array of string` |
+| `classes` | `array of string | array` |
 | `email` | `string` |
 | `experience` | `string` |
 | `feeRange` | `string` |
 | `gender` | `string` |
 | `hasProfile` | `boolean` |
-| `id` | `string` |
 | `knownLanguages` | `array` |
 | `languagesTaught` | `array` |
 | `latitude` | `number` |
@@ -245,7 +234,7 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `mode` | `string` |
 | `name` | `string` |
 | `occupation` | `string` |
-| `pendingRequests` | `array | array of string` |
+| `pendingRequests` | `array of string` |
 | `phone` | `string` |
 | `preferredLocations` | `string` |
 | `preferredTimeRange` | `string` |
@@ -255,10 +244,11 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `role` | `string` |
 | `schoolNames` | `string` |
 | `studentCount` | `string` |
-| `subjects` | `array of string` |
+| `subjects` | `array of string | array` |
 | `teachingApproach` | `string` |
-| `technologies` | `array` |
+| `technologies` | `array | array of string` |
 | `travelDistance` | `string` |
+| `tutorId` | `string` |
 | `verificationStatus` | `string` |
 | `whatsapp` | `string` |
 
@@ -277,6 +267,8 @@ Generated on: 2026-07-27T10:46:47.789Z
 | `referralCode` | `string` |
 | `referredBy` | `string` |
 | `role` | `string` |
+| `roles` | `array of string` |
 | `walletBalance` | `number` |
 
 ---
+

@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp, Bookmark, Lightbulb } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -105,6 +105,7 @@ export default function StudentDashboard() {
   const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [editingStudentId, setEditingStudentId] = useState<string>('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
+  const [isSwitchingTab, setIsSwitchingTab] = useState(false);
   const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -167,7 +168,7 @@ export default function StudentDashboard() {
   const studentGroups = useMemo(() => {
     const acc: any = {};
     allStudents.forEach((student: any) => {
-      const gId = student.groupId || `indv_${student.id}`;
+      const gId = student.groupDocId || `indv_${student.id}`;
       if (!acc[gId]) acc[gId] = { id: gId, students: [], totalBudget: 0, categories: [] };
       acc[gId].students.push(student);
       acc[gId].totalBudget += (parseInt(student.budget) || 0);
@@ -198,10 +199,10 @@ export default function StudentDashboard() {
 
       for (const student of saveData) {
         await updateDoc(doc(db, 'students', student.id), {
-          groupId: student.groupId
+          groupDocId: student.groupDocId
         });
-        if (student.groupId) {
-          newGroupIds.add(student.groupId);
+        if (student.groupDocId) {
+          newGroupIds.add(student.groupDocId);
         }
       }
       
@@ -210,17 +211,17 @@ export default function StudentDashboard() {
           const groupSnap = await getDoc(groupRef);
           
           if (!groupSnap.exists()) {
-            const sampleStudent = saveData.find(s => s.groupId === groupId);
+            const sampleStudent = saveData.find(s => s.groupDocId === groupId);
             const oldStudentData = allStudents.find((s:any) => s.id === sampleStudent?.id);
             let oldGroupData: any = {};
-            if (oldStudentData && oldStudentData.groupId) {
-              const oldGroupSnap = await getDoc(doc(db, 'groups', oldStudentData.groupId));
+            if (oldStudentData && oldStudentData.groupDocId) {
+              const oldGroupSnap = await getDoc(doc(db, 'groups', oldStudentData.groupDocId));
               if (oldGroupSnap.exists()) oldGroupData = oldGroupSnap.data();
             }
             
             await setDoc(groupRef, {
                 id: groupId,
-                parentId: data?.user?.uid,
+                parentDocId: data?.user?.uid,
                 mode: oldGroupData.mode || '',
                 area: oldGroupData.area || '',
                 city: oldGroupData.city || '',
@@ -236,12 +237,12 @@ export default function StudentDashboard() {
             setNewlyCreatedGroupId(groupId);
           }
           
-          const groupStudents = saveData.filter(s => s.groupId === groupId).map(s => s.id);
-          await updateDoc(groupRef, { studentIds: groupStudents });
+          const groupStudents = saveData.filter(s => s.groupDocId === groupId).map(s => s.id);
+          await updateDoc(groupRef, { studentDocIds: groupStudents });
           await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
       }
 
-      const allGroupsQuery = query(collection(db, 'groups'), where('parentId', '==', data?.user?.uid));
+      const allGroupsQuery = query(collection(db, 'groups'), where('parentDocId', '==', data?.user?.uid));
       const allGroupsSnap = await getDocs(allGroupsQuery);
       for (const groupDoc of allGroupsSnap.docs) {
           const reqData = groupDoc.data();
@@ -259,7 +260,7 @@ export default function StudentDashboard() {
       if (openModalAfter && modifiedGroupQueue.length > 0) {
         const nextGroupId = modifiedGroupQueue[0];
         const nextGroup = studentGroups.find((g:any) => g.id === nextGroupId) || { id: nextGroupId, name: `Group` };
-        const requestDoc = data?.groups?.find((g: any) => g.id === nextGroupId) || data?.tuitionRequests?.find((req: any) => req.groupId === nextGroupId) || data?.myRequest;
+        const requestDoc = data?.groups?.find((g: any) => g.id === nextGroupId) || data?.tuitionRequests?.find((req: any) => req.groupDocId === nextGroupId) || data?.myRequest;
         setSelectedGroupForSettings({ ...nextGroup, requestDoc });
         setGroupSettingsModalOpen(true);
       } else {
@@ -279,7 +280,7 @@ export default function StudentDashboard() {
       const newGroup = studentGroups.find((g: any) => g.id === newlyCreatedGroupId);
       if (newGroup) {
         // We find the request doc for the new group from data (it may be stale, but the modal fetches/relies on group settings)
-        setSelectedGroupForSettings({ ...newGroup, requestDoc: { groupId: newlyCreatedGroupId } });
+        setSelectedGroupForSettings({ ...newGroup, requestDoc: { groupDocId: newlyCreatedGroupId } });
         setGroupSettingsModalOpen(true);
         setNewlyCreatedGroupId(null);
       }
@@ -293,10 +294,10 @@ export default function StudentDashboard() {
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
       if (tutor.id === data?.userData?.id || (tutor.email && tutor.email === data?.userData?.email)) return false; // Prevent self-hiring
       const matchGroup = (app: any) => {
-          if (app.groupId) return app.groupId === activeGroup?.id;
-          return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+          if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+          return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
       };
-      const app = data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app));
+      const app = data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app));
       if (app && app.status === 'tuition_started') return false;
       return true;
   }).map((tutor: any) => {
@@ -311,10 +312,10 @@ export default function StudentDashboard() {
   }).sort((a: any, b: any) => {
       const getStatus = (tutorId: string) => {
           const matchGroup = (app: any) => {
-              if (app.groupId) return app.groupId === activeGroup?.id;
-              return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+              if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+              return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
           };
-          const app = data?.applications?.find((app: any) => app.tutorId === tutorId && matchGroup(app));
+          const app = data?.applications?.find((app: any) => app.tutorDocId === tutorId && matchGroup(app));
           if (!app) return '';
           if (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))) {
               return 'locked';
@@ -358,7 +359,7 @@ export default function StudentDashboard() {
           if (!doesClassMatch(studentClass, teacherClasses)) return false;
       }
 
-      const activeGroupDoc = data?.groups?.find((g: any) => g.id === activeGroup?.id) || data?.tuitionRequests?.find((req: any) => req.groupId === activeGroup?.id);
+      const activeGroupDoc = data?.groups?.find((g: any) => g.id === activeGroup?.id) || data?.tuitionRequests?.find((req: any) => req.groupDocId === activeGroup?.id);
       const genderPref = activeGroupDoc?.teacherGenderPreference || scoringContext?.teacherGenderPreference;
       if (genderPref && genderPref !== 'No Preference') {
           if (tutor.gender !== genderPref) return false;
@@ -391,7 +392,7 @@ export default function StudentDashboard() {
       return true;
   });
 
-  const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorId)) || [];
+  const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorDocId)) || [];
 
   const hasProfile = allStudents.length > 0;
 
@@ -505,7 +506,7 @@ export default function StudentDashboard() {
               id: newStudentRef.id,
               guardianName: formData.parentName || '',
               dob: '',
-              parentId: user.uid,
+              parentDocId: user.uid,
               category: formData.category || '',
               name: s.fullName || s.name || '',
               gender: s.gender || '',
@@ -526,7 +527,7 @@ export default function StudentDashboard() {
               hoursPerDay: formData.hours || '',
               daysPerWeek: formData.days || '',
               specificDays: formData.specificDays || [],
-              groupId: s.groupId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : (s.groupId || `indv_${newStudentRef.id}`),
+              groupDocId: s.groupDocId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : (s.groupDocId || `indv_${newStudentRef.id}`),
               createdAt: Date.now()
             });
 
@@ -537,8 +538,8 @@ export default function StudentDashboard() {
               latitude: 0.0,
               longitude: 0.0,
               acceptedTutorId: '',
-              parentId: user.uid,
-              studentId: newStudentRef.id,
+              parentDocId: user.uid,
+              studentDocId: newStudentRef.id,
               category: formData.category || '',
               studentName: s.fullName || s.name || '',
               classLevel: s.classGrade || s.classLevel || '',
@@ -572,7 +573,7 @@ export default function StudentDashboard() {
       const { db } = await import('@/utils/firebase/client');
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
       
-      const q = query(collection(db, 'applications'), where('parentId', '==', data.user.uid));
+      const q = query(collection(db, 'applications'), where('parentDocId', '==', data.user.uid));
       unsubscribe = onSnapshot(q, () => {
         mutate();
       });
@@ -626,8 +627,8 @@ export default function StudentDashboard() {
     if (requestLoading) return;
 
     const matchGroup = (app: any) => {
-      if (app.groupId) return app.groupId === activeGroup?.id;
-      return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+      if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+      return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
     };
     
     const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
@@ -671,14 +672,14 @@ export default function StudentDashboard() {
       }
 
       const appId = generateCustomId('APP');
-      const appRef = doc(db, 'applications', appId);
+      const appRef = doc(collection(db, 'applications'));
       await setDoc(appRef, {
-        id: appId,
-        tutorId: tutor.id,
+        applicationId: appId,
+        tutorDocId: tutor.id,
         tutorName: tutor.name,
-        parentId: data?.profile?.id || user?.uid,
-        groupId: groupToUse.id,
-        studentIds: groupToUse.students.map((s: any) => s.id),
+        parentDocId: data?.user?.uid,
+        groupDocId: groupToUse.id,
+        studentDocIds: groupToUse.students.map((s: any) => s.id),
         studentName: groupToUse.name,
         currentOffer: offerPrice,
         initialBudget: tutorPrice > 0 ? tutorPrice : offerPrice,
@@ -745,8 +746,8 @@ export default function StudentDashboard() {
     if (requestLoading) return;
 
     const matchGroup = (app: any) => {
-      if (app.groupId) return app.groupId === activeGroup?.id;
-      return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+      if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+      return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
     };
     
     const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
@@ -772,14 +773,14 @@ export default function StudentDashboard() {
       const tutorPrice = getTutorBasePrice(tutor);
 
       const appId = generateCustomId('APP');
-      const appRef = doc(db, 'applications', appId);
+      const appRef = doc(collection(db, 'applications'));
       await setDoc(appRef, {
-        id: appId,
-        tutorId: tutor.id,
+        applicationId: appId,
+        tutorDocId: tutor.id,
         tutorName: tutor.name,
-        parentId: data?.profile?.id || user?.uid,
-        groupId: groupToUse.id,
-        studentIds: groupToUse.students.map((s: any) => s.id),
+        parentDocId: data?.user?.uid,
+        groupDocId: groupToUse.id,
+        studentDocIds: groupToUse.students.map((s: any) => s.id),
         studentName: groupToUse.name,
         currentOffer: tutorPrice,
         finalPrice: tutorPrice,
@@ -881,9 +882,9 @@ export default function StudentDashboard() {
       if (isFinalState) {
         const app = data?.applications?.find((a: any) => a.id === appId);
         if (app) {
-          if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(appId) });
-          if (app.studentIds) {
-            for (const sid of app.studentIds) {
+          if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
+          if (app.studentDocIds) {
+            for (const sid of app.studentDocIds) {
               await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
             }
           }
@@ -909,14 +910,14 @@ export default function StudentDashboard() {
       
       const app = data?.applications?.find((a: any) => a.id === appId);
       if (app) {
-        if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(appId) });
-        if (app.studentIds) {
-          for (const sid of app.studentIds) {
+        if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
+        if (app.studentDocIds) {
+          for (const sid of app.studentDocIds) {
             await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
           }
         }
         
-        const qGroupId = app.groupId || app.studentId;
+        const qGroupId = app.groupDocId || app.studentDocId;
         if (qGroupId) {
           const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
           const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
@@ -934,11 +935,11 @@ export default function StudentDashboard() {
                    updatedAt: Date.now()
                 });
                 const d = docSnap.data();
-                if (d.tutorId) {
-                   await updateDoc(doc(db, 'tutors', d.tutorId), { pendingRequests: arrayRemove(docId) });
+                if (d.tutorDocId) {
+                   await updateDoc(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
                    const { addDoc } = await import('firebase/firestore');
                    await addDoc(collection(db, 'notifications'), {
-                      userId: d.tutorId,
+                      userId: d.tutorDocId,
                       type: 'application_declined',
                       title: 'Update on Student Lead',
                       message: 'This student has hired another tutor',
@@ -993,7 +994,7 @@ export default function StudentDashboard() {
 
       // Note: We no longer auto-decline other applications here because hiring (which auto-declines) happens earlier.
 
-      const qGroupId = payingClass.groupId || payingClass.studentId;
+      const qGroupId = payingClass.groupDocId || payingClass.studentDocId;
       if (qGroupId) {
           const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
           const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
@@ -1011,11 +1012,11 @@ export default function StudentDashboard() {
                    updatedAt: Date.now()
                 });
                 const d = docSnap.data();
-                if (d.tutorId) {
-                   await updateDoc(doc(db, 'tutors', d.tutorId), { pendingRequests: arrayRemove(docId) });
+                if (d.tutorDocId) {
+                   await updateDoc(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
                    const { addDoc } = await import('firebase/firestore');
                    await addDoc(collection(db, 'notifications'), {
-                      userId: d.tutorId,
+                      userId: d.tutorDocId,
                       type: 'application_declined',
                       title: 'Update on Student Lead',
                       message: 'This student has hired another tutor',
@@ -1238,7 +1239,7 @@ export default function StudentDashboard() {
                 <div className="max-h-[300px] overflow-y-auto">
                   {((data?.allNotifications)?.length ?? 0) > 0 ? (
                     data?.allNotifications?.slice(0, 3).map((neg: any, idx: number) => {
-                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
+                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
                         <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
                           <p className="text-sm text-gray-800 font-medium line-clamp-2">
@@ -1307,7 +1308,7 @@ export default function StudentDashboard() {
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
         
-        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12 w-full flex-1">
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 lg:px-12 lg:pt-8 w-full flex-1">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -1360,125 +1361,156 @@ export default function StudentDashboard() {
                     </div>
                   )}
                   {/* Hero Section */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                      <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
-                        Hello {activeStudent?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Student'}! <span className="text-4xl animate-bounce origin-bottom-right">👋</span>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div className="lg:col-span-6 xl:col-span-7 flex flex-col justify-center">
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
+                        Hello {activeStudent?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Student'}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
-                      <p className="text-slate-500 text-lg">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
+                      <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
                     </div>
 
-                    {/* Profile Completeness Card */}
-                    <div 
-                      onClick={() => setActiveTab('profile')}
-                      className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-5 shadow-lg shadow-emerald-900/5 md:w-80 flex-shrink-0 flex items-start gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-emerald-200 transition-all duration-300"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-white shadow-sm text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-50">
-                        <User className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-1">
-                          <p className="font-bold text-gray-900 text-sm tracking-tight">Strengthen your profile</p>
-                        </div>
-                        <p className="text-xs text-slate-500 mb-3 leading-snug font-medium">You're {profileCompleteness}% there! Add missing details to stand out.</p>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-emerald-100/50 rounded-full overflow-hidden shadow-inner">
-                            <div className="h-full bg-gradient-to-r from-[#00a992] to-teal-400 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
+                    <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
+                      {/* Profile Completeness Card */}
+                      <div 
+                        onClick={() => setActiveTab('profile')}
+                        className="flex-1 max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between ml-auto"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                            <User className="w-4 h-4" />
                           </div>
-                          <span className="text-xs font-bold text-emerald-600">{profileCompleteness}%</span>
+                          <span className="text-sm font-bold text-gray-900 tracking-tight">Strengthen Profile</span>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-end">
+                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-2">You're {profileCompleteness}% there!</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-3 bg-indigo-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-900">{profileCompleteness}%</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Split Layout */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
-                    {/* Left: My Teachers */}
-                    <div className="lg:col-span-2 space-y-4">
-                      <h2 className="text-xl font-bold text-gray-900 tracking-tight">My Teachers</h2>
-                      
-                      {myActiveTeachers.length === 0 ? (
-                        <div className="bg-gradient-to-b from-white to-slate-50 border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
-                          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-100/50">
-                            <BookOpen className="w-10 h-10 text-emerald-500" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">No teachers chosen yet</h3>
-                          <p className="text-slate-500 max-w-sm mb-8 font-medium">Explore our catalog of verified tutors and find the perfect match to start your learning journey.</p>
-                          <button 
-                            onClick={() => setActiveTab('new_tuition')}
-                            className="bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <Globe className="w-5 h-5" /> Explore Teachers
-                          </button>
+                    {/* Left Column */}
+                    <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-8">
+                      {/* My Teachers */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end px-2">
+                          <h2 className="text-xl font-bold text-gray-900 tracking-tight">My Teachers</h2>
+                          <button onClick={() => setActiveTab('my_teachers')} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
                         </div>
-                      ) : (
-                        <div className="grid gap-4">
-                          {myActiveTeachers.slice(0, 3).map((cls: any) => (
-                            <div key={cls.id} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
-                              <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0 border border-emerald-100/50 shadow-sm">
-                                  {cls.teacher?.charAt(0) || 'T'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-gray-900 truncate tracking-tight">{cls.teacher}</h4>
-                                  <p className="text-sm text-slate-500 truncate font-medium">{cls.subject}</p>
-                                </div>
-                              </div>
-                              <button onClick={() => { if(cls.tutorDetails) { setSelectedViewUser(cls.tutorDetails); setSelectedViewApp(cls.app); } else setActiveTab('my_teachers'); }} className="text-slate-700 font-bold text-sm bg-slate-100 px-5 py-2.5 rounded-xl hover:bg-slate-200 hover:text-slate-900 flex-shrink-0 transition-colors">
-                                View
-                              </button>
+                        
+                        {myActiveTeachers.length === 0 ? (
+                          <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10 flex flex-col items-center justify-center text-center shadow-sm min-h-[250px]">
+                            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100/50">
+                              <BookOpen className="w-8 h-8 text-emerald-500" />
                             </div>
-                          ))}
-                          {myActiveTeachers.length > 3 && (
-                            <button onClick={() => setActiveTab('my_teachers')} className="text-sm font-bold text-slate-500 hover:text-[#00a992] py-2 text-center w-full transition-colors">
-                              View all {myActiveTeachers.length} teachers →
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right: Recommended Teachers */}
-                    <div className="space-y-3">
-                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Teachers</h2>
-                        {studentGroups.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Finding tutors for:</label>
-                            <select 
-                              className="w-32 sm:w-48 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-[#00a992] focus:outline-none focus:ring-1 focus:ring-[#00a992] truncate transition-colors hover:bg-slate-100 cursor-pointer"
-                              value={activeGroupId || activeGroup?.id || ''}
-                              onChange={(e) => setActiveGroupId(e.target.value)}
+                            <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">No teachers chosen yet</h3>
+                            <p className="text-slate-500 max-w-sm mb-6 font-medium text-sm">Explore our catalog of verified tutors and find the perfect match to start your learning journey.</p>
+                            <button 
+                              onClick={() => setActiveTab('new_tuition')}
+                              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 px-6 py-2.5 rounded-full font-bold transition-all text-sm"
                             >
-                              {studentGroups.map((g:any) => (
-                                <option key={g.id} value={g.id}>{g.name}</option>
-                              ))}
-                            </select>
+                              Explore Teachers
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
+                            {myActiveTeachers.slice(0, 3).map((cls: any, idx: number) => (
+                              <div key={cls.id}>
+                                <div className="flex items-center justify-between group py-2">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/50">
+                                      <BookOpen className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-bold text-gray-900 text-base">{cls.teacher}</h4>
+                                      <p className="text-sm text-slate-500">{cls.subject}</p>
+                                    </div>
+                                  </div>
+                                  <button onClick={() => { if(cls.tutorDetails) { setSelectedViewUser(cls.tutorDetails); setSelectedViewApp(cls.app); } else setActiveTab('my_teachers'); }} className="text-emerald-700 font-bold text-sm bg-emerald-50/50 border border-emerald-100 px-6 py-2 rounded-full hover:bg-emerald-100 transition-colors">
+                                    View
+                                  </button>
+                                </div>
+                                {idx < Math.min(myActiveTeachers.length, 3) - 1 && <div className="h-px bg-gray-50 my-2"></div>}
+                              </div>
+                            ))}
                           </div>
                         )}
+                      </div>
+
+
+
+                      {/* Motivation Banner */}
+                      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100/60 rounded-3xl p-6 flex items-center justify-between shadow-sm">
+                         <div className="flex items-center gap-6">
+                           <div className="w-16 h-16 relative flex-shrink-0 hidden sm:block">
+                             <div className="absolute inset-0 bg-emerald-200 rounded-full animate-pulse blur-xl opacity-50"></div>
+                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-emerald-100 shadow-sm relative z-10 text-2xl">
+                               🏆
+                             </div>
+                           </div>
+                           <div>
+                             <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {activeStudent?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Student'}! 🎉</h3>
+                             <p className="text-sm font-medium text-emerald-700 max-w-md">You're doing amazing! Keep up the excellent learning and inspiring your tutors.</p>
+                           </div>
+                         </div>
+                         <div className="hidden md:flex w-12 h-12 bg-emerald-600 rounded-full text-white items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer flex-shrink-0" onClick={() => setActiveTab('my_teachers')}>
+                           <Star className="w-6 h-6" />
+                         </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Recommended Teachers */}
+                    <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+                      <div className="flex justify-between items-end px-2">
+                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Teachers</h2>
+                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
+                      </div>
                       
+                      {studentGroups.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 px-2">
+                          <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Finding tutors for:</label>
+                          <select 
+                            className="w-32 sm:w-48 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-[#00a992] focus:outline-none focus:ring-1 focus:ring-[#00a992] truncate transition-colors hover:bg-slate-100 cursor-pointer"
+                            value={activeGroupId || activeGroup?.id || ''}
+                            onChange={(e) => setActiveGroupId(e.target.value)}
+                          >
+                            {studentGroups.map((g:any) => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                         {computedRecommendedTutors.length === 0 ? (
                           <div className="text-center py-10">
                             <p className="text-slate-500 text-sm font-medium">No recommendations yet.</p>
                           </div>
                         ) : (
-                          <div className="divide-y divide-gray-50/50">
+                          <div className="space-y-6">
                             {computedRecommendedTutors.filter((tutor: any) => {
                                const matchGroup = (app: any) => {
-                                 if (app.groupId) return app.groupId === activeGroup?.id;
-                                 return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                                 if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+                                 return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
                                };
-                               const isLocked = !!data?.applications?.find((app: any) => app.tutorId === tutor.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                               const isLocked = !!data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                                return !isLocked;
                             }).slice(0, 4).map((tutor: any, index: number) => {
                               const matchGroup = (app: any) => {
-                                if (app.groupId) return app.groupId === activeGroup?.id;
-                                return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                                if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+                                return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
                               };
                               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
-                              const offerApp = activeAppForGroup?.tutorId === tutor.id ? activeAppForGroup : undefined;
+                              const offerApp = activeAppForGroup?.tutorDocId === tutor.id ? activeAppForGroup : undefined;
                               
                               const teacherLimit = tutor.isSubscribed ? 15 : 5;
                               const teacherPendingCount = tutor.pendingRequests?.length || 0;
@@ -1495,37 +1527,36 @@ export default function StudentDashboard() {
                               else if (activeAppForGroup) labelText = 'Busy with Another Demo';
 
                               return (
-                                <div key={tutor.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-3 relative hover:bg-slate-50 px-2 -mx-2 rounded-2xl transition-colors">
+                                <div key={tutor.id} className="flex items-center gap-4 relative group">
                                   {isLocked && (
-                                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-10 flex items-center justify-end pr-4 rounded-2xl pointer-events-none">
+                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-10 flex items-center justify-end pr-4 rounded-xl pointer-events-none">
                                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${isRed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                             {labelText}
                                         </span>
                                     </div>
                                   )}
-                                  <div className="w-8 h-8 rounded-full bg-orange-50/80 border border-orange-100 flex items-center justify-center font-bold text-orange-600 text-xs flex-shrink-0 shadow-sm">
+                                  <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center font-bold text-orange-500 text-xs flex-shrink-0">
                                     #{index + 1}
                                   </div>
-                                  <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0 shadow-sm">
+                                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center font-bold text-emerald-600 text-sm flex-shrink-0">
                                     {tutor.name?.charAt(0) || 'T'}
                                   </div>
-                                  <div className="flex-1 min-w-0 overflow-hidden">
+                                  <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-gray-900 text-sm truncate tracking-tight">{tutor.name || 'Tutor'}</h4>
-                                    <p className="text-xs text-slate-500 truncate font-medium">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">{tutor.subjects ? tutor.subjects.join(', ') : tutor.category}</p>
                                   </div>
-                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-slate-700 font-bold text-xs bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 hover:text-slate-900 z-0 flex-shrink-0 transition-colors">
+                                  <button onClick={() => setSelectedViewUser(tutor)} className="text-emerald-700 font-bold text-xs bg-emerald-50/50 border border-emerald-100 px-4 py-2 rounded-full hover:bg-emerald-100 z-0 flex-shrink-0 transition-colors">
                                     View
                                   </button>
                                 </div>
                               );
                             })}
-                            {computedRecommendedTutors.length > 3 && (
-                              <div className="pt-4 mt-2">
-                                <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="w-full text-center text-xs font-bold text-gray-500 hover:text-[#00a992]">
-                                  See more recommendations
-                                </button>
-                              </div>
-                            )}
+                            <div className="pt-4 mt-2 border-t border-gray-50 flex justify-between items-center">
+                              <span className="text-xs text-slate-500 font-medium">Find more great tutors</span>
+                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
+                                <ArrowRight className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1540,11 +1571,12 @@ export default function StudentDashboard() {
               <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
                   <div>
-                    <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
+                    <h2 className="text-3xl sm:text-4xl font-black text-[#111827] tracking-tight">
                       {tuitionSubTab === 'all' ? 'All Tutors' : 'Recommended Tutors'}
                     </h2>
+                    <p className="text-slate-500 mt-1 mb-4">Find great tutors who are ready to teach you.</p>
                     {studentGroups.length > 0 && (
-                      <div className="mt-4 flex items-center gap-3">
+                      <div className="mt-2 flex items-center gap-3">
                         <label className="text-sm font-bold text-gray-600">Finding tutors for:</label>
                         <select 
                           className="w-48 sm:w-64 bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold text-[#00a992] focus:outline-none focus:ring-2 focus:ring-[#00a992]/50 truncate"
@@ -1558,32 +1590,84 @@ export default function StudentDashboard() {
                       </div>
                     )}
                   </div>
-                  <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto overflow-x-auto">
+                  <div className="flex bg-gray-100 p-1 rounded-full shadow-inner w-full sm:w-auto overflow-x-auto border border-gray-200">
                     <button 
-                      onClick={() => setTuitionSubTab('all')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => {
+                        if (tuitionSubTab === 'all') return;
+                        setIsSwitchingTab(true);
+                        setTuitionSubTab('all');
+                        setTimeout(() => setIsSwitchingTab(false), 1200);
+                      }} 
+                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                       All
                     </button>
                     <button 
-                      onClick={() => setTuitionSubTab('recommendation')} 
-                      className={`flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => {
+                        if (tuitionSubTab === 'recommendation') return;
+                        setIsSwitchingTab(true);
+                        setTuitionSubTab('recommendation');
+                        setTimeout(() => setIsSwitchingTab(false), 1200);
+                      }} 
+                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                       Recommendation
                     </button>
                   </div>
                 </div>
 
+                {isSwitchingTab ? (
+                  <div className="flex flex-col items-center justify-center py-32 animate-in fade-in duration-300">
+                    <Loader2 className="w-12 h-12 text-[#00a992] animate-spin mb-4" />
+                    <h3 className="text-lg font-bold text-gray-900">Finding the perfect match...</h3>
+                    <p className="text-sm text-gray-500 mt-1">Loading {tuitionSubTab === 'all' ? 'all' : 'recommended'} tutors for you.</p>
+                  </div>
+                ) : (
+                  <div className="animate-in fade-in duration-500">
+                {tuitionSubTab === 'recommendation' ? (
+                  <div className="mb-8 bg-emerald-50 rounded-2xl p-3 sm:p-4 flex items-center justify-between relative overflow-hidden border border-emerald-100 shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-4 z-10">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#00a992] shadow-sm flex-shrink-0">
+                         <Lightbulb className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-base">Smart Recommendations</h4>
+                        <p className="text-xs text-gray-600 mt-0.5">These tutors match your learning preferences and subject requirements.</p>
+                      </div>
+                    </div>
+                    <div className="hidden sm:block z-10 mr-6">
+                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                    </div>
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-[#00a992] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                  </div>
+                ) : (
+                  <div className="mb-8 bg-blue-50 rounded-2xl p-3 sm:p-4 flex items-center justify-between relative overflow-hidden border border-blue-100 shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-4 z-10">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
+                         <Globe className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-base">Explore All Tutors</h4>
+                        <p className="text-xs text-gray-600 mt-0.5">Browse through our complete list of qualified tutors.</p>
+                      </div>
+                    </div>
+                    <div className="hidden sm:block z-10 mr-6">
+                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                    </div>
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                       const matchGroup = (app: any) => {
-                        if (app.groupId) return app.groupId === activeGroup?.id;
-                        return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                        if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+                        return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
                       };
-                      const lockedApp = data?.applications?.find((app: any) => app.tutorId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
+                      const lockedApp = data?.applications?.find((app: any) => app.tutorDocId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                       const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                       const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
-                      const offerApp = activeAppForGroup?.tutorId === teacher.id ? activeAppForGroup : undefined;
+                      const offerApp = activeAppForGroup?.tutorDocId === teacher.id ? activeAppForGroup : undefined;
                       
                       const teacherLimit = teacher.isSubscribed ? 15 : 5;
                       const teacherPendingCount = teacher.pendingRequests?.length || 0;
@@ -1611,9 +1695,9 @@ export default function StudentDashboard() {
                       else if (activeAppForGroup) subText = 'Active demo with another tutor';
                       
                       return (
-                        <div key={teacher.id} className="bg-white rounded-3xl shadow-lg shadow-gray-200/40 border border-gray-100 hover:shadow-xl hover:shadow-gray-300/50 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
+                        <div key={teacher.id} className="bg-white rounded-3xl shadow-md border border-gray-100 hover:shadow-lg transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
                           {isLocked && (
-                            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm ${isRed ? 'bg-red-50' : 'bg-emerald-50'}`}>
                                 <Lock className={`w-6 h-6 ${isRed ? 'text-red-500' : 'text-emerald-500'}`} />
                               </div>
@@ -1623,76 +1707,108 @@ export default function StudentDashboard() {
                               </p>
                             </div>
                           )}
-                          <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 flex items-center justify-between">
+                          
+                          {/* Header */}
+                          <div className="bg-[#00a992] p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
                               {teacher.rank && (
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-300 text-gray-800' : teacher.rank === 3 ? 'bg-amber-600 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-md flex-shrink-0 ${teacher.rank === 1 ? 'bg-yellow-400 text-yellow-900' : teacher.rank === 2 ? 'bg-gray-200 text-gray-800' : teacher.rank === 3 ? 'bg-orange-500 text-white' : 'bg-white/20 text-white backdrop-blur-sm'}`}>
                                   #{teacher.rank}
                                 </div>
                               )}
-                              <h3 className="text-xl font-bold text-white tracking-tight truncate">{teacher.name}</h3>
+                              <h3 className="text-lg font-bold text-white tracking-tight truncate">{teacher.name}</h3>
                             </div>
                             {!isLocked && labelText ? (
-                              <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
+                              <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
                                 {labelText}
                               </span>
                             ) : (
-                              <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded-full border border-white/30 shadow-sm">
+                              <span className="px-3 py-1 border border-white/40 text-white text-[10px] font-bold rounded-full uppercase tracking-wider flex-shrink-0">
                                 {teacher.mode || 'Online'}
                               </span>
                             )}
                           </div>
-                          <div className="p-6 flex flex-col flex-grow">
-                            {teacher.teachingApproach && (
-                              <p className="text-sm text-gray-600 mb-5 overflow-hidden leading-relaxed">{teacher.teachingApproach}</p>
-                            )}
-                          <div className="space-y-2 text-sm text-slate-600 mb-6 bg-slate-50 p-5 rounded-2xl border border-slate-100/60 flex-grow shadow-inner">
-                            {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && <p><strong className="text-slate-900">Technologies:</strong> {teacher.technologies.join(', ')}</p>}
-                            {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && <p><strong className="text-slate-900">Languages:</strong> {teacher.languagesTaught.join(', ')}</p>}
-                            {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && <p><strong className="text-slate-900">Subjects:</strong> {teacher.subjects.join(', ')}</p>}
-                            {teacher.experience && <p><strong className="text-slate-900">Experience:</strong> {teacher.experience}</p>}
-                            {teacher.mode !== 'Online' && teacher.locations && (
-                              <p><strong className="text-slate-900">📍 Location:</strong> {teacher.locations} {teacher.travelKm ? `(Travels up to ${teacher.travelKm}km)` : ''}</p>
-                            )}
-                            <p><strong className="text-slate-900">Fee Range:</strong> <span className="text-emerald-600 font-bold">{teacher.feeRange || 'Negotiable'}</span></p>
-                          </div>
                           
-                          <div className="flex flex-col gap-3 mt-auto">
-                            {!hasProfile ? (
-                              <button 
-                                onClick={() => setActiveTab('profile')}
-                                className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 text-white hover:from-[#009b86] hover:to-teal-600 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 text-sm transform hover:scale-[1.02] active:scale-[0.98]"
-                              >
-                                <User className="w-4 h-4" /> View Teacher
-                              </button>
-                            ) : (
-                              <>
-                                <div className="mb-4">
-                                  <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
-                                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
-                                  <input 
-                                    type="number"
-                                    min={getTutorBasePrice(teacher) ? Math.ceil(getTutorBasePrice(teacher) * 0.6) : 0}
-                                    max={getTutorBasePrice(teacher) || undefined}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                                    placeholder={getTutorBasePrice(teacher) ? `e.g. ${getTutorBasePrice(teacher)}` : "e.g. 500"}
-                                    value={negotiationOffer[teacher.id] || ''}
-                                    onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
-                                  />
-                                  {getTutorBasePrice(teacher) > 0 && negotiationOffer[teacher.id] && parseInt(negotiationOffer[teacher.id]) >= getTutorBasePrice(teacher) * 0.6 && parseInt(negotiationOffer[teacher.id]) <= getTutorBasePrice(teacher) * 0.7 && (
-                                      <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite low. The teacher is highly likely to reject it.</p>
-                                  )}
+                          <div className="p-5 flex flex-col flex-grow">
+                            {/* Group Name (Teacher) */}
+                            <div className="flex items-center gap-2 mb-4 text-gray-900">
+                              <User className="w-5 h-5 text-[#00a992]" />
+                              <h4 className="font-bold text-base">Tutor Profile</h4>
+                            </div>
+
+                            {/* Details Box */}
+                            <div className="bg-emerald-50/50 rounded-2xl p-4 space-y-3 mb-6 flex-grow">
+                              {teacher.category === 'programming' && (teacher.technologies?.length ?? 0) > 0 && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <BookOpen className="w-4 h-4 text-[#00a992]" />
+                                  <span className="text-slate-600 font-bold">Tech:</span>
+                                  <span className="text-slate-500 truncate">{teacher.technologies.join(', ')}</span>
                                 </div>
-                                {isHired ? (
-                                  <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-xl shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200">
-                                    <CheckCircle2 className="w-4 h-4" /> Already Hired
-                                  </button>
-                                ) : (
-                                  <div className="flex flex-col gap-2 mt-auto">
-                                    <div className="flex gap-2">
+                              )}
+                              {teacher.category === 'languages' && (teacher.languagesTaught?.length ?? 0) > 0 && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <BookOpen className="w-4 h-4 text-[#00a992]" />
+                                  <span className="text-slate-600 font-bold">Lang:</span>
+                                  <span className="text-slate-500 truncate">{teacher.languagesTaught.join(', ')}</span>
+                                </div>
+                              )}
+                              {(!teacher.category || teacher.category === 'school') && (teacher.subjects?.length ?? 0) > 0 && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <BookOpen className="w-4 h-4 text-[#00a992]" />
+                                  <span className="text-slate-600 font-bold">Sub:</span>
+                                  <span className="text-slate-500 truncate">{teacher.subjects.join(', ')}</span>
+                                </div>
+                              )}
+                              {teacher.experience && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <LayoutDashboard className="w-4 h-4 text-[#00a992]" />
+                                  <span className="text-slate-600 font-bold">Exp:</span>
+                                  <span className="text-slate-500">{teacher.experience}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 text-sm">
+                                <Wallet className="w-4 h-4 text-[#00a992]" />
+                                <span className="text-slate-600 font-bold">Fee:</span>
+                                <span className="text-[#00a992] font-bold">{teacher.feeRange || 'Negotiable'}</span>
+                              </div>
+                            </div>
+                          
+                            {/* Actions Area */}
+                            <div className="mt-auto">
+                              {!hasProfile ? (
+                                <button 
+                                  onClick={() => setActiveTab('profile')}
+                                  className="w-full bg-[#00a992] text-white font-bold py-3.5 rounded-full transition-all shadow-md hover:bg-[#00927d] flex items-center justify-center gap-2 text-sm"
+                                >
+                                  <User className="w-4 h-4" /> View Teacher
+                                </button>
+                              ) : (
+                                <>
+                                  <div className="mb-4">
+                                    <p className="text-[10px] text-gray-500 leading-tight mb-3">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
+                                    <input 
+                                      type="number"
+                                      min={getTutorBasePrice(teacher) ? Math.ceil(getTutorBasePrice(teacher) * 0.6) : 0}
+                                      max={getTutorBasePrice(teacher) || undefined}
+                                      className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                                      placeholder={getTutorBasePrice(teacher) ? `e.g. ${getTutorBasePrice(teacher)}` : "Your Offer (₹/mo)"}
+                                      value={negotiationOffer[teacher.id] || ''}
+                                      onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
+                                    />
+                                    {getTutorBasePrice(teacher) > 0 && negotiationOffer[teacher.id] && parseInt(negotiationOffer[teacher.id]) >= getTutorBasePrice(teacher) * 0.6 && parseInt(negotiationOffer[teacher.id]) <= getTutorBasePrice(teacher) * 0.7 && (
+                                        <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite low. The teacher is highly likely to reject it.</p>
+                                    )}
+                                  </div>
+                                  
+                                  {isHired ? (
+                                    <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-full shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200 mb-4">
+                                      <CheckCircle2 className="w-4 h-4" /> Already Hired
+                                    </button>
+                                  ) : (
+                                    <div className="flex gap-2 mb-4">
                                       <button 
                                         onClick={() => setSelectedViewUser(teacher)}
-                                        className="w-1/3 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 font-bold py-3.5 rounded-xl transition-all text-sm flex items-center justify-center active:scale-[0.98]"
+                                        className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
                                       >
                                         View
                                       </button>
@@ -1707,9 +1823,9 @@ export default function StudentDashboard() {
                                             }
                                             handleRequestTutor(teacher);
                                           }}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
+                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Make Offer')}
+                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       ) : (
                                         <button
@@ -1722,17 +1838,20 @@ export default function StudentDashboard() {
                                             }
                                             handleDirectRequestDemo(teacher); 
                                           }}
-                                          className={`flex-1 py-3.5 px-3 rounded-xl text-sm font-bold transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98]')}`}
+                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit Reached' : 'Request Demo')}
+                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo')} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       )}
                                     </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
+                                  )}
+                                  
+                                  <button className="w-full text-center text-sm font-bold text-emerald-700 flex items-center justify-center gap-2 hover:text-emerald-800 transition-colors">
+                                    <Bookmark className="w-4 h-4" /> Save for later
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1745,6 +1864,8 @@ export default function StudentDashboard() {
                       </div>
                     )}
                   </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1755,7 +1876,7 @@ export default function StudentDashboard() {
                 {((data?.allNotifications)?.length ?? 0) > 0 ? (
                   <div className="space-y-4">
                     {data?.allNotifications?.map((neg: any) => {
-                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
+                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
                         <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
                           <div>
@@ -1814,8 +1935,8 @@ export default function StudentDashboard() {
                         const modifiedGroupIds = new Set<string>();
                         for (const student of groupedStudents) {
                           const oldStudent = allStudents.find((s:any) => s.id === student.id);
-                          if (oldStudent?.groupId !== student.groupId) {
-                            if (student.groupId) modifiedGroupIds.add(student.groupId);
+                          if (oldStudent?.groupDocId !== student.groupDocId) {
+                            if (student.groupDocId) modifiedGroupIds.add(student.groupDocId);
                           }
                         }
 
@@ -1855,7 +1976,7 @@ export default function StudentDashboard() {
                 {(displayRequests?.length ?? 0) > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {displayRequests?.map((neg: any) => {
-                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentId) || { name: neg.studentName || 'Student' };
+                      const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
                       <div key={neg.id} className="bg-gradient-to-br from-white to-slate-50 p-6 rounded-3xl border border-gray-100 shadow-lg shadow-slate-200/50 flex flex-col h-full hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300">
                             
@@ -1913,9 +2034,9 @@ export default function StudentDashboard() {
                               {/* Request Specific Status UI (Buttons/Labels) */}
                               <div className="mt-auto space-y-2">
                                 {(() => {
-                                  const leadId = neg.groupId || neg.studentId;
+                                  const leadId = neg.groupDocId || neg.studentDocId;
                                   const activeLockApp = data?.applications?.find((app: any) => 
-                                    (app.groupId || app.studentId) === leadId && 
+                                    (app.groupDocId || app.studentDocId) === leadId && 
                                     ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status)
                                   );
                                   const isLockedByOtherTutor = activeLockApp && activeLockApp.id !== neg.id;
@@ -2152,7 +2273,7 @@ export default function StudentDashboard() {
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[150px]">{cls.teacher}</h3>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
                                   <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-md border border-blue-100/50 uppercase tracking-wider">Demo Phase</span>
-                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
+                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentDocId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
                                 </div>
                               </div>
                             </div>
@@ -2203,7 +2324,7 @@ export default function StudentDashboard() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const viewUser = cls.tutorDetails || {
-                                    id: cls.app?.tutorId,
+                                    id: cls.app?.tutorDocId,
                                     name: cls.teacher || 'Tutor',
                                     feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                   };
@@ -2260,7 +2381,7 @@ export default function StudentDashboard() {
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[150px]">{cls.teacher}</h3>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
                                   <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider">{cls.subject}</span>
-                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
+                                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 truncate max-w-[100px]">For {allStudents.find((s:any) => s.id === cls.studentDocId)?.name?.split(' ')[0] || cls.studentName?.split(' ')[0] || 'Student'}</span>
                                 </div>
                               </div>
                             </div>
@@ -2329,7 +2450,7 @@ export default function StudentDashboard() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const viewUser = cls.tutorDetails || {
-                                    id: cls.app?.tutorId,
+                                    id: cls.app?.tutorDocId,
                                     name: cls.teacher || 'Tutor',
                                     feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                   };
@@ -2364,7 +2485,7 @@ export default function StudentDashboard() {
                             const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
                             const proratedFee = Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
                             const isPaid = cls.feePaid === true;
-                            const displayNames = cls.studentName || (cls.studentIds?.length > 1 ? 'Group' : 'Student');
+                            const displayNames = cls.studentName || (cls.studentDocIds?.length > 1 ? 'Group' : 'Student');
 
                             return (
                               <div className="mt-2 flex flex-col gap-2">
@@ -2679,7 +2800,7 @@ export default function StudentDashboard() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {studentGroups.map((group: any, idx: number) => {
-                      const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupId === group.id) || data?.myRequest; // Fallback
+                      const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupDocId === group.id) || data?.myRequest; // Fallback
                       
                       return (
                         <div key={group.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg hover:shadow-teal-900/5 transition-all duration-300 flex flex-col h-full">
@@ -3159,20 +3280,20 @@ export default function StudentDashboard() {
               }
 
               const matchGroup = (app: any) => {
-                if (app.groupId) return app.groupId === activeGroup?.id;
-                return activeGroup?.students?.some((s:any) => s.id === app.studentId) || false;
+                if (app.groupDocId) return app.groupDocId === activeGroup?.id;
+                return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
               };
               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
               const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
-              const hasNegotiation = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['negotiating'].includes(app.status));
-              const isPending = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
-              const isHired = data?.applications?.some((app: any) => app.tutorId === selectedViewUser.id && ['tuition_started'].includes(app.status));
-              const cooldownApp = data?.applications?.find((app: any) => app.tutorId === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
+              const hasNegotiation = data?.applications?.some((app: any) => app.tutorDocId === selectedViewUser.id && ['negotiating'].includes(app.status));
+              const isPending = data?.applications?.some((app: any) => app.tutorDocId === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
+              const isHired = data?.applications?.some((app: any) => app.tutorDocId === selectedViewUser.id && ['tuition_started'].includes(app.status));
+              const cooldownApp = data?.applications?.find((app: any) => app.tutorDocId === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
               
               if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp || activeAppForGroup || hiredAppForGroup) {
                 return (
                   <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center text-gray-500 font-medium text-sm">
-                    {hiredAppForGroup ? 'A teacher has already been hired for this group.' : (activeAppForGroup && activeAppForGroup.tutorId !== selectedViewUser.id ? 'You have an active demo with another tutor for this group.' : 'Currently unavailable for new requests.')}
+                    {hiredAppForGroup ? 'A teacher has already been hired for this group.' : (activeAppForGroup && activeAppForGroup.tutorDocId !== selectedViewUser.id ? 'You have an active demo with another tutor for this group.' : 'Currently unavailable for new requests.')}
                   </div>
                 );
               }
@@ -3247,7 +3368,7 @@ export default function StudentDashboard() {
                     await deleteDoc(doc(db, 'students', studentToRemove.id));
                     
                     // Update group and sync tuition requests
-                    const groupId = studentToRemove.groupId;
+                    const groupId = studentToRemove.groupDocId;
                     if (groupId) {
                         const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
                         const { getDoc, updateDoc } = await import('firebase/firestore');
@@ -3255,8 +3376,8 @@ export default function StudentDashboard() {
                         const groupSnap = await getDoc(groupRef);
                         if (groupSnap.exists()) {
                             const groupData = groupSnap.data();
-                            const newStudentIds = (groupData.studentIds || []).filter((id: string) => id !== studentToRemove.id);
-                            await updateDoc(groupRef, { studentIds: newStudentIds });
+                            const newStudentIds = (groupData.studentDocIds || []).filter((id: string) => id !== studentToRemove.id);
+                            await updateDoc(groupRef, { studentDocIds: newStudentIds });
                             await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
                         }
                     }
@@ -3378,27 +3499,27 @@ export default function StudentDashboard() {
                     await deleteDoc(doc(db, 'users', uid));
                     
                     // Delete all students
-                    const stuQ = query(collection(db, 'students'), where('parentId', '==', uid));
+                    const stuQ = query(collection(db, 'students'), where('parentDocId', '==', uid));
                     const stuSnap = await getDocs(stuQ);
                     for (const d of stuSnap.docs) await deleteDoc(doc(db, 'students', d.id));
                     
                     // Delete all requests
-                    const reqQ = query(collection(db, 'tuition_requests'), where('parentId', '==', uid));
+                    const reqQ = query(collection(db, 'tuition_requests'), where('parentDocId', '==', uid));
                     const reqSnap = await getDocs(reqQ);
                     for (const d of reqSnap.docs) await deleteDoc(doc(db, 'tuition_requests', d.id));
                     
                     // Delete all applications
-                    const appQ = query(collection(db, 'applications'), where('parentId', '==', uid));
+                    const appQ = query(collection(db, 'applications'), where('parentDocId', '==', uid));
                     const appSnap = await getDocs(appQ);
                     for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
                     
                     // Delete tutor requests
-                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('parentId', '==', uid));
+                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('parentDocId', '==', uid));
                     const tutorReqSnap = await getDocs(tutorReqQ);
                     for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
 
                     // Delete direct requests
-                    const directReqQ = query(collection(db, 'direct_requests'), where('parentId', '==', uid));
+                    const directReqQ = query(collection(db, 'direct_requests'), where('parentDocId', '==', uid));
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 
@@ -3480,7 +3601,7 @@ export default function StudentDashboard() {
                 setTimeout(() => {
                    const nextId = nextQueue[0];
                    const nextGroup = studentGroups.find((g:any) => g.id === nextId) || { id: nextId, name: `Group` };
-                   const requestDoc = data?.groups?.find((g: any) => g.id === nextId) || data?.tuitionRequests?.find((req: any) => req.groupId === nextId) || data?.myRequest;
+                   const requestDoc = data?.groups?.find((g: any) => g.id === nextId) || data?.tuitionRequests?.find((req: any) => req.groupDocId === nextId) || data?.myRequest;
                    setSelectedGroupForSettings({ ...nextGroup, requestDoc });
                    setGroupSettingsModalOpen(true);
                    setModifiedGroupQueue(nextQueue);
@@ -3499,7 +3620,7 @@ export default function StudentDashboard() {
         studentNames={(() => {
           if (!selectedGroupForSettings?.id) return [];
           const source = pendingGroupSaveData.length > 0 ? pendingGroupSaveData : allStudents;
-          return source.filter(s => s.groupId === selectedGroupForSettings.id).map(s => s.name);
+          return source.filter(s => s.groupDocId === selectedGroupForSettings.id).map(s => s.name);
         })()}
       />
       

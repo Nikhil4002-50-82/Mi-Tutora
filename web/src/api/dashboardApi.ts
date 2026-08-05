@@ -34,23 +34,22 @@ export const fetchStudentDashboardData = async () => {
     await setDoc(userDocRef, userData);
   }
   
-  const parentQuery = query(collection(db, 'parents'), where('authUid', '==', user.uid));
-  const parentSnap = await getDocs(parentQuery);
-  const parentData = !parentSnap.empty ? parentSnap.docs[0].data() : null;
-  const parentId = !parentSnap.empty ? parentSnap.docs[0].id : user.uid;
+  const parentDocSnap = await getDoc(doc(db, 'parents', user.uid));
+  const parentData = parentDocSnap.exists() ? parentDocSnap.data() : null;
+  const parentId = user.uid;
   
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentId', '==', parentId)));
+  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentDocId', '==', parentId)));
   const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-  const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentId', '==', parentId)));
+  const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentDocId', '==', parentId)));
   const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   students.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
   const myStudent = students.length > 0 ? students[0] : null;
 
-  const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentId', '==', parentId)));
+  const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentDocId', '==', parentId)));
   const groups = groupsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
-  const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentId', '==', parentId)));
+  const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentDocId', '==', parentId)));
   const requests = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   const myRequest = requests.length > 0 ? requests[0] : null;
 
@@ -96,7 +95,7 @@ export const fetchStudentDashboardData = async () => {
     return true;
   }) || [];
 
-  const tutorIds = applications.map((app: any) => app.tutorId).filter(Boolean);
+  const tutorIds = applications.map((app: any) => app.tutorDocId).filter(Boolean);
   let tutorsInfo: any[] = [];
   if (tutorIds.length > 0) {
      for (let i = 0; i < tutorIds.length; i += 10) {
@@ -111,7 +110,7 @@ export const fetchStudentDashboardData = async () => {
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
   const applicationsWithSubjects = await Promise.all(applications.map(async (app: any) => {
-    const tutor = tutorsInfo.find(t => t.id === app.tutorId);
+    const tutor = tutorsInfo.find(t => t.id === app.tutorDocId);
 
     let currentStatus = app.status;
     // Auto-expire if teacher hasn't paid demo fee within 7 days
@@ -124,9 +123,9 @@ export const fetchStudentDashboardData = async () => {
           updatedAt: now,
           reason: 'auto_expired_demo_fee'
         });
-        if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
-        if (app.studentIds) {
-          for (const sid of app.studentIds) {
+        if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(app.id) });
+        if (app.studentDocIds) {
+          for (const sid of app.studentDocIds) {
             await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
           }
         }
@@ -150,9 +149,9 @@ export const fetchStudentDashboardData = async () => {
               updatedAt: now,
               reason: 'auto_expired_demo_decision'
             });
-            if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
-            if (app.studentIds) {
-              for (const sid of app.studentIds) {
+            if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(app.id) });
+            if (app.studentDocIds) {
+              for (const sid of app.studentDocIds) {
                 await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
               }
             }
@@ -184,7 +183,7 @@ export const fetchStudentDashboardData = async () => {
     .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
   ];
-  const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorId));
+  const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorDocId));
 
   return {
     user,
@@ -211,7 +210,7 @@ export const fetchStudentDashboardData = async () => {
       app: app,
       subject: app.category || 'General',
       teacher: app.tutorName || 'Assigned Tutor',
-      studentId: app.studentId,
+      studentDocId: app.studentDocId,
       studentName: app.studentName,
       date: app.demoDate || 'TBD',
       status: app.status,
@@ -223,7 +222,7 @@ export const fetchStudentDashboardData = async () => {
       app: app,
       subject: app.category || 'General',
       teacher: app.tutorName || 'Assigned Tutor',
-      studentId: app.studentId,
+      studentDocId: app.studentDocId,
       studentName: app.studentName,
       date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
       status: app.status,
@@ -270,7 +269,7 @@ export const fetchTeacherDashboardData = async () => {
   const tutorData = !tutorSnap.empty ? tutorSnap.docs[0].data() : null;
   const tutorId = !tutorSnap.empty ? tutorSnap.docs[0].id : user.uid;
   
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorId', '==', tutorId)));
+  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorDocId', '==', tutorId)));
   const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
   const hiredAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', '==', 'tuition_started')));
@@ -278,17 +277,17 @@ export const fetchTeacherDashboardData = async () => {
   const globallyHiredStudentIds = new Set();
   hiredAppsSnap.docs.forEach(d => {
     const data = d.data();
-    if (data.groupId) globallyHiredGroupIds.add(data.groupId);
-    if (data.studentId) globallyHiredStudentIds.add(data.studentId);
-    if (data.studentIds) data.studentIds.forEach((sid: string) => globallyHiredStudentIds.add(sid));
+    if (data.groupDocId) globallyHiredGroupIds.add(data.groupDocId);
+    if (data.studentDocId) globallyHiredStudentIds.add(data.studentDocId);
+    if (data.studentDocIds) data.studentDocIds.forEach((sid: string) => globallyHiredStudentIds.add(sid));
   });
 
   const lockedAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])));
-  const globalLocks: Record<string, { unlockDate: number, tutorId: string }> = {};
+  const globalLocks: Record<string, { unlockDate: number, tutorDocId: string }> = {};
   
   lockedAppsSnap.docs.forEach(d => {
     const data = d.data();
-    const gId = data.groupId || data.studentId;
+    const gId = data.groupDocId || data.studentDocId;
     if (gId) {
       let unlockDate = Date.now() + 14 * 24 * 60 * 60 * 1000;
       if (data.status === 'demo_scheduled' || data.status === 'waiting_for_parent_decision') {
@@ -305,7 +304,7 @@ export const fetchTeacherDashboardData = async () => {
          unlockDate = paidDate + 14 * 24 * 60 * 60 * 1000;
       }
       if (!globalLocks[gId] || unlockDate > globalLocks[gId].unlockDate) {
-         globalLocks[gId] = { unlockDate, tutorId: data.tutorId };
+         globalLocks[gId] = { unlockDate, tutorDocId: data.tutorDocId };
       }
     }
   });
@@ -325,13 +324,14 @@ export const fetchTeacherDashboardData = async () => {
   
   // Group students first
   const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
-    const gId = student.groupId || `indv_${student.id}`;
+    const gId = student.groupDocId || `indv_${student.id}`;
     if (!acc[gId]) {
       acc[gId] = { 
         id: gId, 
         students: [], 
         totalBudget: 0,
-        parentId: student.parentId,
+        parentDocId: student.parentDocId || student.parentId,
+        
         categories: []
       };
     }
@@ -424,8 +424,8 @@ export const fetchTeacherDashboardData = async () => {
   const pricingSnap = await getDocs(collection(db, 'marketplace_pricing'));
   const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
-  const groupIds = applications.map((app: any) => app.groupId || app.studentId).filter(Boolean);
-  const studentIds = applications.flatMap((app: any) => app.studentIds || [app.studentId]).filter(Boolean);
+  const groupIds = applications.map((app: any) => app.groupDocId || app.studentDocId).filter(Boolean);
+  const studentIds = applications.flatMap((app: any) => app.studentDocIds || [app.studentDocId]).filter(Boolean);
 
   let studentsInfo: any[] = [];
   if (studentIds.length > 0) {
@@ -442,8 +442,8 @@ export const fetchTeacherDashboardData = async () => {
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
   const applicationsWithSubjects = await Promise.all(applications.map(async (app: any) => {
-    const student = studentsInfo.find(s => s.id === app.studentId);
-    const appStudentsList = studentsInfo.filter(s => (app.studentIds || []).includes(s.id) || s.id === app.studentId);
+    const student = studentsInfo.find(s => s.id === app.studentDocId);
+    const appStudentsList = studentsInfo.filter(s => (app.studentDocIds || []).includes(s.id) || s.id === app.studentDocId);
     
     let currentStatus = app.status;
     // Auto-expire if teacher hasn't paid demo fee within 7 days
@@ -456,9 +456,9 @@ export const fetchTeacherDashboardData = async () => {
           updatedAt: now,
           reason: 'auto_expired_demo_fee'
         });
-        if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
-        if (app.studentIds) {
-          for (const sid of app.studentIds) {
+        if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(app.id) });
+        if (app.studentDocIds) {
+          for (const sid of app.studentDocIds) {
             await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
           }
         }
@@ -482,9 +482,9 @@ export const fetchTeacherDashboardData = async () => {
               updatedAt: now,
               reason: 'auto_expired_demo_decision'
             });
-            if (app.tutorId) await updateDoc(doc(db, 'tutors', app.tutorId), { pendingRequests: arrayRemove(app.id) });
-            if (app.studentIds) {
-              for (const sid of app.studentIds) {
+            if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(app.id) });
+            if (app.studentDocIds) {
+              for (const sid of app.studentDocIds) {
                 await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(app.id) });
               }
             }
@@ -515,7 +515,7 @@ export const fetchTeacherDashboardData = async () => {
   const allNotifications = applicationsWithSubjects
     .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-  const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupId || app.studentId)));
+  const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupDocId || app.studentDocId)));
 
   let totalRevenue = 0;
   let demoFeesPaid = 0;
@@ -605,7 +605,7 @@ export const fetchTeacherDashboardData = async () => {
     demoClasses: applicationsWithSubjects.filter((app: any) => ['demo_booking_phase', 'demo_scheduled'].includes(app.status)).map((app: any) => ({
       id: app.id,
       app: app,
-      student: app.studentName || (app.studentIds?.length > 1 ? 'Group' : 'Student'),
+      student: app.studentName || (app.studentDocIds?.length > 1 ? 'Group' : 'Student'),
       subject: app.category || 'General',
       date: app.demoDate || 'TBD',
       status: app.status,
