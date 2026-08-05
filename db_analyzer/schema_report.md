@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-05T20:30:17.805Z
+Generated on: 2026-08-05T21:42:16.295Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -19,7 +19,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 8*
+*Documents sampled: 7*
 
 | Field Path | Data Type |
 |---|---|
@@ -29,15 +29,22 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `category` | `string` |
 | `createdAt` | `number` |
 | `currentOffer` | `number` |
+| `demoDate` | `string` |
 | `demoHours` | `string` |
 | `demoPaymentPaid` | `boolean` |
+| `demoTime` | `string` |
 | `finalPrice` | `number` |
 | `groupDocId` | `string` |
 | `groupId` | `string` |
 | `initialBudget` | `number` |
+| `initiator` | `string` |
 | `lastUpdatedBy` | `string` |
+| `mode` | `string` |
 | `parentDocId` | `string` |
 | `parentId` | `string` |
+| `proposedDate` | `string` |
+| `proposedTime` | `string` |
+| `requestDocId` | `string` |
 | `requestId` | `string` |
 | `source` | `string` |
 | `status` | `string` |
@@ -80,7 +87,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 ---
 
 ## Collection: `groups`
-*Documents sampled: 17*
+*Documents sampled: 18*
 
 | Field Path | Data Type |
 |---|---|
@@ -91,6 +98,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `city` | `string` |
 | `createdAt` | `number` |
 | `daysPerWeek` | `string` |
+| `groupDocId` | `string` |
 | `groupId` | `string` |
 | `latitude` | `null | number` |
 | `longitude` | `null | number` |
@@ -154,6 +162,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `authUid` | `string` |
 | `email` | `string` |
 | `name` | `string` |
+| `parentDocId` | `string` |
 | `parentId` | `string` |
 | `phone` | `string` |
 | `whatsapp` | `string` |
@@ -178,7 +187,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 29*
+*Documents sampled: 30*
 
 | Field Path | Data Type |
 |---|---|
@@ -193,12 +202,13 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `groupDocId` | `string` |
 | `groupId` | `string` |
 | `guardianName` | `string` |
+| `id` | `string` |
 | `languages` | `array | array of string` |
 | `learningGoal` | `string` |
 | `name` | `string` |
 | `parentDocId` | `string` |
 | `parentId` | `string` |
-| `pendingRequests` | `array of string` |
+| `pendingRequests` | `array of string | array` |
 | `phoneNumber` | `string` |
 | `specialRequirements` | `string` |
 | `studentId` | `string` |
@@ -206,6 +216,43 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `subjects` | `array of string | array` |
 | `technologies` | `array | array of string` |
 | `whatsappNumber` | `string` |
+
+---
+
+## Collection: `tuition_requests`
+*Documents sampled: 1*
+
+| Field Path | Data Type |
+|---|---|
+| `acceptedTutorId` | `string` |
+| `area` | `string` |
+| `category` | `string` |
+| `city` | `string` |
+| `combinedBudget` | `number` |
+| `combinedLanguages` | `array` |
+| `combinedSubjects` | `array of string` |
+| `combinedTechnologies` | `array` |
+| `createdAt` | `number` |
+| `daysPerWeek` | `string` |
+| `groupDocId` | `string` |
+| `latitude` | `null` |
+| `longitude` | `null` |
+| `mode` | `string` |
+| `parentDocId` | `string` |
+| `preferredTimeRange` | `string` |
+| `requestId` | `string` |
+| `specificDays` | `array of string` |
+| `status` | `string` |
+| `studentsDetails` | `array of object` |
+| `studentsDetails[].board` | `string` |
+| `studentsDetails[].budget` | `number` |
+| `studentsDetails[].classLevel` | `string` |
+| `studentsDetails[].id` | `string` |
+| `studentsDetails[].languages` | `array` |
+| `studentsDetails[].name` | `string` |
+| `studentsDetails[].subjects` | `array of string` |
+| `studentsDetails[].technologies` | `array` |
+| `teacherGenderPreference` | `string` |
 
 ---
 
@@ -234,7 +281,7 @@ Generated on: 2026-08-05T20:30:17.805Z
 | `mode` | `string` |
 | `name` | `string` |
 | `occupation` | `string` |
-| `pendingRequests` | `array of string` |
+| `pendingRequests` | `array of string | array` |
 | `phone` | `string` |
 | `preferredLocations` | `string` |
 | `preferredTimeRange` | `string` |
