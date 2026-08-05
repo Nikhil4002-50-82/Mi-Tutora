@@ -1110,7 +1110,7 @@ export default function StudentDashboard() {
 
       {/* SIDEBAR (Desktop & Mobile Drawer) */}
       <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
-        <div className="h-[88px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
+        <div className="h-[76px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
           <div className="flex w-full justify-between items-center">
             <div className="flex items-center gap-3">
               <GraduationCap className="w-8 h-8 text-emerald-400" />
@@ -1217,7 +1217,7 @@ export default function StudentDashboard() {
       )}
       <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
-        <header className="h-[88px] bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
+        <header className="h-[76px] bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
           <div className="flex items-center gap-6">
             <div className="relative group cursor-pointer" ref={notificationsRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsNotificationsDropdownOpen(!isNotificationsDropdownOpen) }}>
               <button className="text-gray-400 hover:text-emerald-600 transition-colors relative mt-1">
