@@ -611,9 +611,9 @@ export default function DemoForm({
            await setDoc(sDoc.ref, sDoc.data);
         }
 
-        const uniqueGroups = Array.from(new Set(studentDocs.map(s => s.data.groupId)));
+        const uniqueGroups = Array.from(new Set(studentDocs.map(s => s.data.groupDocId)));
         for (const gId of uniqueGroups) {
-           const groupStudents = studentDocs.filter(s => s.data.groupId === gId);
+           const groupStudents = studentDocs.filter(s => s.data.groupDocId === gId);
            const studentIds = groupStudents.map(s => s.data.id);
            const lookupId = groupStudents[0].frontendStudent.groupId || 'unassigned';
            const groupPref = formData.groupPreferences?.[lookupId] || formData.groupPreferences?.[gId] || {};
