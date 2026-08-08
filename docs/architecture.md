@@ -111,6 +111,9 @@ mushi/
 │   ├── analyze.js
 │   └── schema_report.md   # Auto-generated snapshot of the DB structure
 ├── docs/                  # Project documentation (You are here)
+│   ├── negotiation_plan.md# Strategy document for the negotiation feature
+│   ├── ranking_plan.md    # Strategy document for tutor ranking algorithm
+│   └── whatsapp_automation_options.md # Plans for WhatsApp integration
 ├── web/                   # The main Next.js Application
 │   ├── public/            # Static assets
 │   ├── src/
@@ -121,15 +124,10 @@ mushi/
 │   │   └── utils/         # Helper functions and constants
 │   ├── package.json       # App dependencies
 │   └── tailwind.config.ts # Tailwind UI styling configuration
-├── negotitation_plan.md   # Strategy document for the negotiation feature
-├── ranking_plan.md        # Strategy document for tutor ranking algorithm
-└── whatsapp_automation_options.md # Plans for WhatsApp integration
 ```
 
 ## 7. Strategic & Planned Features (Roadmap)
 
 Based on internal planning documents, the following major features are in focus:
 
-1.  **Advanced Negotiation Flow (`negotitation_plan.md`)**: Enhancing the `applications` lifecycle to allow seamless back-and-forth haggling on price and timings before finalizing a group.
-2.  **Tutor Ranking System (`ranking_plan.md`)**: Implementing an algorithm to rank tutors in the marketplace based on ratings, successful applications, and profile completeness to improve search quality.
-3.  **WhatsApp Automation (`whatsapp_automation_options.md`)**: Integrating WhatsApp APIs to send critical notifications (e.g., demo scheduled, payment received) to parents and tutors who are more active on WhatsApp than email/app notifications.
+1.  **WhatsApp Automation (`whatsapp_automation_options.md`)**: Integrating WhatsApp APIs to send critical notifications (e.g., demo scheduled, payment received) to parents and tutors who are more active on WhatsApp than email/app notifications.

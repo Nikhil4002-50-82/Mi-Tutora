@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-05T21:42:16.295Z
+Generated on: 2026-08-08T10:01:12.827Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -318,4 +318,5 @@ Generated on: 2026-08-05T21:42:16.295Z
 | `walletBalance` | `number` |
 
 ---
+
 

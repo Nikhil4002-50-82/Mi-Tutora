@@ -1000,6 +1000,7 @@ export default function TeacherDashboard() {
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                    <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
+                   {data?.profile?.tutorId && <p className="text-xs text-gray-500 truncate mt-0.5 font-mono">ID: {data?.profile?.tutorId}</p>}
                  </div>
                  <div className="p-2">
                    <button onClick={() => { setActiveTab('profile'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
@@ -1616,7 +1617,10 @@ export default function TeacherDashboard() {
                             {/* Card Header */}
                             <div className="mb-4">
                               <div className="flex items-start justify-between gap-3 mb-2">
-                                <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">{neg.studentName}</h4>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">{neg.studentName}</h4>
+                                  {neg.applicationId && <p className="text-xs text-slate-500 font-mono font-bold mt-1 uppercase tracking-wider">ID: {neg.applicationId}</p>}
+                                </div>
                                 <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider flex-shrink-0">Request</span>
                               </div>
                               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{neg.category}</p>
@@ -2703,6 +2707,18 @@ export default function TeacherDashboard() {
                 </div>
                 <div>
                   <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    {(selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds && selectedViewUser.id)) && (
+                      <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                        Parent ID: {selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds ? selectedViewUser.id : '')}
+                      </p>
+                    )}
+                    {(selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId) && (
+                      <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                        Group ID: {selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId}
+                      </p>
+                    )}
+                  </div>
                   <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
                     <Users className="w-4 h-4" /> {selectedViewUser.students?.length || 1} Student(s)
                   </p>

@@ -1346,6 +1346,7 @@ export default function StudentDashboard() {
                  <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                    <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || 'Student'}</p>
                    <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
+                   {data?.profile?.parentId && <p className="text-xs text-gray-500 truncate mt-0.5 font-mono">ID: {data?.profile?.parentId}</p>}
                  </div>
                  <div className="p-2">
                    <button onClick={() => { setActiveTab('profile'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
@@ -2043,7 +2044,10 @@ export default function StudentDashboard() {
                             {/* Card Header */}
                             <div className="mb-4">
                               <div className="flex items-start justify-between gap-3 mb-2">
-                                <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight flex-1 min-w-0 break-words">Tutor: {neg.tutorName}</h4>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-lg text-slate-900 tracking-tight leading-tight break-words">Tutor: {neg.tutorName}</h4>
+                                  {neg.applicationId && <p className="text-xs text-slate-500 font-mono font-bold mt-1 uppercase tracking-wider">ID: {neg.applicationId}</p>}
+                                </div>
                                 <span 
                                   className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-100/50 uppercase tracking-wider truncate max-w-[50%] flex-shrink-0"
                                   title={`For: ${studentForApp.name}`}
@@ -2780,14 +2784,22 @@ export default function StudentDashboard() {
                         <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
                         <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-900/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
                         
-                        <div className="relative z-10 flex items-center gap-5">
-                          <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
-                            {(data?.profile?.name || data?.user?.displayName || 'P').charAt(0).toUpperCase()}
+                        <div className="relative z-10 flex items-center justify-between w-full">
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
+                              {(data?.profile?.name || data?.user?.displayName || 'P').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-bold text-white tracking-tight">{data?.profile?.name || data?.user?.displayName || 'Parent Profile'}</h3>
+                              <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{data?.profile?.email || data?.user?.email || 'No email provided'}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-white tracking-tight">{data?.profile?.name || data?.user?.displayName || 'Parent Profile'}</h3>
-                            <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{data?.profile?.email || data?.user?.email || 'No email provided'}</p>
-                          </div>
+                          {data?.profile?.parentId && (
+                            <div className="text-right">
+                               <p className="text-[11px] text-emerald-100/80 font-bold uppercase tracking-wider mb-0.5">Parent ID</p>
+                               <p className="text-lg font-bold text-white font-mono bg-white/10 px-3 py-1 rounded-lg border border-white/20 backdrop-blur-sm shadow-sm">{data?.profile?.parentId}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="p-6 sm:p-8 bg-slate-50/50">
@@ -3157,6 +3169,11 @@ export default function StudentDashboard() {
                 </div>
                 <div>
                   <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
+                  {selectedViewUser.tutorId && (
+                    <p className="text-emerald-100 font-mono font-bold mt-1.5 uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                      ID: {selectedViewUser.tutorId}
+                    </p>
+                  )}
                   <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
                     <User className="w-4 h-4" /> {selectedViewUser.category || 'Tutor'}
                   </p>
@@ -3711,8 +3728,8 @@ export default function StudentDashboard() {
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-4xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">Group {viewingGroupDetails.index}: Student Details</h3>
-                <p className="text-slate-500 font-medium">{viewingGroupDetails.name}</p>
+                <h3 className="text-2xl font-black text-slate-900">Group {viewingGroupDetails.index}: Student Details {viewingGroupDetails.students?.[0]?.groupId ? `(ID: ${viewingGroupDetails.students[0].groupId})` : ''}</h3>
+                <p className="text-slate-500 font-medium">Group: {viewingGroupDetails.name}</p>
               </div>
               <button onClick={() => setViewingGroupDetails(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                 <X className="w-6 h-6 text-slate-400" />
@@ -3723,10 +3740,11 @@ export default function StudentDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {viewingGroupDetails.students.map((s: any) => (
                   <div key={s.id} className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex justify-between items-start mb-1">
                       <h5 className="text-lg font-bold text-slate-800 tracking-tight">{s.name}</h5>
                       <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md">₹{s.budget}/mo</span>
                     </div>
+                    {s.studentId && <p className="text-xs text-slate-500 font-mono font-medium mb-3">ID: {s.studentId}</p>}
                     <div className="space-y-2 text-sm text-slate-600">
                       {s.classLevel && <p><strong className="text-slate-900">Class:</strong> {s.classLevel}</p>}
                       {s.board && <p><strong className="text-slate-900">Board:</strong> {s.board}</p>}

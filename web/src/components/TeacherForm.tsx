@@ -302,14 +302,22 @@ export default function TeacherForm({
               <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-900/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
               
-              <div className="relative z-10 flex items-center gap-5">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
-                  {(formData.fullName || 'T').charAt(0).toUpperCase()}
+              <div className="relative z-10 flex items-center justify-between w-full">
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
+                    {(formData.fullName || 'T').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">{formData.fullName || 'Teacher Profile'}</h3>
+                    <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{formData.email || 'No email provided'}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white tracking-tight">{formData.fullName || 'Teacher Profile'}</h3>
-                  <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{formData.email || 'No email provided'}</p>
-                </div>
+                {initialData?.tutorId && (
+                  <div className="text-right ml-auto">
+                     <p className="text-[11px] text-emerald-100/80 font-bold uppercase tracking-wider mb-0.5">Tutor ID</p>
+                     <p className="text-lg font-bold text-white font-mono bg-white/10 px-3 py-1 rounded-lg border border-white/20 backdrop-blur-sm shadow-sm">{initialData.tutorId}</p>
+                  </div>
+                )}
               </div>
             </div>
             
