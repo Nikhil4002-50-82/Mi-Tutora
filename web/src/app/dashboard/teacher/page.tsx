@@ -381,7 +381,37 @@ export default function TeacherDashboard() {
       return;
     }
     const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
-    const teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    let teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    
+    if (teacherPendingCount > 0 && data?.profile?.pendingRequests && data?.profile?.pendingRequests.length > 0) {
+      try {
+        const { db } = await import('@/utils/firebase/client');
+        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
+        const reqIds = data.profile.pendingRequests.slice(0, 30);
+        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
+        const snap = await getDocs(q);
+        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+        let verifiedCount = 0;
+        const orphanedIds: string[] = [];
+        const retrievedDocs = new Map();
+        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
+        for (const reqId of reqIds) {
+          const appData = retrievedDocs.get(reqId);
+          if (appData && activeStatuses.includes(appData.status)) {
+            verifiedCount++;
+          } else {
+            orphanedIds.push(reqId);
+          }
+        }
+        teacherPendingCount = verifiedCount;
+        if (orphanedIds.length > 0) {
+          updateDoc(doc(db, 'tutors', data.profile.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
+        }
+      } catch (e) {
+        console.error("Queue verification error:", e);
+      }
+    }
+
     if (teacherPendingCount >= teacherLimit) {
       toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
       return;
@@ -468,7 +498,37 @@ export default function TeacherDashboard() {
       return;
     }
     const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
-    const teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    let teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
+    
+    if (teacherPendingCount > 0 && data?.profile?.pendingRequests && data?.profile?.pendingRequests.length > 0) {
+      try {
+        const { db } = await import('@/utils/firebase/client');
+        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
+        const reqIds = data.profile.pendingRequests.slice(0, 30);
+        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
+        const snap = await getDocs(q);
+        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+        let verifiedCount = 0;
+        const orphanedIds: string[] = [];
+        const retrievedDocs = new Map();
+        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
+        for (const reqId of reqIds) {
+          const appData = retrievedDocs.get(reqId);
+          if (appData && activeStatuses.includes(appData.status)) {
+            verifiedCount++;
+          } else {
+            orphanedIds.push(reqId);
+          }
+        }
+        teacherPendingCount = verifiedCount;
+        if (orphanedIds.length > 0) {
+          updateDoc(doc(db, 'tutors', data.profile.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
+        }
+      } catch (e) {
+        console.error("Queue verification error:", e);
+      }
+    }
+
     if (teacherPendingCount >= teacherLimit) {
       toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
       return;
