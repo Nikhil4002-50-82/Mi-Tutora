@@ -2033,6 +2033,20 @@ export default function StudentDashboard() {
                               
                               {/* Request Specific Status UI (Buttons/Labels) */}
                               <div className="mt-auto space-y-2">
+                                <button
+                                  onClick={() => {
+                                    const teacherUser = data?.allTutors?.find((t:any) => t.id === neg.tutorDocId) || {
+                                      id: neg.tutorDocId,
+                                      name: neg.tutorName || 'Teacher',
+                                      category: neg.category,
+                                    };
+                                    setSelectedViewUser(teacherUser);
+                                    setSelectedViewApp(neg);
+                                  }}
+                                  className="w-full bg-white border-2 border-emerald-100 hover:border-emerald-500 hover:bg-emerald-50 text-emerald-700 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-2"
+                                >
+                                  View Profile
+                                </button>
                                 {(() => {
                                   const leadId = neg.groupDocId || neg.studentDocId;
                                   const activeLockApp = data?.applications?.find((app: any) => 
