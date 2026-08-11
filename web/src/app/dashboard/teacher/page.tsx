@@ -456,7 +456,7 @@ export default function TeacherDashboard() {
         tutorName: data?.profile?.name,
         requestDocId: '',
         parentDocId: student.parentDocId || student.parentId,
-        studentDocId: student.id,
+        studentDocId: student.students?.[0]?.id || student.id,
         groupDocId: student.id,
         studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
@@ -566,7 +566,7 @@ export default function TeacherDashboard() {
         tutorName: data?.profile?.name,
         requestDocId: '',
         parentDocId: student.parentDocId || student.parentId,
-        studentDocId: student.id,
+        studentDocId: student.students?.[0]?.id || student.id,
         groupDocId: student.id,
         studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
         studentName: student.name,
@@ -1416,7 +1416,7 @@ export default function TeacherDashboard() {
                           const isLocked = false;
                           const isRed = !!lockedApp;
                           const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
-                          const labelText = isRed ? 'Locked' : (isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : (offerApp ? 'Offer Received' : '')));
+                          const labelText = isRed ? 'Busy with another demo' : (isDemoPhase ? 'Demo in Progress' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : (offerApp ? 'Offer Received' : '')));
 
                           return (
                             <div key={group.id} className="bg-white rounded-3xl shadow-md border border-gray-100 flex flex-col h-full overflow-hidden relative group">
@@ -1430,9 +1430,15 @@ export default function TeacherDashboard() {
                                   )}
                                   <h3 className="text-lg font-bold text-white tracking-tight truncate">{parentName}</h3>
                                 </div>
-                                <span className="px-3 py-1 border border-white/40 text-white text-[10px] font-bold rounded-full uppercase tracking-wider flex-shrink-0">
-                                  {group.category || 'School'}
-                                </span>
+                                {labelText ? (
+                                  <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
+                                    {labelText}
+                                  </span>
+                                ) : (
+                                  <span className="px-3 py-1 border border-white/40 text-white text-[10px] font-bold rounded-full uppercase tracking-wider flex-shrink-0">
+                                    {group.category || 'School'}
+                                  </span>
+                                )}
                               </div>
                               
                               <div className="p-5 flex flex-col flex-grow">

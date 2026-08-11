@@ -498,16 +498,24 @@ export default function StudentDashboard() {
           const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
 
           const numStudents = formData.numberOfStudents || 1;
+          const studentDocs = [];
+          
           for (let i = 0; i < numStudents; i++) {
             const s = formData.students && formData.students[i] ? formData.students[i] : formData;
             const newStudentRef = doc(collection(db, 'students'));
             
-            await setDoc(newStudentRef, {
+            const { generateCustomId } = await import('@/utils/idGenerator');
+            let tempGroupId = (s as any).groupDocId || 'unassigned';
+            if (tempGroupId === 'unassigned' || tempGroupId?.startsWith('indv_temp')) {
+               tempGroupId = generateCustomId('MTG');
+            }
+            
+            const studentData = {
               id: newStudentRef.id,
               guardianName: formData.parentName || '',
               dob: '',
               parentDocId: user.uid,
-              category: formData.category || '',
+              category: formData.category || s.category || '',
               name: s.fullName || s.name || '',
               gender: s.gender || '',
               phoneNumber: formData.phone || '',
@@ -527,33 +535,87 @@ export default function StudentDashboard() {
               hoursPerDay: formData.hours || '',
               daysPerWeek: formData.days || '',
               specificDays: formData.specificDays || [],
-              groupDocId: s.groupDocId?.startsWith('indv_temp') ? `indv_${newStudentRef.id}` : (s.groupDocId || `indv_${newStudentRef.id}`),
+              groupDocId: tempGroupId,
               createdAt: Date.now()
-            });
-
-            const newRequestRef = doc(collection(db, 'tuition_requests'));
-            await setDoc(newRequestRef, {
-              id: newRequestRef.id,
-              city: '',
-              latitude: 0.0,
-              longitude: 0.0,
-              acceptedTutorId: '',
-              parentDocId: user.uid,
-              studentDocId: newStudentRef.id,
-              category: formData.category || '',
-              studentName: s.fullName || s.name || '',
-              classLevel: s.classGrade || s.classLevel || '',
-              board: s.board || '',
-              subjects: Array.isArray(s.subjects) ? s.subjects : (s.subjects ? s.subjects.split(',').map((subj: string) => subj.trim()) : []),
-              technologies: s.technologies || [],
-              languages: s.languages || [],
-              mode: formData.demoMode || '',
-              preferredTimeRange: formData.hours || '',
-              area: combinedAddress,
-              budget: parseInt(s.budget) || 0,
-              status: 'open',
-              createdAt: Date.now()
-            });
+            };
+            
+            studentDocs.push({ ref: newStudentRef, data: studentData, frontendStudent: s });
+          }
+          
+          for (const sDoc of studentDocs) {
+             await setDoc(sDoc.ref, sDoc.data);
+          }
+          
+          const uniqueGroups = Array.from(new Set(studentDocs.map(s => s.data.groupDocId)));
+          for (const gId of uniqueGroups) {
+             const groupStudents = studentDocs.filter(s => s.data.groupDocId === gId);
+             const studentIds = groupStudents.map(s => s.data.id);
+             
+             const groupRef = doc(collection(db, 'groups'));
+             const groupDocId = groupRef.id;
+             
+             for (const sDoc of groupStudents) {
+                 await updateDoc(sDoc.ref, { groupDocId: groupDocId });
+             }
+             
+             await setDoc(groupRef, {
+                groupDocId: groupDocId,
+                parentDocId: user.uid,
+                studentDocIds: studentIds,
+                mode: formData.demoMode || '',
+                area: combinedAddress,
+                city: isOnline ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+                latitude: null,
+                longitude: null,
+                teacherGenderPreference: 'No Preference',
+                preferredTimeRange: formData.hours || '',
+                daysPerWeek: formData.days || '',
+                specificDays: formData.specificDays || [],
+                status: 'active',
+                createdAt: Date.now()
+             });
+             
+             const combinedSubjects = Array.from(new Set(groupStudents.flatMap(s => s.data.subjects)));
+             const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(s => s.data.technologies)));
+             const combinedLanguages = Array.from(new Set(groupStudents.flatMap(s => s.data.languages)));
+             const combinedBudget = groupStudents.reduce((acc, s) => acc + s.data.budget, 0);
+             const studentsDetails = groupStudents.map(s => ({
+                id: s.data.id,
+                name: s.data.name,
+                classLevel: s.data.classLevel,
+                board: s.data.board,
+                subjects: s.data.subjects,
+                technologies: s.data.technologies,
+                languages: s.data.languages,
+                budget: s.data.budget,
+             }));
+             
+             const { generateCustomId } = await import('@/utils/idGenerator');
+             const newRequestId = generateCustomId('REQ');
+             const newRequestRef = doc(collection(db, 'tuition_requests'));
+             await setDoc(newRequestRef, {
+                requestId: newRequestId,
+                groupDocId: groupDocId,
+                parentDocId: user.uid,
+                category: groupStudents[0].data.category,
+                mode: formData.demoMode || '',
+                area: combinedAddress,
+                city: isOnline ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+                latitude: null,
+                longitude: null,
+                teacherGenderPreference: 'No Preference',
+                preferredTimeRange: formData.hours || '',
+                daysPerWeek: formData.days || '',
+                specificDays: formData.specificDays || [],
+                studentsDetails,
+                combinedSubjects,
+                combinedTechnologies,
+                combinedLanguages,
+                combinedBudget,
+                status: 'open',
+                acceptedTutorId: '',
+                createdAt: Date.now()
+             });
           }
 
           localStorage.removeItem('demoFormData');
@@ -987,8 +1049,8 @@ export default function StudentDashboard() {
         
         const qGroupId = app.groupDocId || app.studentDocId;
         if (qGroupId) {
-          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
-          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
+          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupDocId', '==', qGroupId)));
+          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentDocId', '==', qGroupId)));
           
           const docsToProcess = new Map();
           otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
@@ -1064,8 +1126,8 @@ export default function StudentDashboard() {
 
       const qGroupId = payingClass.groupDocId || payingClass.studentDocId;
       if (qGroupId) {
-          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupId', '==', qGroupId)));
-          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentId', '==', qGroupId)));
+          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupDocId', '==', qGroupId)));
+          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentDocId', '==', qGroupId)));
           
           const docsToProcess = new Map();
           otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
@@ -3461,31 +3523,64 @@ export default function StudentDashboard() {
                   setIsRemovingStudent(true);
                   try {
                     const { db } = await import('@/utils/firebase/client');
-                    const { doc, deleteDoc, query, collection, where, getDocs } = await import('firebase/firestore');
+                    const { doc, query, collection, where, getDocs, getDoc, writeBatch, arrayRemove } = await import('firebase/firestore');
                     
-                    // Delete student
-                    await deleteDoc(doc(db, 'students', studentToRemove.id));
-                    
-                    // Update group and sync tuition requests
+                    const batch = writeBatch(db);
                     const groupId = studentToRemove.groupDocId;
+                    
+                    // 1. Gather Evidence: Find applications connected to this student
+                    const appQ = query(collection(db, 'applications'), where('studentDocIds', 'array-contains', studentToRemove.id));
+                    const appSnap = await getDocs(appQ);
+                    
+                    // 2. Prepare queue cleanups and application deletions
+                    for (const appDoc of appSnap.docs) {
+                      const appData = appDoc.data();
+                      
+                      // Remove from Tutor's pending queue
+                      if (appData.tutorDocId) {
+                        batch.update(doc(db, 'tutors', appData.tutorDocId), {
+                          pendingRequests: arrayRemove(appDoc.id)
+                        });
+                      }
+                      
+                      // Remove from Siblings' pending queues
+                      if (appData.studentDocIds) {
+                        for (const sid of appData.studentDocIds) {
+                          if (sid !== studentToRemove.id) { // No need to update the student we are about to delete
+                            batch.update(doc(db, 'students', sid), {
+                              pendingRequests: arrayRemove(appDoc.id)
+                            });
+                          }
+                        }
+                      }
+                      
+                      // Queue application deletion
+                      batch.delete(doc(db, 'applications', appDoc.id));
+                    }
+                    
+                    // 3. Prepare group update
+                    let groupToSync = false;
                     if (groupId) {
-                        const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
-                        const { getDoc, updateDoc } = await import('firebase/firestore');
                         const groupRef = doc(db, 'groups', groupId);
                         const groupSnap = await getDoc(groupRef);
                         if (groupSnap.exists()) {
                             const groupData = groupSnap.data();
                             const newStudentIds = (groupData.studentDocIds || []).filter((id: string) => id !== studentToRemove.id);
-                            await updateDoc(groupRef, { studentDocIds: newStudentIds });
-                            await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
+                            batch.update(groupRef, { studentDocIds: newStudentIds });
+                            groupToSync = true;
                         }
                     }
                     
-                    // Delete applications
-                    const appQ = query(collection(db, 'applications'), where('studentId', '==', studentToRemove.id));
-                    const appSnap = await getDocs(appQ);
-                    for (const appDoc of appSnap.docs) {
-                      await deleteDoc(doc(db, 'applications', appDoc.id));
+                    // 4. Finally, queue student deletion
+                    batch.delete(doc(db, 'students', studentToRemove.id));
+                    
+                    // 5. Commit everything atomically
+                    await batch.commit();
+                    
+                    // 6. Post-commit: Sync the tuition request document
+                    if (groupToSync && groupId) {
+                        const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+                        await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
                     }
                     
                     toast.success('Student removed successfully');

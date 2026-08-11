@@ -28,6 +28,7 @@ function SignupContent() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setError('');
     
@@ -115,6 +116,8 @@ function SignupContent() {
   };
 
   const handleGoogleSignup = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const { auth, db } = await import('@/utils/firebase/client');
     const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
     const { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } = await import('firebase/firestore');
@@ -200,6 +203,7 @@ function SignupContent() {
       router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
     } catch (err: any) {
       setError(getFriendlyAuthError(err));
+      setIsSubmitting(false);
     }
   };
 
@@ -339,8 +343,10 @@ function SignupContent() {
 
           <div className="space-y-4 mb-6">
             <button
+              type="button"
+              disabled={isSubmitting}
               onClick={handleGoogleSignup}
-              className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700"
+              className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700 disabled:opacity-70"
             >
               <svg viewBox="0 0 24 24" className="w-5 h-5">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />

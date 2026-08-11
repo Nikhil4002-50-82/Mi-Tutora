@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-11T09:00:24.718Z
+Generated on: 2026-08-11T11:18:13.790Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -15,6 +15,37 @@ Generated on: 2026-08-11T09:00:24.718Z
 | `message` | `string` |
 | `timestamp` | `timestamp` |
 | `type` | `string` |
+
+---
+
+## Collection: `applications`
+*Documents sampled: 2*
+
+| Field Path | Data Type |
+|---|---|
+| `absoluteMax` | `number` |
+| `absoluteMin` | `number` |
+| `applicationId` | `string` |
+| `category` | `string` |
+| `createdAt` | `number` |
+| `currentOffer` | `number` |
+| `demoHours` | `string` |
+| `finalPrice` | `number` |
+| `groupDocId` | `string` |
+| `initialBudget` | `number` |
+| `initiator` | `string` |
+| `lastUpdatedBy` | `string` |
+| `mode` | `string` |
+| `parentDocId` | `string` |
+| `requestDocId` | `string` |
+| `source` | `string` |
+| `status` | `string` |
+| `studentDocId` | `string` |
+| `studentDocIds` | `array of string` |
+| `studentName` | `string` |
+| `tutorDocId` | `string` |
+| `tutorName` | `string` |
+| `updatedAt` | `number` |
 
 ---
 

@@ -145,20 +145,20 @@ export default function DemoForm({
                 const studentSnap = await getDoc(doc(db, 'students', activeStudentId));
                 studentData = studentSnap.exists() ? studentSnap.data() : null;
               } else if (!activeStudentId) {
-                const studentQuery = query(collection(db, 'students'), where('parentId', '==', user.uid));
+                const studentQuery = query(collection(db, 'students'), where('parentDocId', '==', user.uid));
                 const studentSnap = await getDocs(studentQuery);
                 studentData = !studentSnap.empty ? studentSnap.docs[0].data() : null;
               }
 
               let requestData: any = {};
               if (activeStudentId && activeStudentId !== 'new') {
-                const requestQuery = query(collection(db, 'tuition_requests'), where('studentId', '==', activeStudentId));
+                const requestQuery = query(collection(db, 'tuition_requests'), where('studentDocId', '==', activeStudentId));
                 const requestSnap = await getDocs(requestQuery);
                 const requestDocs = requestSnap.docs.map(d => d.data());
                 requestDocs.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
                 requestData = requestDocs[0] || {};
               } else if (!activeStudentId) {
-                const requestQuery = query(collection(db, 'tuition_requests'), where('parentId', '==', user.uid));
+                const requestQuery = query(collection(db, 'tuition_requests'), where('parentDocId', '==', user.uid));
                 const requestSnap = await getDocs(requestQuery);
                 const requestDocs = requestSnap.docs.map(d => d.data());
                 requestDocs.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -168,7 +168,7 @@ export default function DemoForm({
               if (studentData) {
                 setIsEditing(false);
                 setFormData(prev => {
-                  const groupId = studentData.groupId || `indv_${studentData.id}`;
+                  const groupId = studentData.groupDocId || `indv_${studentData.id}`;
                   const groupPrefs = { ...prev.groupPreferences };
                   if (!groupPrefs[groupId]) {
                     groupPrefs[groupId] = {
@@ -523,7 +523,7 @@ export default function DemoForm({
         }, { merge: true });
 
         // Update Aggregate Tuition Request
-        const groupStudentsSnap = await getDocs(query(collection(db, 'students'), where('groupId', '==', groupId)));
+        const groupStudentsSnap = await getDocs(query(collection(db, 'students'), where('groupDocId', '==', groupId)));
         const groupStudents = groupStudentsSnap.docs.map(d => d.data());
         const updatedIndex = groupStudents.findIndex((st: any) => st.id === activeStudentId);
         if (updatedIndex > -1) {
@@ -547,7 +547,7 @@ export default function DemoForm({
            budget: st.budget || 0,
         }));
 
-        const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
+        const requestQuery = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupId));
         const requestSnap = await getDocs(requestQuery);
         if (!requestSnap.empty) {
           await updateDoc(requestSnap.docs[0].ref, {
