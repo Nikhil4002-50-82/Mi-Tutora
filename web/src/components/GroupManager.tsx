@@ -7,7 +7,7 @@ interface Student {
   id: string;
   name: string;
   category?: string;
-  groupId?: string;
+  groupDocId?: string;
   [key: string]: any;
 }
 
@@ -37,12 +37,12 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     let groupCounter = 1;
 
     students.forEach(student => {
-      if (student.groupId && student.groupId !== 'unassigned') {
-        if (!initialGroups[student.groupId]) {
-          initialGroups[student.groupId] = [];
-          names[student.groupId] = `Group ${groupCounter++}`;
+      if (student.groupDocId && student.groupDocId !== 'unassigned') {
+        if (!initialGroups[student.groupDocId]) {
+          initialGroups[student.groupDocId] = [];
+          names[student.groupDocId] = `Group ${groupCounter++}`;
         }
-        initialGroups[student.groupId].push(student);
+        initialGroups[student.groupDocId].push(student);
       } else {
         initialGroups['unassigned'].push(student);
       }
@@ -192,7 +192,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
         if (groupId === 'unassigned') {
           finalGroupId = `indv_${student.id}`;
         }
-        updatedStudents.push({ ...student, groupId: finalGroupId });
+        updatedStudents.push({ ...student, groupDocId: finalGroupId });
       });
     });
     

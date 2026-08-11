@@ -35,7 +35,8 @@ function LoginContent() {
   
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get('role') || 'student';
+  const urlRole = searchParams.get('role');
+  const role = ['student', 'teacher', 'parent'].includes(urlRole as string) ? (urlRole as string) : 'student';
   const isTeacher = role === 'teacher';
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -67,10 +68,8 @@ function LoginContent() {
           roles = data.roles || (data.role ? [data.role] : []);
           
           if (!roles.includes(role)) {
-            // Append new role to existing user
-            await updateDoc(doc(db, 'users', user.uid), {
-              roles: arrayUnion(role)
-            });
+            const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
+            await updateDoc(doc(db, 'users', user.uid), payload);
             roles.push(role);
           }
           userRole = role; // Active role for this session
@@ -256,9 +255,8 @@ function LoginContent() {
                     roles = data.roles || (data.role ? [data.role] : []);
                     
                     if (!roles.includes(role)) {
-                      await updateDoc(doc(db, 'users', user.uid), {
-                        roles: arrayUnion(role)
-                      });
+                      const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
+                      await updateDoc(doc(db, 'users', user.uid), payload);
                       roles.push(role);
                     }
                     userRole = role;
@@ -272,10 +270,10 @@ function LoginContent() {
                     });
                     if (role === 'student') {
                       const parentId = generateCustomId('MTP');
-                      await setDoc(doc(db, 'parents', parentId), { id: parentId, authUid: user.uid });
+                      await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid });
                     } else {
                       const tutorId = generateCustomId('MTT');
-                      await setDoc(doc(db, 'tutors', tutorId), { id: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+                      await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
                     }
                   }
                   

@@ -10,7 +10,7 @@ export async function syncTuitionRequestForGroup(db: any, groupId: string, paren
   }
   
   const groupData = groupSnap.data();
-  const studentIds = groupData.studentIds || [];
+  const studentIds = groupData.studentDocIds || groupData.studentIds || [];
   
   // 2. Fetch all students in this group
   let studentsDetails: any[] = [];
@@ -21,7 +21,7 @@ export async function syncTuitionRequestForGroup(db: any, groupId: string, paren
   let category = '';
 
   if (studentIds.length > 0) {
-    const studentsSnap = await getDocs(query(collection(db, 'students'), where('groupId', '==', groupId)));
+    const studentsSnap = await getDocs(query(collection(db, 'students'), where('groupDocId', '==', groupId)));
     const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
     
     for (const st of students) {
@@ -46,7 +46,7 @@ export async function syncTuitionRequestForGroup(db: any, groupId: string, paren
   }
 
   // 3. Find or Create tuition_request
-  const requestQuery = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
+  const requestQuery = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupId));
   const requestSnap = await getDocs(requestQuery);
   
   if (studentIds.length === 0) {

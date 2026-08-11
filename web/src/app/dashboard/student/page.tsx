@@ -690,7 +690,7 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, addDoc, setDoc, doc, updateDoc, arrayUnion, writeBatch } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
@@ -703,7 +703,9 @@ export default function StudentDashboard() {
 
       const appId = generateCustomId('APP');
       const appRef = doc(collection(db, 'applications'));
-      await setDoc(appRef, {
+      const batch = writeBatch(db);
+
+      batch.set(appRef, {
         applicationId: appId,
         tutorDocId: tutor.id,
         tutorName: tutor.name,
@@ -726,15 +728,17 @@ export default function StudentDashboard() {
       });
 
       // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', tutor.id), {
+      batch.update(doc(db, 'tutors', tutor.id), {
         pendingRequests: arrayUnion(appRef.id)
       });
       // Update the students' pending request queue
       for (const s of groupToUse.students) {
-        await updateDoc(doc(db, 'students', s.id), {
+        batch.update(doc(db, 'students', s.id), {
           pendingRequests: arrayUnion(appRef.id)
         });
       }
+
+      await batch.commit();
 
       toast.success("Tutor request & offer sent successfully!");
       mutate();
@@ -907,7 +911,7 @@ export default function StudentDashboard() {
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove, writeBatch } = await import('firebase/firestore');
       
       const updateData: any = {};
       let isFinalState = false;
@@ -937,19 +941,23 @@ export default function StudentDashboard() {
       }
       updateData.updatedAt = Date.now();
 
-      await updateDoc(doc(db, 'applications', appId), updateData);
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'applications', appId), updateData);
       
       if (isFinalState) {
         const app = data?.applications?.find((a: any) => a.id === appId);
         if (app) {
-          if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
+          if (app.tutorDocId) batch.update(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
           if (app.studentDocIds) {
             for (const sid of app.studentDocIds) {
-              await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+              batch.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
             }
           }
         }
       }
+
+      await batch.commit();
       
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
@@ -3576,18 +3584,21 @@ export default function StudentDashboard() {
                   setIsDeletingAccount(true);
                   try {
                     const { db, auth } = await import('@/utils/firebase/client');
-                    const { doc, deleteDoc, query, collection, where, getDocs } = await import('firebase/firestore');
+                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc } = await import('firebase/firestore');
                     const { deleteUser } = await import('firebase/auth');
                     
                     if(!auth.currentUser) throw new Error('Not logged in');
                     
                     const uid = auth.currentUser.uid;
+                    const userDocRef = doc(db, 'users', uid);
+                    const userDoc = await getDoc(userDocRef);
+                    const userData = userDoc.data() || {};
+                    const roles = userData.roles || (userData.role ? [userData.role] : []);
+                    
+                    const isDualRole = roles.length > 1;
                     
                     // Delete parent doc
                     await deleteDoc(doc(db, 'parents', uid));
-                    
-                    // Delete user doc
-                    await deleteDoc(doc(db, 'users', uid));
                     
                     // Delete all students
                     const stuQ = query(collection(db, 'students'), where('parentDocId', '==', uid));
@@ -3614,19 +3625,34 @@ export default function StudentDashboard() {
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 
-                    try {
-                      await deleteUser(auth.currentUser);
-                      localStorage.clear();
-                      toast.success('Account deleted successfully');
-                      window.location.href = '/';
-                    } catch (e: any) {
-                      if(e.code === 'auth/requires-recent-login') {
+                    if (isDualRole) {
+                      const newRoles = roles.filter((r: string) => r !== 'student');
+                      await updateDoc(userDocRef, {
+                        role: newRoles[0] || 'teacher',
+                        roles: newRoles
+                      });
+                      
+                      const updatedUser = { ...JSON.parse(localStorage.getItem('user') || '{}'), role: newRoles[0] || 'teacher', roles: newRoles };
+                      localStorage.setItem('user', JSON.stringify(updatedUser));
+                      
+                      toast.success('Student profile deleted successfully');
+                      window.location.href = '/dashboard/teacher';
+                    } else {
+                      await deleteDoc(userDocRef);
+                      try {
+                        await deleteUser(auth.currentUser);
                         localStorage.clear();
                         toast.success('Account deleted successfully');
-                        await auth.signOut();
-                        window.location.href = '/login';
-                      } else {
-                        throw e;
+                        window.location.href = '/';
+                      } catch (e: any) {
+                        if(e.code === 'auth/requires-recent-login') {
+                          localStorage.clear();
+                          toast.success('Account deleted successfully');
+                          await auth.signOut();
+                          window.location.href = '/login';
+                        } else {
+                          throw e;
+                        }
                       }
                     }
                   } catch (err: any) {

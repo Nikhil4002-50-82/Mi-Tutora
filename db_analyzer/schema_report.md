@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-08T10:01:12.827Z
+Generated on: 2026-08-11T09:00:24.718Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -15,48 +15,6 @@ Generated on: 2026-08-08T10:01:12.827Z
 | `message` | `string` |
 | `timestamp` | `timestamp` |
 | `type` | `string` |
-
----
-
-## Collection: `applications`
-*Documents sampled: 7*
-
-| Field Path | Data Type |
-|---|---|
-| `absoluteMax` | `number` |
-| `absoluteMin` | `number` |
-| `applicationId` | `string` |
-| `category` | `string` |
-| `createdAt` | `number` |
-| `currentOffer` | `number` |
-| `demoDate` | `string` |
-| `demoHours` | `string` |
-| `demoPaymentPaid` | `boolean` |
-| `demoTime` | `string` |
-| `finalPrice` | `number` |
-| `groupDocId` | `string` |
-| `groupId` | `string` |
-| `initialBudget` | `number` |
-| `initiator` | `string` |
-| `lastUpdatedBy` | `string` |
-| `mode` | `string` |
-| `parentDocId` | `string` |
-| `parentId` | `string` |
-| `proposedDate` | `string` |
-| `proposedTime` | `string` |
-| `requestDocId` | `string` |
-| `requestId` | `string` |
-| `source` | `string` |
-| `status` | `string` |
-| `studentDocId` | `string` |
-| `studentDocIds` | `array of string` |
-| `studentId` | `string` |
-| `studentIds` | `array of string` |
-| `studentName` | `string` |
-| `tutorDocId` | `string` |
-| `tutorId` | `string` |
-| `tutorName` | `string` |
-| `updatedAt` | `number` |
 
 ---
 
@@ -87,7 +45,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 ---
 
 ## Collection: `groups`
-*Documents sampled: 18*
+*Documents sampled: 19*
 
 | Field Path | Data Type |
 |---|---|
@@ -155,7 +113,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 ---
 
 ## Collection: `parents`
-*Documents sampled: 6*
+*Documents sampled: 7*
 
 | Field Path | Data Type |
 |---|---|
@@ -187,7 +145,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 30*
+*Documents sampled: 31*
 
 | Field Path | Data Type |
 |---|---|
@@ -257,7 +215,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 ---
 
 ## Collection: `tutors`
-*Documents sampled: 14*
+*Documents sampled: 13*
 
 | Field Path | Data Type |
 |---|---|
@@ -281,7 +239,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 | `mode` | `string` |
 | `name` | `string` |
 | `occupation` | `string` |
-| `pendingRequests` | `array of string | array` |
+| `pendingRequests` | `array of string` |
 | `phone` | `string` |
 | `preferredLocations` | `string` |
 | `preferredTimeRange` | `string` |
@@ -302,7 +260,7 @@ Generated on: 2026-08-08T10:01:12.827Z
 ---
 
 ## Collection: `users`
-*Documents sampled: 18*
+*Documents sampled: 16*
 
 | Field Path | Data Type |
 |---|---|
@@ -318,5 +276,4 @@ Generated on: 2026-08-08T10:01:12.827Z
 | `walletBalance` | `number` |
 
 ---
-
 

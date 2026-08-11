@@ -22,13 +22,17 @@ function SignupContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
-  const role = searchParams.get('role') || 'student';
+  const urlRole = searchParams.get('role');
+  const role = ['student', 'teacher', 'parent'].includes(urlRole as string) ? (urlRole as string) : 'student';
   const isTeacher = role === 'teacher';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
+    
+    let createdUser: any = null;
+    
     try {
       const { auth, db } = await import('@/utils/firebase/client');
       const { createUserWithEmailAndPassword } = await import('firebase/auth');
@@ -36,6 +40,7 @@ function SignupContent() {
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      createdUser = user;
 
       if (user) {
         // Insert into users collection
@@ -44,6 +49,7 @@ function SignupContent() {
           email: user.email,
           name: name,
           role: role,
+          roles: [role],
           referredBy: referralCode.trim()
         });
 
@@ -87,6 +93,17 @@ function SignupContent() {
         }, 3000);
       }
     } catch (err: any) {
+      if (createdUser) {
+        try {
+          const { deleteUser } = await import('firebase/auth');
+          await deleteUser(createdUser);
+          const { auth } = await import('@/utils/firebase/client');
+          await auth.signOut();
+        } catch (rollbackErr) {
+          console.error('Failed to rollback user creation:', rollbackErr);
+        }
+      }
+
       if (err.code === 'auth/email-already-in-use') {
         setError(`This email is already registered! Please go to the Login page and select '${role === 'teacher' ? 'Teacher' : 'Student'}' to instantly add this role to your account.`);
       } else {
@@ -117,9 +134,8 @@ function SignupContent() {
         
         if (!roles.includes(role)) {
           const { updateDoc, arrayUnion } = await import('firebase/firestore');
-          await updateDoc(doc(db, 'users', user.uid), {
-            roles: arrayUnion(role)
-          });
+          const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
+          await updateDoc(doc(db, 'users', user.uid), payload);
           roles.push(role);
           
           if (accountType === 'parent') {

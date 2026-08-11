@@ -637,6 +637,11 @@ export default function DemoForm({
            
            const groupRef = doc(collection(db, 'groups'));
            const groupDocId = groupRef.id;
+
+           for (const sDoc of groupStudents) {
+               await updateDoc(sDoc.ref, { groupDocId: groupDocId });
+           }
+
            await setDoc(groupRef, {
               groupDocId: groupDocId,
               parentDocId: user.uid,

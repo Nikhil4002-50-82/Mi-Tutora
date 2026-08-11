@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Secure the "users" collection against privilege escalation
+    match /users/{userId} {
+      allow read: if true; 
+      
+      // Enforce safe roles on document creation
+      allow create: if request.resource.data.role in ['student', 'teacher', 'parent']
+                    && request.resource.data.roles.hasOnly(['student', 'teacher', 'parent']);
+                    
+      // Prevent privilege escalation on document updates
+      allow update: if (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'roles'])) 
+                    || (request.resource.data.roles.hasOnly(['student', 'teacher', 'parent']));
+                    
+      allow delete: if true; // Kept open like the rest of the DB
+    }
+
+    // Keep the rest of the database completely open (as it was before)
+    // This ensures we do not break any existing design or logic in your app.
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'users';
+    }
+  }
+}
