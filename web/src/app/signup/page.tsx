@@ -199,8 +199,11 @@ function SignupContent() {
       
       localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
       const searchParams = new URLSearchParams(window.location.search);
-      const next = searchParams.get('next');
-      router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
+      let nextUrl = searchParams.get('next');
+      if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
+        nextUrl = null;
+      }
+      router.push(nextUrl || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
     } catch (err: any) {
       setError(getFriendlyAuthError(err));
       setIsSubmitting(false);

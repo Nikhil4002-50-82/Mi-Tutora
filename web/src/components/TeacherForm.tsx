@@ -203,7 +203,7 @@ export default function TeacherForm({
       }
 
       // Save data to localStorage (more robust across OAuth redirects) and redirect to signup
-      localStorage.setItem('teacherFormData', JSON.stringify({ ...formData, category }));
+      sessionStorage.setItem('teacherFormData', JSON.stringify({ ...formData, category }));
       router.push('/signup?role=teacher&next=/dashboard/teacher');
       return;
     }
@@ -276,7 +276,7 @@ export default function TeacherForm({
 
       
 
-      localStorage.removeItem('teacherFormData');
+      sessionStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
       toast.success("Profile saved successfully!", { description: "Your teacher profile has been updated." });
       setIsEditing(false);

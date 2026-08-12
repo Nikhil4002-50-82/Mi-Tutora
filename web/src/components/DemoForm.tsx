@@ -427,7 +427,7 @@ export default function DemoForm({
       if (auth.currentUser) {
         await auth.signOut();
       }
-      localStorage.setItem('demoFormData', JSON.stringify({ ...formData }));
+      sessionStorage.setItem('demoFormData', JSON.stringify({ ...formData }));
       router.push('/signup?role=student&next=/dashboard/student');
       return;
     }

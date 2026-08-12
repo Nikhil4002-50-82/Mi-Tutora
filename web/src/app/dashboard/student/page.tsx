@@ -543,7 +543,7 @@ export default function StudentDashboard() {
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
     await auth.signOut();
-    localStorage.clear();
+    localStorage.removeItem('user');
     sessionStorage.clear();
     toast.success("Logged out successfully!");
     window.location.href = '/login';
@@ -3696,12 +3696,12 @@ export default function StudentDashboard() {
                       await deleteDoc(userDocRef);
                       try {
                         await deleteUser(auth.currentUser);
-                        localStorage.clear();
+                        localStorage.removeItem('user');
                         toast.success('Account deleted successfully');
                         window.location.href = '/';
                       } catch (e: any) {
                         if(e.code === 'auth/requires-recent-login') {
-                          localStorage.clear();
+                          localStorage.removeItem('user');
                           toast.success('Account deleted successfully');
                           await auth.signOut();
                           window.location.href = '/login';

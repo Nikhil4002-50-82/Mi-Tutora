@@ -79,10 +79,15 @@ function LoginContent() {
         localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
         
         toast.success("Login successful!");
+        let nextUrl = searchParams.get('next');
+        if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
+          nextUrl = null;
+        }
+        
         if (userRole === 'student') {
-          router.push(searchParams.get('next') || '/dashboard/student');
+          router.push(nextUrl || '/dashboard/student');
         } else {
-          router.push(searchParams.get('next') || '/dashboard/teacher');
+          router.push(nextUrl || '/dashboard/teacher');
         }
       }
     } catch (err: any) {
@@ -283,8 +288,11 @@ function LoginContent() {
                   }
                   
                   localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
-                  const next = searchParams.get('next');
-                  router.push(next || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
+                  let nextUrl = searchParams.get('next');
+                  if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
+                    nextUrl = null;
+                  }
+                  router.push(nextUrl || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
                 } catch (error: any) {
                   toast.error(getFriendlyAuthError(error));
                   setIsSubmitting(false);
