@@ -466,187 +466,41 @@ export default function StudentDashboard() {
           mutate();
         } catch (e: any) {
           toast.error("Failed to generate referral code: " + e.message);
+        } finally {
+          setIsGeneratingRef(false);
         }
       };
       generateCode();
     }
   }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.myStudent?.name, mutate, data, isGeneratingRef]);
 
-  useEffect(() => {
-    const processSilentSubmission = async () => {
-      const savedDemoData = localStorage.getItem('demoFormData');
-      if (savedDemoData && data?.user) {
-        try {
-          const { db } = await import('@/utils/firebase/client');
-          const { doc, getDoc, updateDoc, setDoc, addDoc, collection } = await import('firebase/firestore');
-          const formData = JSON.parse(savedDemoData);
-          const user = data.user;
-          
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          const existingCode = userDocSnap.exists() && userDocSnap.data().referralCode;
-          const fallbackName = formData.students?.[0]?.fullName || formData.students?.[0]?.name || 'Unknown Parent';
-          const newCode = existingCode || generateReferralCode(formData.parentName || fallbackName, user.uid);
-          await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
-          const parentDocRef = doc(db, 'parents', user.uid);
-          const parentDocSnap = await getDoc(parentDocRef);
-          if (!parentDocSnap.exists()) {
-            await setDoc(parentDocRef, { id: user.uid, name: formData.parentName || fallbackName });
-          }
-
-          const isOnline = formData.demoMode?.toLowerCase() === 'online';
-          const combinedAddress = isOnline ? '' : [formData.addressFlat, formData.addressStreet, formData.addressPincode].filter(Boolean).join(', ');
-
-          const numStudents = formData.numberOfStudents || 1;
-          const studentDocs = [];
-          
-          for (let i = 0; i < numStudents; i++) {
-            const s = formData.students && formData.students[i] ? formData.students[i] : formData;
-            const newStudentRef = doc(collection(db, 'students'));
-            
-            const { generateCustomId } = await import('@/utils/idGenerator');
-            let tempGroupId = (s as any).groupDocId || 'unassigned';
-            if (tempGroupId === 'unassigned' || tempGroupId?.startsWith('indv_temp')) {
-               tempGroupId = generateCustomId('MTG');
-            }
-            
-            const studentData = {
-              id: newStudentRef.id,
-              guardianName: formData.parentName || '',
-              dob: '',
-              parentDocId: user.uid,
-              category: formData.category || s.category || '',
-              name: s.fullName || s.name || '',
-              gender: s.gender || '',
-              phoneNumber: formData.phone || '',
-              whatsappNumber: formData.whatsapp || '',
-              email: formData.email || '',
-              address: combinedAddress,
-              studentType: s.studentType || '',
-              classLevel: s.classGrade || s.classLevel || '',
-              board: s.board || '',
-              subjects: Array.isArray(s.subjects) ? s.subjects : (s.subjects ? s.subjects.split(',').map((subj: string) => subj.trim()) : []),
-              technologies: s.technologies || [],
-              languages: s.languages || [],
-              budget: parseInt(s.budget) || 0,
-              preferredMode: formData.demoMode || '',
-              learningGoal: formData.goal || '',
-              specialRequirements: formData.requirements || '',
-              hoursPerDay: formData.hours || '',
-              daysPerWeek: formData.days || '',
-              specificDays: formData.specificDays || [],
-              groupDocId: tempGroupId,
-              createdAt: Date.now()
-            };
-            
-            studentDocs.push({ ref: newStudentRef, data: studentData, frontendStudent: s });
-          }
-          
-          for (const sDoc of studentDocs) {
-             await setDoc(sDoc.ref, sDoc.data);
-          }
-          
-          const uniqueGroups = Array.from(new Set(studentDocs.map(s => s.data.groupDocId)));
-          for (const gId of uniqueGroups) {
-             const groupStudents = studentDocs.filter(s => s.data.groupDocId === gId);
-             const studentIds = groupStudents.map(s => s.data.id);
-             
-             const groupRef = doc(collection(db, 'groups'));
-             const groupDocId = groupRef.id;
-             
-             for (const sDoc of groupStudents) {
-                 await updateDoc(sDoc.ref, { groupDocId: groupDocId });
-             }
-             
-             await setDoc(groupRef, {
-                groupDocId: groupDocId,
-                parentDocId: user.uid,
-                studentDocIds: studentIds,
-                mode: formData.demoMode || '',
-                area: combinedAddress,
-                city: isOnline ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-                latitude: null,
-                longitude: null,
-                teacherGenderPreference: 'No Preference',
-                preferredTimeRange: formData.hours || '',
-                daysPerWeek: formData.days || '',
-                specificDays: formData.specificDays || [],
-                status: 'active',
-                createdAt: Date.now()
-             });
-             
-             const combinedSubjects = Array.from(new Set(groupStudents.flatMap(s => s.data.subjects)));
-             const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(s => s.data.technologies)));
-             const combinedLanguages = Array.from(new Set(groupStudents.flatMap(s => s.data.languages)));
-             const combinedBudget = groupStudents.reduce((acc, s) => acc + s.data.budget, 0);
-             const studentsDetails = groupStudents.map(s => ({
-                id: s.data.id,
-                name: s.data.name,
-                classLevel: s.data.classLevel,
-                board: s.data.board,
-                subjects: s.data.subjects,
-                technologies: s.data.technologies,
-                languages: s.data.languages,
-                budget: s.data.budget,
-             }));
-             
-             const { generateCustomId } = await import('@/utils/idGenerator');
-             const newRequestId = generateCustomId('REQ');
-             const newRequestRef = doc(collection(db, 'tuition_requests'));
-             await setDoc(newRequestRef, {
-                requestId: newRequestId,
-                groupDocId: groupDocId,
-                parentDocId: user.uid,
-                category: groupStudents[0].data.category,
-                mode: formData.demoMode || '',
-                area: combinedAddress,
-                city: isOnline ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-                latitude: null,
-                longitude: null,
-                teacherGenderPreference: 'No Preference',
-                preferredTimeRange: formData.hours || '',
-                daysPerWeek: formData.days || '',
-                specificDays: formData.specificDays || [],
-                studentsDetails,
-                combinedSubjects,
-                combinedTechnologies,
-                combinedLanguages,
-                combinedBudget,
-                status: 'open',
-                acceptedTutorId: '',
-                createdAt: Date.now()
-             });
-          }
-
-          localStorage.removeItem('demoFormData');
-          mutate();
-        } catch (e) {
-          console.error("Failed to silently submit demo request", e);
-        }
-      }
-    };
-    processSilentSubmission();
-  }, [data?.user, mutate]);
 
   useEffect(() => {
-    if (!data?.user) return;
+    if (!data?.user?.uid) return;
+    let isCancelled = false;
     let unsubscribe: any;
+    
     const setupRealtime = async () => {
       const { db } = await import('@/utils/firebase/client');
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
       
+      if (isCancelled) return;
+      
       const q = query(collection(db, 'applications'), where('parentDocId', '==', data.user.uid));
       unsubscribe = onSnapshot(q, () => {
-        mutate();
+        if (!isCancelled) mutate();
+      }, (error) => {
+        console.error("Realtime listener error:", error);
       });
     };
     setupRealtime();
 
     return () => {
+      isCancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [data?.user, mutate]);
+  }, [data?.user?.uid, mutate]);
 
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
@@ -1259,6 +1113,10 @@ export default function StudentDashboard() {
 
   if (loading && !data) {
     return <LoadingScreen />;
+  }
+
+  if (!data && swrError) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold">Error loading dashboard: {swrError.message}</div>;
   }
 
   return (

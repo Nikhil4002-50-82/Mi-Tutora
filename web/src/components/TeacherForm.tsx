@@ -142,9 +142,17 @@ export default function TeacherForm({
     }
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(async (position) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         const { latitude, longitude } = position.coords;
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        
         const data = await res.json();
         
         const street = data.address?.road || data.address?.suburb || data.address?.neighbourhood || '';
@@ -157,8 +165,12 @@ export default function TeacherForm({
           city: city || prev.city,
           pincode: pincode || prev.pincode
         }));
-      } catch (err) {
-        console.error('Error fetching location details:', err);
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          console.error('Geocoding request timed out');
+        } else {
+          console.error('Error fetching location details:', err);
+        }
         alert('Failed to automatically detect your address. Please enter it manually.');
       } finally {
         setLocationLoading(false);

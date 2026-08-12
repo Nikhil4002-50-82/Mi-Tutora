@@ -45,6 +45,8 @@ export default function ActionModal({
       setValue(initialValue);
       setDateValue(initialDate);
       setTimeValue(initialTime);
+      setPlatform("Google Meet");
+      setLinkValue("");
     }
   }, [isOpen, initialValue, initialDate, initialTime]);
 
@@ -72,9 +74,15 @@ export default function ActionModal({
           return;
         }
         try {
-          new URL(linkValue);
+          const parsedUrl = new URL(linkValue);
+          if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+             throw new Error("Invalid protocol");
+          }
+          if (linkValue.includes('||')) {
+             throw new Error("Invalid characters");
+          }
         } catch {
-          alert("Please enter a valid URL (e.g., https://meet.google.com/...)");
+          alert("Please enter a valid, secure URL (e.g., https://meet.google.com/...) without special delimiters.");
           return;
         }
         onSubmit(value, dateValue, `${timeValue}||${platform}||${linkValue}`);

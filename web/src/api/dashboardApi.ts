@@ -446,6 +446,7 @@ export const fetchTeacherDashboardData = async () => {
   return {
     user,
     userData,
+    tutorDocId: tutorId,
     globalLocks,
     profile: tutorData,
     teacherCategories,

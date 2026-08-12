@@ -204,6 +204,8 @@ export default function TeacherDashboard() {
           mutate();
         } catch (e: any) {
           toast.error("Failed to generate referral code: " + e.message);
+        } finally {
+          setIsGeneratingRef(false);
         }
       };
       generateCode();
@@ -216,80 +218,33 @@ export default function TeacherDashboard() {
     }
   }, [data?.teacherCategories, subTab]);
 
-  useEffect(() => {
-    const processSilentSubmission = async () => {
-      const savedTeacherData = localStorage.getItem('teacherFormData');
-      if (savedTeacherData && data?.user) {
-        try {
-          const { db } = await import('@/utils/firebase/client');
-          const { doc, getDoc, updateDoc, setDoc } = await import('firebase/firestore');
-          const parsedData = JSON.parse(savedTeacherData);
-          const user = data.user;
-          
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          const existingCode = userDocSnap.exists() && userDocSnap.data().referralCode;
-          const newCode = existingCode || generateReferralCode(parsedData.fullName, user.uid);
-          await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
 
-          const isOnlineOnlyCategory = parsedData.category === 'programming' || parsedData.category === 'languages';
-          const actualMode = isOnlineOnlyCategory ? 'Online' : parsedData.mode;
-          const combinedAddress = (actualMode?.toLowerCase() === 'online') ? '' : [parsedData.street, parsedData.city, parsedData.pincode].filter(Boolean).join(', ');
-
-          await updateDoc(doc(db, 'tutors', user.uid), {
-            category: parsedData.category || '',
-            name: parsedData.fullName,
-            gender: parsedData.gender,
-            phone: parsedData.phone,
-            whatsapp: parsedData.whatsapp,
-            address: combinedAddress,
-            area: (actualMode?.toLowerCase() === 'online') ? '' : (parsedData.street || ''),
-            city: (actualMode?.toLowerCase() === 'online') ? '' : (parsedData.city || ''),
-            qualification: parsedData.qualification,
-            experience: parsedData.experience,
-            occupation: parsedData.occupation,
-            subjects: parsedData.subjects || [],
-            classes: parsedData.classes || [],
-            boards: parsedData.boards || [],
-            technologies: parsedData.technologies || [],
-            languagesTaught: parsedData.languages || [],
-            mode: actualMode,
-            teachingApproach: parsedData.description,
-            studentCount: parsedData.studentsCount,
-            schoolNames: parsedData.schoolNames,
-            preferredLocations: parsedData.locations,
-            travelDistance: parsedData.travelKm,
-            feeRange: parsedData.feeRange,
-            hasProfile: true
-          });
-          localStorage.removeItem('teacherFormData');
-          mutate();
-        } catch (e) {
-          console.error("Failed to silently submit profile data", e);
-        }
-      }
-    };
-    processSilentSubmission();
-  }, [data?.user?.uid, mutate]);
 
   useEffect(() => {
-    if (!data?.user) return;
+    if (!data?.user || !data?.tutorDocId) return;
+    let isCancelled = false;
     let unsubscribe: any;
+    
     const setupRealtime = async () => {
       const { db } = await import('@/utils/firebase/client');
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
       
-      const q = query(collection(db, 'applications'), where('tutorDocId', '==', data.user.uid));
+      if (isCancelled) return;
+      
+      const q = query(collection(db, 'applications'), where('tutorDocId', '==', data.tutorDocId));
       unsubscribe = onSnapshot(q, () => {
-        mutate();
+        if (!isCancelled) mutate();
+      }, (error) => {
+        console.error("Realtime listener error:", error);
       });
     };
     setupRealtime();
 
     return () => {
+      isCancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [data?.user?.uid, mutate]);
+  }, [data?.user?.uid, data?.tutorDocId, mutate]);
 
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
