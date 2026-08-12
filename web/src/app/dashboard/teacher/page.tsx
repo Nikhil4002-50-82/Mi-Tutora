@@ -95,6 +95,7 @@ export default function TeacherDashboard() {
   const [isNotificationsDropdownOpen, setIsNotificationsDropdownOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const isSubmittingRef = useRef(false);
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
@@ -376,62 +377,26 @@ export default function TeacherDashboard() {
   const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'teacher' && app.createdAt >= todayStart.getTime()).length || 0;
 
   const handleSendOffer = async (student: any) => {
-    if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests.");
-      return;
-    }
-    const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
-    let teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
-    
-    if (teacherPendingCount > 0 && data?.profile?.pendingRequests && data?.profile?.pendingRequests.length > 0) {
-      try {
-        const { db } = await import('@/utils/firebase/client');
-        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
-        const reqIds = data.profile.pendingRequests.slice(0, 30);
-        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
-        const snap = await getDocs(q);
-        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-        let verifiedCount = 0;
-        const orphanedIds: string[] = [];
-        const retrievedDocs = new Map();
-        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
-        for (const reqId of reqIds) {
-          const appData = retrievedDocs.get(reqId);
-          if (appData && activeStatuses.includes(appData.status)) {
-            verifiedCount++;
-          } else {
-            orphanedIds.push(reqId);
-          }
-        }
-        teacherPendingCount = verifiedCount;
-        if (orphanedIds.length > 0) {
-          updateDoc(doc(db, 'tutors', data.profile.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
-        }
-      } catch (e) {
-        console.error("Queue verification error:", e);
-      }
-    }
-
-    if (teacherPendingCount >= teacherLimit) {
-      toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
-      return;
-    }
     const studentPendingCount = student.pendingRequests?.length || 0;
     if (studentPendingCount >= 5) {
       toast.error("This student already has the maximum number of pending offers.");
       return;
     }
-    if (offerLoading) return;
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
+    if (offerLoading) { isSubmittingRef.current = false; return false; }
     const offerPrice = parseInt(negotiationOffer[student.id]);
     if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid offer price.");
 
     if (student.budget && offerPrice < student.budget) {
       setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `Since you cannot decrease the price, the minimum you can offer is Rs. ${student.budget}. Please adjust your offer.` });
-      return;
+      isSubmittingRef.current = false;
+      return false;
     }
     if (student.budget && offerPrice > student.budget * 1.4) {
       setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The maximum you can offer is Rs. ${Math.floor(student.budget * 1.4)} (140% of the student's budget). Please adjust your offer.` });
-      return;
+      isSubmittingRef.current = false;
+      return false;
     }
 
     if (!hasProfile) {
@@ -443,116 +408,119 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, setDoc, doc, updateDoc, arrayUnion, writeBatch } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       
       const appId = generateCustomId('APP');
       const appRef = doc(collection(db, 'applications'));
-      const batch = writeBatch(db);
+      
+      await runTransaction(db, async (transaction) => {
+         const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
+         const tutorSnap = await transaction.get(tutorRef);
+         const tutorData = tutorSnap.data() || {};
+         const today = new Date().toISOString().split('T')[0];
+         const currentDailyCount = tutorData.dailyUsage?.date === today ? tutorData.dailyUsage.count : 0;
+         
+         if (currentDailyCount >= 5) {
+            throw new Error("DAILY_LIMIT_EXCEEDED");
+         }
 
-      batch.set(appRef, {
-        applicationId: appId,
-        tutorDocId: data?.user?.uid,
-        tutorName: data?.profile?.name,
-        requestDocId: '',
-        parentDocId: student.parentDocId || student.parentId,
-        studentDocId: student.students?.[0]?.id || student.id,
-        groupDocId: student.id,
-        studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
-        studentName: student.name,
-        currentOffer: offerPrice,
-        initialBudget: student.budget || offerPrice,
-        absoluteMin: student.budget || offerPrice,
-        absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
-        initiator: 'teacher',
-        lastUpdatedBy: 'teacher',
-        status: 'negotiating',
-        source: 'direct',
-        category: student.category || 'general',
-        demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
-        createdAt: Date.now()
+         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
+         let verifiedCount = 0;
+         const orphanedIds: string[] = [];
+         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
+         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         
+         if (reqIds.length > 0) {
+             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
+             appSnaps.forEach((appSnap, index) => {
+                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
+                     verifiedCount++;
+                 } else {
+                     orphanedIds.push(reqIds[index]);
+                 }
+             });
+         }
+         
+         if (verifiedCount >= teacherLimit) {
+             throw new Error("TEACHER_QUEUE_FULL");
+         }
+         
+         transaction.set(appRef, {
+            applicationId: appId,
+            tutorDocId: data?.user?.uid,
+            tutorName: data?.profile?.name,
+            requestDocId: '',
+            parentDocId: student.parentDocId || student.parentId,
+            studentDocId: student.students?.[0]?.id || student.id,
+            groupDocId: student.id,
+            studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
+            studentName: student.name,
+            currentOffer: offerPrice,
+            initialBudget: student.budget || offerPrice,
+            absoluteMin: student.budget || offerPrice,
+            absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
+            initiator: 'teacher',
+            lastUpdatedBy: 'teacher',
+            status: 'negotiating',
+            source: 'direct',
+            category: student.category || 'general',
+            demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
+            createdAt: Date.now()
+         });
+
+         transaction.update(tutorRef, {
+            dailyUsage: { date: today, count: currentDailyCount + 1 }
+         });
+         
+         if (orphanedIds.length > 0) {
+            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
+         }
+         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
+         
+         const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
+         for (const sid of studentIdsToUpdate) {
+            transaction.update(doc(db, 'students', sid), { pendingRequests: arrayUnion(appRef.id) });
+         }
       });
-
-      // Update the teacher's pending request queue
-      batch.update(doc(db, 'tutors', data?.user?.uid as string), {
-        pendingRequests: arrayUnion(appRef.id)
-      });
-      // Update the students' pending request queue
-      const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
-      for (const sid of studentIdsToUpdate) {
-        batch.update(doc(db, 'students', sid), {
-          pendingRequests: arrayUnion(appRef.id)
-        });
-      }
-
-      await batch.commit();
 
       toast.success("Offer sent successfully!");
       mutate();
+      return true;
     } catch (e: any) {
-      toast.error("Error sending offer: " + e.message);
+      if (e.message === "DAILY_LIMIT_EXCEEDED") {
+         toast.error("You have reached your daily limit of 5 requests.");
+      } else if (e.message === "TEACHER_QUEUE_FULL") {
+         toast.error("You already have the maximum number of pending requests in your queue. Please accept or decline some before sending more.");
+      } else {
+         toast.error("Error sending offer: " + e.message);
+      }
     } finally {
+      isSubmittingRef.current = false;
       setOfferLoading(false);
     }
   };
 
   const handleDirectRequestDemo = async (student: any) => {
-    if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests.");
-      return;
-    }
-    const teacherLimit = data?.profile?.isSubscribed ? 15 : 5;
-    let teacherPendingCount = data?.profile?.pendingRequests?.length || 0;
-    
-    if (teacherPendingCount > 0 && data?.profile?.pendingRequests && data?.profile?.pendingRequests.length > 0) {
-      try {
-        const { db } = await import('@/utils/firebase/client');
-        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
-        const reqIds = data.profile.pendingRequests.slice(0, 30);
-        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
-        const snap = await getDocs(q);
-        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-        let verifiedCount = 0;
-        const orphanedIds: string[] = [];
-        const retrievedDocs = new Map();
-        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
-        for (const reqId of reqIds) {
-          const appData = retrievedDocs.get(reqId);
-          if (appData && activeStatuses.includes(appData.status)) {
-            verifiedCount++;
-          } else {
-            orphanedIds.push(reqId);
-          }
-        }
-        teacherPendingCount = verifiedCount;
-        if (orphanedIds.length > 0) {
-          updateDoc(doc(db, 'tutors', data.profile.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
-        }
-      } catch (e) {
-        console.error("Queue verification error:", e);
-      }
-    }
-
-    if (teacherPendingCount >= teacherLimit) {
-      toast.error(`You already have ${teacherLimit} pending requests in your queue. Please accept or decline some before sending more.`);
-      return;
-    }
     const studentPendingCount = student.pendingRequests?.length || 0;
     if (studentPendingCount >= 5) {
       toast.error("This student already has the maximum number of pending offers.");
       return;
     }
-    if (offerLoading) return;
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
+    if (offerLoading) { isSubmittingRef.current = false; return false; }
     if (!hasProfile) {
       toast.error("Please complete your profile first.");
       setActiveTab('profile');
-      return;
+      isSubmittingRef.current = false;
+      return false;
     }
 
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
 
@@ -560,115 +528,181 @@ export default function TeacherDashboard() {
 
       const appId = generateCustomId('APP');
       const appRef = doc(collection(db, 'applications'));
-      await setDoc(appRef, {
-        applicationId: appId,
-        tutorDocId: data?.user?.uid,
-        tutorName: data?.profile?.name,
-        requestDocId: '',
-        parentDocId: student.parentDocId || student.parentId,
-        studentDocId: student.students?.[0]?.id || student.id,
-        groupDocId: student.id,
-        studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
-        studentName: student.name,
-        currentOffer: offerPrice,
-        finalPrice: offerPrice,
-        initialBudget: student.budget,
-        absoluteMin: Math.ceil(offerPrice * 0.6),
-        absoluteMax: student.budget ? Math.floor(student.budget * 1.2) : Math.floor(offerPrice * 1.2),
-        lastUpdatedBy: 'tutor',
-        status: 'demo_requested_by_teacher',
-        source: 'direct',
-        category: student.category || 'general',
-        demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
+      
+      await runTransaction(db, async (transaction) => {
+         const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
+         const tutorSnap = await transaction.get(tutorRef);
+         const tutorData = tutorSnap.data() || {};
+         const today = new Date().toISOString().split('T')[0];
+         const currentDailyCount = tutorData.dailyUsage?.date === today ? tutorData.dailyUsage.count : 0;
+         
+         if (currentDailyCount >= 5) {
+            throw new Error("DAILY_LIMIT_EXCEEDED");
+         }
 
-      // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', data?.user?.uid as string), {
-        pendingRequests: arrayUnion(appRef.id)
+         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
+         let verifiedCount = 0;
+         const orphanedIds: string[] = [];
+         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
+         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         
+         if (reqIds.length > 0) {
+             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
+             appSnaps.forEach((appSnap, index) => {
+                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
+                     verifiedCount++;
+                 } else {
+                     orphanedIds.push(reqIds[index]);
+                 }
+             });
+         }
+         
+         if (verifiedCount >= teacherLimit) {
+             throw new Error("TEACHER_QUEUE_FULL");
+         }
+         
+         transaction.set(appRef, {
+            applicationId: appId,
+            tutorDocId: data?.user?.uid,
+            tutorName: data?.profile?.name,
+            requestDocId: '',
+            parentDocId: student.parentDocId || student.parentId,
+            studentDocId: student.students?.[0]?.id || student.id,
+            groupDocId: student.id,
+            studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
+            studentName: student.name,
+            currentOffer: offerPrice,
+            finalPrice: offerPrice,
+            initialBudget: student.budget || offerPrice,
+            absoluteMin: student.budget || offerPrice,
+            absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
+            initiator: 'teacher',
+            lastUpdatedBy: 'tutor',
+            status: 'demo_requested_by_teacher',
+            source: 'direct',
+            category: student.category || 'general',
+            demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+         });
+
+         transaction.update(tutorRef, {
+            dailyUsage: { date: today, count: currentDailyCount + 1 }
+         });
+         
+         if (orphanedIds.length > 0) {
+            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
+         }
+         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
+         
+         const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
+         for (const sid of studentIdsToUpdate) {
+            transaction.update(doc(db, 'students', sid), { pendingRequests: arrayUnion(appRef.id) });
+         }
       });
-      // Update the students' pending request queue
-      const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
-      for (const sid of studentIdsToUpdate) {
-        await updateDoc(doc(db, 'students', sid), {
-          pendingRequests: arrayUnion(appRef.id)
-        });
-      }
 
       toast.success("Demo requested successfully!");
       mutate();
+      return true;
     } catch (e: any) {
-      toast.error("Error requesting demo: " + e.message);
+      if (e.message === "DAILY_LIMIT_EXCEEDED") {
+         toast.error("You have reached your daily limit of 5 requests.");
+      } else if (e.message === "TEACHER_QUEUE_FULL") {
+         toast.error("You already have the maximum number of pending requests in your queue. Please accept or decline some before sending more.");
+      } else {
+         toast.error("Error requesting demo: " + e.message);
+      }
     } finally {
+      isSubmittingRef.current = false;
       setOfferLoading(false);
     }
   };
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
     if (action === 'counter_price' && newOffer && neg) {
       const minAllowed = neg.absoluteMin || (neg.initialBudget || 0);
       const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.4);
       if (newOffer < minAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
-        return;
+        isSubmittingRef.current = false;
+        return false;
       }
       if (newOffer > maxAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
-        return;
+        isSubmittingRef.current = false;
+        return false;
       }
     }
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove, writeBatch } = await import('firebase/firestore');
+      const { doc, arrayRemove, runTransaction } = await import('firebase/firestore');
       
-      const updateData: any = {};
-      let isFinalState = false;
-      if (action === 'accept_price' || action === 'request_demo') {
-        updateData.status = 'demo_requested_by_teacher';
-        if (newOffer) updateData.finalPrice = newOffer;
-        updateData.lastUpdatedBy = 'tutor';
-      } else if (action === 'propose_demo_date') {
-        updateData.proposedDate = neg?.proposedDate;
-        updateData.proposedTime = neg?.proposedTime;
-        updateData.lastUpdatedBy = 'teacher';
-      } else if (action === 'accept_demo_date') {
-        updateData.status = 'demo_scheduled';
-        updateData.demoDate = neg?.proposedDate || data?.applications?.find((a:any)=>a.id===appId)?.proposedDate;
-        updateData.demoTime = neg?.proposedTime || data?.applications?.find((a:any)=>a.id===appId)?.proposedTime;
-        updateData.lastUpdatedBy = 'teacher';
-      } else if (action === 'counter_price') {
-        updateData.currentOffer = newOffer;
-        updateData.lastUpdatedBy = 'tutor';
-      } else if (action === 'decline') {
-        updateData.status = 'declined';
-        updateData.declinedAt = Date.now();
-        isFinalState = true;
-      }
-      updateData.updatedAt = Date.now();
-
-      const batch = writeBatch(db);
-
-      batch.update(doc(db, 'applications', appId), updateData);
-      
-      if (isFinalState) {
-        const app = data?.applications?.find((a: any) => a.id === appId);
-        if (app) {
-          if (app.tutorDocId) batch.update(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
-          if (app.studentDocIds) {
-            for (const sid of app.studentDocIds) {
-              batch.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+      await runTransaction(db, async (transaction) => {
+        const appRef = doc(db, 'applications', appId);
+        const appSnap = await transaction.get(appRef);
+        
+        if (!appSnap.exists()) {
+          throw new Error("Application not found.");
+        }
+        
+        const appData = appSnap.data();
+        
+        if (appData.status === 'declined') {
+          throw new Error("This request has already been declined or canceled by the other party.");
+        }
+        if (action === 'accept_price' && appData.lastUpdatedBy === 'tutor') {
+           throw new Error("This offer has already been accepted or modified.");
+        }
+        
+        const updateData: any = {};
+        let isFinalState = false;
+        
+        if (action === 'accept_price' || action === 'request_demo') {
+          updateData.status = 'demo_requested_by_teacher';
+          if (newOffer) updateData.finalPrice = newOffer;
+          updateData.lastUpdatedBy = 'tutor';
+        } else if (action === 'propose_demo_date') {
+          updateData.proposedDate = neg?.proposedDate;
+          updateData.proposedTime = neg?.proposedTime;
+          updateData.lastUpdatedBy = 'teacher';
+        } else if (action === 'accept_demo_date') {
+          updateData.status = 'demo_scheduled';
+          updateData.demoDate = neg?.proposedDate || appData.proposedDate;
+          updateData.demoTime = neg?.proposedTime || appData.proposedTime;
+          updateData.lastUpdatedBy = 'teacher';
+        } else if (action === 'counter_price') {
+          updateData.currentOffer = newOffer;
+          updateData.lastUpdatedBy = 'tutor';
+        } else if (action === 'decline') {
+          updateData.status = 'declined';
+          updateData.declinedAt = Date.now();
+          isFinalState = true;
+        }
+        updateData.updatedAt = Date.now();
+        
+        transaction.update(appRef, updateData);
+        
+        if (isFinalState) {
+          if (appData.tutorDocId) {
+            transaction.update(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(appId) });
+          }
+          if (appData.studentDocIds) {
+            for (const sid of appData.studentDocIds) {
+              transaction.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
             }
           }
         }
-      }
-
-      await batch.commit();
+      });
       
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
+      return false;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -2903,7 +2937,10 @@ export default function TeacherDashboard() {
                     <div className="flex gap-2">
                       {negotiationOffer[selectedViewUser.id] ? (
                         <button 
-                          onClick={() => { handleSendOffer(selectedViewUser); setSelectedViewUser(null); }}
+                          onClick={async () => { 
+                            const success = await handleSendOffer(selectedViewUser); 
+                            if (success) setSelectedViewUser(null); 
+                          }}
                           disabled={offerLoading}
                           className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
                         >
@@ -2911,7 +2948,10 @@ export default function TeacherDashboard() {
                         </button>
                       ) : (
                         <button 
-                          onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
+                          onClick={async () => { 
+                            const success = await handleDirectRequestDemo(selectedViewUser); 
+                            if (success) setSelectedViewUser(null); 
+                          }}
                           className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                         >
                           <CheckCircle2 className="w-4 h-4" /> Request Demo
@@ -3196,13 +3236,19 @@ export default function TeacherDashboard() {
                   Cancel
                 </button>
                 <button 
-                  onClick={() => {
-                    if (actionConfirmModal.type === 'accept_demo') {
-                      setPayingClass(actionConfirmModal.payload);
-                    } else {
-                      handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                  onClick={async () => {
+                    if (isSubmittingRef.current) return;
+                    isSubmittingRef.current = true;
+                    try {
+                      if (actionConfirmModal.type === 'accept_demo') {
+                        setPayingClass(actionConfirmModal.payload);
+                      } else {
+                        await handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                      }
+                      setActionConfirmModal(null);
+                    } finally {
+                      isSubmittingRef.current = false;
                     }
-                    setActionConfirmModal(null);
                   }}
                   className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
                 >

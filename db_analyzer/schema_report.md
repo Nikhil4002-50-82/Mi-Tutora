@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-11T11:18:13.790Z
+Generated on: 2026-08-12T13:48:06.511Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -19,7 +19,7 @@ Generated on: 2026-08-11T11:18:13.790Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 2*
+*Documents sampled: 3*
 
 | Field Path | Data Type |
 |---|---|
@@ -29,6 +29,7 @@ Generated on: 2026-08-11T11:18:13.790Z
 | `category` | `string` |
 | `createdAt` | `number` |
 | `currentOffer` | `number` |
+| `declinedAt` | `number` |
 | `demoHours` | `string` |
 | `finalPrice` | `number` |
 | `groupDocId` | `string` |

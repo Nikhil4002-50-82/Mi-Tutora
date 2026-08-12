@@ -38,7 +38,7 @@ export function FAQ() {
     },
     {
       question: 'Is there a free demo class?',
-      answer: 'Yes! We offer a completely free demo class so you can experience our teaching methodology and meet your tutor before committing. No payment required for the demo.',
+      answer: 'Yes! For students, the demo class is completely free to help you experience the teaching methodology before committing. For tutors, a nominal booking fee is required to secure the demo and confirm the lead.',
     },
   ];
 

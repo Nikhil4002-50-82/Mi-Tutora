@@ -95,6 +95,7 @@ export default function StudentDashboard() {
   const [isNotificationsDropdownOpen, setIsNotificationsDropdownOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const isSubmittingRef = useRef(false);
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
   const [requestLoading, setRequestLoading] = useState(false);
   const [payingClass, setPayingClass] = useState<any>(null);
@@ -670,53 +671,16 @@ export default function StudentDashboard() {
   const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'student' && app.createdAt >= todayStart.getTime()).length || 0;
 
   const handleRequestTutor = async (tutor: any) => {
-    if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests.");
-      return;
-    }
     const pendingStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked'];
     const studentPendingCount = data?.applications?.filter((app: any) => pendingStatuses.includes(app.status)).length || 0;
     if (studentPendingCount >= 5) {
       setMessageModalConfig({ isOpen: true, title: 'Queue Full', message: 'You already have 5 pending requests. Please wait for a response or cancel an existing request before sending a new one.' });
       return;
     }
-    const teacherLimit = tutor.isSubscribed ? 15 : 5;
-    let teacherPendingCount = tutor.pendingRequests?.length || 0;
     
-    if (teacherPendingCount > 0 && tutor.pendingRequests && tutor.pendingRequests.length > 0) {
-      try {
-        const { db } = await import('@/utils/firebase/client');
-        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
-        const reqIds = tutor.pendingRequests.slice(0, 30);
-        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
-        const snap = await getDocs(q);
-        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-        let verifiedCount = 0;
-        const orphanedIds: string[] = [];
-        const retrievedDocs = new Map();
-        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
-        for (const reqId of reqIds) {
-          const appData = retrievedDocs.get(reqId);
-          if (appData && activeStatuses.includes(appData.status)) {
-            verifiedCount++;
-          } else {
-            orphanedIds.push(reqId);
-          }
-        }
-        teacherPendingCount = verifiedCount;
-        if (orphanedIds.length > 0) {
-          updateDoc(doc(db, 'tutors', tutor.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
-        }
-      } catch (e) {
-        console.error("Queue verification error:", e);
-      }
-    }
-
-    if (teacherPendingCount >= teacherLimit) {
-      toast.error("This teacher's queue is currently full. Please try again later.");
-      return;
-    }
-    if (requestLoading) return;
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
+    if (requestLoading) { isSubmittingRef.current = false; return false; }
 
     const matchGroup = (app: any) => {
       if (app.groupDocId) return app.groupDocId === activeGroup?.id;
@@ -742,7 +706,6 @@ export default function StudentDashboard() {
       return;
     }
     
-    // Redirect logic if profile is incomplete
     if (!hasProfile) {
       toast.error("Please complete your profile to request a tutor.");
       setActiveTab('profile');
@@ -752,71 +715,109 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, addDoc, setDoc, doc, updateDoc, arrayUnion, writeBatch } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
       const groupToUse = activeGroup;
       if (!groupToUse) {
         toast.error("Please add a student profile first.");
+        isSubmittingRef.current = false;
         setRequestLoading(false);
-        return;
+        return false;
       }
 
       const appId = generateCustomId('APP');
       const appRef = doc(collection(db, 'applications'));
-      const batch = writeBatch(db);
+      
+      await runTransaction(db, async (transaction) => {
+         const parentRef = doc(db, 'parents', data?.user?.uid as string);
+         const parentSnap = await transaction.get(parentRef);
+         const parentData = parentSnap.data() || {};
+         const today = new Date().toISOString().split('T')[0];
+         const currentDailyCount = parentData.dailyUsage?.date === today ? parentData.dailyUsage.count : 0;
+         
+         if (currentDailyCount >= 5) {
+            throw new Error("DAILY_LIMIT_EXCEEDED");
+         }
 
-      batch.set(appRef, {
-        applicationId: appId,
-        tutorDocId: tutor.id,
-        tutorName: tutor.name,
-        parentDocId: data?.user?.uid,
-        groupDocId: groupToUse.id,
-        studentDocIds: groupToUse.students.map((s: any) => s.id),
-        studentName: groupToUse.name,
-        currentOffer: offerPrice,
-        initialBudget: tutorPrice > 0 ? tutorPrice : offerPrice,
-        absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
-        absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
-        initiator: 'student',
-        lastUpdatedBy: 'student',
-        status: 'negotiating',
-        source: 'direct',
-        category: tutor.category || groupToUse.category || '',
-        mode: tutor.mode,
-        demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
-        createdAt: Date.now()
+         const tutorRef = doc(db, 'tutors', tutor.id);
+         const tutorSnap = await transaction.get(tutorRef);
+         const tutorData = tutorSnap.data() || {};
+         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
+         
+         let verifiedCount = 0;
+         const orphanedIds: string[] = [];
+         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
+         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         
+         if (reqIds.length > 0) {
+             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
+             appSnaps.forEach((appSnap, index) => {
+                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
+                     verifiedCount++;
+                 } else {
+                     orphanedIds.push(reqIds[index]);
+                 }
+             });
+         }
+         
+         if (verifiedCount >= teacherLimit) {
+             throw new Error("TEACHER_QUEUE_FULL");
+         }
+         
+         transaction.set(appRef, {
+            applicationId: appId,
+            tutorDocId: tutor.id,
+            tutorName: tutor.name,
+            parentDocId: data?.user?.uid,
+            groupDocId: groupToUse.id,
+            studentDocIds: groupToUse.students.map((s: any) => s.id),
+            studentName: groupToUse.name,
+            currentOffer: offerPrice,
+            initialBudget: tutorPrice > 0 ? tutorPrice : offerPrice,
+            absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
+            absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
+            initiator: 'student',
+            lastUpdatedBy: 'student',
+            status: 'negotiating',
+            source: 'direct',
+            category: tutor.category || groupToUse.category || '',
+            mode: tutor.mode,
+            demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
+            createdAt: Date.now()
+         });
+
+         transaction.update(parentRef, {
+            dailyUsage: { date: today, count: currentDailyCount + 1 }
+         });
+         
+         if (orphanedIds.length > 0) {
+            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
+         }
+         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
+         for (const s of groupToUse.students) {
+            transaction.update(doc(db, 'students', s.id), { pendingRequests: arrayUnion(appRef.id) });
+         }
       });
-
-      // Update the teacher's pending request queue
-      batch.update(doc(db, 'tutors', tutor.id), {
-        pendingRequests: arrayUnion(appRef.id)
-      });
-      // Update the students' pending request queue
-      for (const s of groupToUse.students) {
-        batch.update(doc(db, 'students', s.id), {
-          pendingRequests: arrayUnion(appRef.id)
-        });
-      }
-
-      await batch.commit();
 
       toast.success("Tutor request & offer sent successfully!");
       mutate();
+      return true;
     } catch (e: any) {
-      toast.error("Error sending request: " + e.message);
-    } finally {
+      if (e.message === "DAILY_LIMIT_EXCEEDED") {
+         toast.error("You have reached your daily limit of 5 requests.");
+      } else if (e.message === "TEACHER_QUEUE_FULL") {
+         toast.error("This teacher's queue is currently full. Please try again later.");
+      } else {
+         toast.error("Error sending request: " + e.message);
+      }
+      isSubmittingRef.current = false;
       setRequestLoading(false);
     }
   };
 
   const handleDirectRequestDemo = async (tutor: any) => {
-    if (dailyRequestsCount >= 5) {
-      toast.error("You have reached your daily limit of 5 requests.");
-      return;
-    }
-
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const recentDemosCount = data?.applications?.filter((app: any) => 
       ['demo_requested_by_student', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status) &&
@@ -833,42 +834,7 @@ export default function StudentDashboard() {
       setMessageModalConfig({ isOpen: true, title: 'Queue Full', message: 'You already have 5 pending requests. Please wait for a response or cancel an existing request before sending a new one.' });
       return;
     }
-    const teacherLimit = tutor.isSubscribed ? 15 : 5;
-    let teacherPendingCount = tutor.pendingRequests?.length || 0;
     
-    if (teacherPendingCount > 0 && tutor.pendingRequests && tutor.pendingRequests.length > 0) {
-      try {
-        const { db } = await import('@/utils/firebase/client');
-        const { collection, query, where, getDocs, doc, updateDoc, arrayRemove, documentId } = await import('firebase/firestore');
-        const reqIds = tutor.pendingRequests.slice(0, 30);
-        const q = query(collection(db, 'applications'), where(documentId(), 'in', reqIds));
-        const snap = await getDocs(q);
-        const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-        let verifiedCount = 0;
-        const orphanedIds: string[] = [];
-        const retrievedDocs = new Map();
-        snap.docs.forEach(d => retrievedDocs.set(d.id, d.data()));
-        for (const reqId of reqIds) {
-          const appData = retrievedDocs.get(reqId);
-          if (appData && activeStatuses.includes(appData.status)) {
-            verifiedCount++;
-          } else {
-            orphanedIds.push(reqId);
-          }
-        }
-        teacherPendingCount = verifiedCount;
-        if (orphanedIds.length > 0) {
-          updateDoc(doc(db, 'tutors', tutor.id), { pendingRequests: arrayRemove(...orphanedIds) }).catch(console.error);
-        }
-      } catch (e) {
-        console.error("Queue verification error:", e);
-      }
-    }
-
-    if (teacherPendingCount >= teacherLimit) {
-      toast.error("This teacher's queue is currently full. Please try again later.");
-      return;
-    }
     if (requestLoading) return;
 
     const matchGroup = (app: any) => {
@@ -885,66 +851,116 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, setDoc, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
       const groupToUse = activeGroup;
       if (!groupToUse) {
         toast.error("Please add a student profile first.");
+        isSubmittingRef.current = false;
         setRequestLoading(false);
-        return;
+        return false;
       }
 
       const tutorPrice = getTutorBasePrice(tutor);
 
       const appId = generateCustomId('APP');
       const appRef = doc(collection(db, 'applications'));
-      await setDoc(appRef, {
-        applicationId: appId,
-        tutorDocId: tutor.id,
-        tutorName: tutor.name,
-        parentDocId: data?.user?.uid,
-        groupDocId: groupToUse.id,
-        studentDocIds: groupToUse.students.map((s: any) => s.id),
-        studentName: groupToUse.name,
-        currentOffer: tutorPrice,
-        finalPrice: tutorPrice,
-        initialBudget: tutorPrice > 0 ? tutorPrice : 500,
-        absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : 300,
-        absoluteMax: tutorPrice > 0 ? tutorPrice : 500,
-        initiator: 'student',
-        lastUpdatedBy: 'student',
-        status: 'demo_requested_by_student',
-        source: 'direct',
-        category: tutor.category || groupToUse.category || '',
-        mode: tutor.mode,
-        demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
+      
+      await runTransaction(db, async (transaction) => {
+         const parentRef = doc(db, 'parents', data?.user?.uid as string);
+         const parentSnap = await transaction.get(parentRef);
+         const parentData = parentSnap.data() || {};
+         const today = new Date().toISOString().split('T')[0];
+         const currentDailyCount = parentData.dailyUsage?.date === today ? parentData.dailyUsage.count : 0;
+         
+         if (currentDailyCount >= 5) {
+            throw new Error("DAILY_LIMIT_EXCEEDED");
+         }
 
-      // Update the teacher's pending request queue
-      await updateDoc(doc(db, 'tutors', tutor.id), {
-        pendingRequests: arrayUnion(appRef.id)
+         const tutorRef = doc(db, 'tutors', tutor.id);
+         const tutorSnap = await transaction.get(tutorRef);
+         const tutorData = tutorSnap.data() || {};
+         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
+         
+         let verifiedCount = 0;
+         const orphanedIds: string[] = [];
+         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
+         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         
+         if (reqIds.length > 0) {
+             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
+             appSnaps.forEach((appSnap, index) => {
+                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
+                     verifiedCount++;
+                 } else {
+                     orphanedIds.push(reqIds[index]);
+                 }
+             });
+         }
+         
+         if (verifiedCount >= teacherLimit) {
+             throw new Error("TEACHER_QUEUE_FULL");
+         }
+         
+         transaction.set(appRef, {
+            applicationId: appId,
+            tutorDocId: tutor.id,
+            tutorName: tutor.name,
+            parentDocId: data?.user?.uid,
+            groupDocId: groupToUse.id,
+            studentDocIds: groupToUse.students.map((s: any) => s.id),
+            studentName: groupToUse.name,
+            currentOffer: tutorPrice,
+            finalPrice: tutorPrice,
+            initialBudget: tutorPrice > 0 ? tutorPrice : 500,
+            absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : 300,
+            absoluteMax: tutorPrice > 0 ? tutorPrice : 500,
+            initiator: 'student',
+            lastUpdatedBy: 'student',
+            status: 'demo_requested_by_student',
+            source: 'direct',
+            category: tutor.category || groupToUse.category || '',
+            mode: tutor.mode,
+            demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+         });
+
+         transaction.update(parentRef, {
+            dailyUsage: { date: today, count: currentDailyCount + 1 }
+         });
+         
+         if (orphanedIds.length > 0) {
+            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
+         }
+         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
+         for (const s of groupToUse.students) {
+            transaction.update(doc(db, 'students', s.id), { pendingRequests: arrayUnion(appRef.id) });
+         }
       });
-      // Update the students' pending request queue
-      for (const s of groupToUse.students) {
-        await updateDoc(doc(db, 'students', s.id), {
-          pendingRequests: arrayUnion(appRef.id)
-        });
-      }
 
       toast.success("Demo requested successfully!");
       mutate();
+      return true;
     } catch (e: any) {
-      toast.error("Error requesting demo: " + e.message);
+      if (e.message === "DAILY_LIMIT_EXCEEDED") {
+         toast.error("You have reached your daily limit of 5 requests.");
+      } else if (e.message === "TEACHER_QUEUE_FULL") {
+         toast.error("This teacher's queue is currently full. Please try again later.");
+      } else {
+         toast.error("Error requesting demo: " + e.message);
+      }
     } finally {
+      isSubmittingRef.current = false;
       setRequestLoading(false);
     }
   };
 
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
     if (['request_demo', 'accept_demo'].includes(action)) {
       const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
       const recentDemosCount = data?.applications?.filter((app: any) => 
@@ -954,7 +970,8 @@ export default function StudentDashboard() {
 
       if (recentDemosCount >= 2) {
         toast.error("You can only have up to 2 active demos in a 7-day period. Please complete or cancel your current demos first.");
-        return;
+        isSubmittingRef.current = false;
+        return false;
       }
     }
 
@@ -963,72 +980,93 @@ export default function StudentDashboard() {
       const minAllowed = neg.absoluteMin || Math.ceil((neg.initialBudget || 0) * 0.6);
       if (newOffer > maxAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
-        return;
+        isSubmittingRef.current = false;
+        return false;
       }
       if (newOffer < minAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
-        return;
+        isSubmittingRef.current = false;
+        return false;
       }
     }
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove, writeBatch } = await import('firebase/firestore');
+      const { doc, arrayRemove, runTransaction } = await import('firebase/firestore');
       
-      const updateData: any = {};
-      let isFinalState = false;
-      if (action === 'accept_price' || action === 'request_demo') {
-        updateData.status = 'demo_requested_by_student';
-        if (newOffer) updateData.finalPrice = newOffer;
-        updateData.lastUpdatedBy = 'student';
-      } else if (action === 'accept_demo') {
-        updateData.status = 'demo_pending_payment';
-        updateData.lastUpdatedBy = 'student';
-      } else if (action === 'propose_demo_date') {
-        updateData.proposedDate = neg?.proposedDate;
-        updateData.proposedTime = neg?.proposedTime;
-        updateData.lastUpdatedBy = 'student';
-      } else if (action === 'accept_demo_date') {
-        updateData.status = 'demo_scheduled';
-        updateData.demoDate = neg?.proposedDate || data?.applications?.find((a:any)=>a.id===appId)?.proposedDate;
-        updateData.demoTime = neg?.proposedTime || data?.applications?.find((a:any)=>a.id===appId)?.proposedTime;
-        updateData.lastUpdatedBy = 'student';
-      } else if (action === 'counter_price') {
-        updateData.currentOffer = newOffer;
-        updateData.lastUpdatedBy = 'student';
-      } else if (action === 'decline') {
-        updateData.status = 'declined';
-        updateData.declinedAt = Date.now();
-        isFinalState = true;
-      }
-      updateData.updatedAt = Date.now();
-
-      const batch = writeBatch(db);
-
-      batch.update(doc(db, 'applications', appId), updateData);
-      
-      if (isFinalState) {
-        const app = data?.applications?.find((a: any) => a.id === appId);
-        if (app) {
-          if (app.tutorDocId) batch.update(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
-          if (app.studentDocIds) {
-            for (const sid of app.studentDocIds) {
-              batch.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+      await runTransaction(db, async (transaction) => {
+        const appRef = doc(db, 'applications', appId);
+        const appSnap = await transaction.get(appRef);
+        
+        if (!appSnap.exists()) {
+          throw new Error("Application not found.");
+        }
+        
+        const appData = appSnap.data();
+        
+        if (appData.status === 'declined') {
+          throw new Error("This request has already been declined or canceled by the other party.");
+        }
+        if (action === 'accept_price' && appData.lastUpdatedBy === 'student') {
+           throw new Error("This offer has already been accepted or modified.");
+        }
+        
+        const updateData: any = {};
+        let isFinalState = false;
+        
+        if (action === 'accept_price' || action === 'request_demo') {
+          updateData.status = 'demo_requested_by_student';
+          if (newOffer) updateData.finalPrice = newOffer;
+          updateData.lastUpdatedBy = 'student';
+        } else if (action === 'accept_demo') {
+          updateData.status = 'demo_pending_payment';
+          updateData.lastUpdatedBy = 'student';
+        } else if (action === 'propose_demo_date') {
+          updateData.proposedDate = neg?.proposedDate;
+          updateData.proposedTime = neg?.proposedTime;
+          updateData.lastUpdatedBy = 'student';
+        } else if (action === 'accept_demo_date') {
+          updateData.status = 'demo_scheduled';
+          updateData.demoDate = neg?.proposedDate || appData.proposedDate;
+          updateData.demoTime = neg?.proposedTime || appData.proposedTime;
+          updateData.lastUpdatedBy = 'student';
+        } else if (action === 'counter_price') {
+          updateData.currentOffer = newOffer;
+          updateData.lastUpdatedBy = 'student';
+        } else if (action === 'decline') {
+          updateData.status = 'declined';
+          updateData.declinedAt = Date.now();
+          isFinalState = true;
+        }
+        updateData.updatedAt = Date.now();
+        
+        transaction.update(appRef, updateData);
+        
+        if (isFinalState) {
+          if (appData.tutorDocId) {
+            transaction.update(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(appId) });
+          }
+          if (appData.studentDocIds) {
+            for (const sid of appData.studentDocIds) {
+              transaction.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
             }
           }
         }
-      }
-
-      await batch.commit();
+      });
       
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
+      return false;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleAppointTutor = async (appId: string) => {
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
     try {
       const { db } = await import('@/utils/firebase/client');
       const { doc, updateDoc, arrayRemove, getDocs, query, collection, where, addDoc } = await import('firebase/firestore');
@@ -1088,6 +1126,9 @@ export default function StudentDashboard() {
       mutate();
     } catch (e: any) {
       toast.error("Error appointing tutor");
+      return false;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -3481,14 +3522,20 @@ export default function StudentDashboard() {
                     <div className="flex gap-2">
                       {negotiationOffer[selectedViewUser.id] ? (
                         <button 
-                          onClick={() => { handleRequestTutor(selectedViewUser); setSelectedViewUser(null); }}
+                          onClick={async () => { 
+                            const success = await handleRequestTutor(selectedViewUser); 
+                            if (success) setSelectedViewUser(null); 
+                          }}
                           className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                         >
                           <CheckCircle2 className="w-4 h-4" /> Negotiate
                         </button>
                       ) : (
                         <button 
-                          onClick={() => { handleDirectRequestDemo(selectedViewUser); setSelectedViewUser(null); }}
+                          onClick={async () => { 
+                            const success = await handleDirectRequestDemo(selectedViewUser); 
+                            if (success) setSelectedViewUser(null); 
+                          }}
                           className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                         >
                           <CheckCircle2 className="w-4 h-4" /> Request Demo
@@ -3626,13 +3673,19 @@ export default function StudentDashboard() {
                   Cancel
                 </button>
                 <button 
-                  onClick={() => {
-                    if (actionConfirmModal.type === 'hire') {
-                      handleAppointTutor(actionConfirmModal.appId);
-                    } else {
-                      handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                  onClick={async () => {
+                    if (isSubmittingRef.current) return;
+                    isSubmittingRef.current = true;
+                    try {
+                      if (actionConfirmModal.type === 'hire') {
+                        await handleAppointTutor(actionConfirmModal.appId);
+                      } else {
+                        await handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                      }
+                      setActionConfirmModal(null);
+                    } finally {
+                      isSubmittingRef.current = false;
                     }
-                    setActionConfirmModal(null);
                   }}
                   className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'hire' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
                 >
