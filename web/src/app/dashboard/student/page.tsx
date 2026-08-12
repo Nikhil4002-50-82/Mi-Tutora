@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 import axios from 'axios';
 import { motion } from 'motion/react';
@@ -488,9 +489,46 @@ export default function StudentDashboard() {
       if (isCancelled) return;
       
       const q = query(collection(db, 'applications'), where('parentDocId', '==', data.user.uid));
-      unsubscribe = onSnapshot(q, () => {
-        if (!isCancelled) mutate();
-      }, (error) => {
+      unsubscribe = onSnapshot(q, (snapshot: any) => {
+        if (isCancelled) return;
+        if (snapshot.metadata.hasPendingWrites) return;
+
+        const changedDocs = snapshot.docChanges();
+        if (changedDocs.length === 0) return;
+
+        mutate((currentData: any) => {
+          if (!currentData) return currentData;
+          
+          let applicationsChanged = false;
+          let newApps = [...(currentData.applications || [])];
+
+          changedDocs.forEach((change: any) => {
+            const appData = { id: change.doc.id, ...change.doc.data() } as any;
+            const idx = newApps.findIndex(a => a.id === appData.id);
+
+            if (change.type === 'added' || change.type === 'modified') {
+              if (idx === -1) {
+                newApps.push(appData);
+                applicationsChanged = true;
+              } else if (JSON.stringify(newApps[idx]) !== JSON.stringify(appData)) {
+                newApps[idx] = appData;
+                applicationsChanged = true;
+              }
+            }
+            if (change.type === 'removed') {
+              if (idx !== -1) {
+                newApps.splice(idx, 1);
+                applicationsChanged = true;
+              }
+            }
+          });
+
+          if (applicationsChanged) {
+            return { ...currentData, applications: newApps };
+          }
+          return currentData;
+        }, { revalidate: false });
+      }, (error: any) => {
         console.error("Realtime listener error:", error);
       });
     };
@@ -907,7 +945,11 @@ export default function StudentDashboard() {
           }
         }
       });
-      
+      const appDataSync = data?.applications?.find((a: any) => a.id === appId);
+      if (appDataSync) {
+        const { syncStudentAvailability } = await import('@/utils/studentAvailability');
+        await syncStudentAvailability(db, appDataSync.studentDocIds || [appDataSync.studentDocId]).catch(console.error);
+      }
       toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
       mutate();
     } catch (e: any) {
@@ -975,7 +1017,10 @@ export default function StudentDashboard() {
           }
         }
       }
-      
+      if (app) {
+        const { syncStudentAvailability } = await import('@/utils/studentAvailability');
+        await syncStudentAvailability(db, app.studentDocIds || [app.studentDocId]).catch(console.error);
+      }
       toast.success("Tutor appointed successfully! Tuition has started.");
       mutate();
     } catch (e: any) {
@@ -1054,7 +1099,11 @@ export default function StudentDashboard() {
              }
           }
       }
-
+      const appDataSync = payingClass;
+      if (appDataSync) {
+        const { syncStudentAvailability } = await import('@/utils/studentAvailability');
+        await syncStudentAvailability(db, appDataSync.studentDocIds || [appDataSync.studentDocId]).catch(console.error);
+      }
       toast.success("Payment completed successfully!");
       setPayingClass(null);
       setUseWallet(false);
@@ -1666,7 +1715,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <div className="hidden sm:block z-10 mr-6">
-                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                       <Image src="/book.png" alt="Books" width={256} height={256} className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
                     </div>
                     <div className="absolute right-0 top-0 w-64 h-64 bg-[#00a992] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                   </div>
@@ -1682,7 +1731,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <div className="hidden sm:block z-10 mr-6">
-                       <img src="/book.png" alt="Books" className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
+                       <Image src="/book.png" alt="Books" width={256} height={256} className="h-20 w-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-md" />
                     </div>
                     <div className="absolute right-0 top-0 w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                   </div>

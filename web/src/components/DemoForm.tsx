@@ -613,6 +613,7 @@ export default function DemoForm({
                technologies: s.technologies || [],
                languages: s.languages || [],
                groupDocId: tempGroupId,
+               isAvailable: true,
                createdAt: Date.now()
              },
              frontendStudent: s

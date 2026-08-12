@@ -1,5 +1,5 @@
 import { auth, db } from '@/utils/firebase/client';
-import { doc, getDoc, collection, query, where, getDocs, setDoc, documentId, updateDoc, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, setDoc, documentId, updateDoc, arrayRemove, orderBy, limit } from 'firebase/firestore';
 
 export const fetchStudentDashboardData = async () => {
   await new Promise(resolve => auth.onAuthStateChanged(resolve));
@@ -37,37 +37,42 @@ export const fetchStudentDashboardData = async () => {
   const parentDocSnap = await getDoc(doc(db, 'parents', user.uid));
   const parentData = parentDocSnap.exists() ? parentDocSnap.data() : null;
   const parentId = user.uid;
-  
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('parentDocId', '==', parentId)));
-  const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const [
+    applicationsSnap,
+    studentsSnap,
+    groupsSnap,
+    requestsSnap,
+    tutorsSnapResult,
+    referralsSnap,
+    pricingSnap
+  ] = await Promise.all([
+    getDocs(query(collection(db, 'applications'), where('parentDocId', '==', parentId))),
+    getDocs(query(collection(db, 'students'), where('parentDocId', '==', parentId))),
+    getDocs(query(collection(db, 'groups'), where('parentDocId', '==', parentId))),
+    getDocs(query(collection(db, 'tuition_requests'), where('parentDocId', '==', parentId), limit(50))),
+    getDocs(query(collection(db, 'tutors'), where('hasProfile', '==', true), limit(100))).catch(e => {
+      console.warn("Failed to fetch tutors", e);
+      return { docs: [] };
+    }),
+    getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid), limit(50))),
+    getDocs(collection(db, 'marketplace_pricing'))
+  ]);
 
-  const studentsSnap = await getDocs(query(collection(db, 'students'), where('parentDocId', '==', parentId)));
+  const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  
   const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   students.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
   const myStudent = students.length > 0 ? students[0] : null;
 
-  const groupsSnap = await getDocs(query(collection(db, 'groups'), where('parentDocId', '==', parentId)));
   const groups = groupsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-
-  const requestsSnap = await getDocs(query(collection(db, 'tuition_requests'), where('parentDocId', '==', parentId)));
+  
   const requests = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   const myRequest = requests.length > 0 ? requests[0] : null;
 
-  let availableTutorsRaw: any[] = [];
-  try {
-    const tutorsSnap = await getDocs(query(collection(db, 'tutors'), where('hasProfile', '==', true)));
-    availableTutorsRaw = tutorsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-  } catch(e) {
-    console.warn("Failed to fetch tutors", e);
-  }
-  const availableTutors = availableTutorsRaw;
-
-  const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
+  const availableTutors = tutorsSnapResult.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+  
   const referrals = referralsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-
-  const pricingSnap = await getDocs(collection(db, 'marketplace_pricing'));
   const marketplacePricing = pricingSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-
   const matchedTutors = availableTutors.filter((tutor: any) => {
     if (!myStudent) return true;
     const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
@@ -79,12 +84,16 @@ export const fetchStudentDashboardData = async () => {
   const tutorIds = applications.map((app: any) => app.tutorDocId).filter(Boolean);
   let tutorsInfo: any[] = [];
   if (tutorIds.length > 0) {
-     for (let i = 0; i < tutorIds.length; i += 10) {
-       const chunk = tutorIds.slice(i, i + 10);
-       const tutorsQuery = query(collection(db, 'tutors'), where(documentId(), 'in', chunk));
-       const tSnap = await getDocs(tutorsQuery);
-       tutorsInfo = [...tutorsInfo, ...tSnap.docs.map(d => ({ id: d.id, ...d.data() }))];
+     const uniqueTutorIds = Array.from(new Set(tutorIds));
+     const chunkPromises = [];
+     for (let i = 0; i < uniqueTutorIds.length; i += 10) {
+       const chunk = uniqueTutorIds.slice(i, i + 10);
+       chunkPromises.push(getDocs(query(collection(db, 'tutors'), where(documentId(), 'in', chunk))));
      }
+     const chunkSnaps = await Promise.all(chunkPromises);
+     chunkSnaps.forEach(tSnap => {
+       tutorsInfo = [...tutorsInfo, ...tSnap.docs.map(d => ({ id: d.id, ...d.data() }))];
+     });
   }
 
   const now = Date.now();
@@ -215,22 +224,32 @@ export const fetchTeacherDashboardData = async () => {
   const tutorData = !tutorSnap.empty ? tutorSnap.docs[0].data() : null;
   const tutorId = !tutorSnap.empty ? tutorSnap.docs[0].id : user.uid;
   
-  const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('tutorDocId', '==', tutorId)));
+  const [
+    applicationsSnap,
+    studentsSnapResult,
+    referralsSnap,
+    pricingSnap,
+    lockedAppsSnap
+  ] = await Promise.all([
+    getDocs(query(collection(db, 'applications'), where('tutorDocId', '==', tutorId))),
+    getDocs(query(collection(db, 'students'), where('isAvailable', '==', true), limit(100))).catch(e => {
+      console.warn("Failed to fetch students", e);
+      return { docs: [] };
+    }),
+    getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid), limit(50))),
+    getDocs(collection(db, 'marketplace_pricing')),
+    getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])))
+  ]);
+
   const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+  const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
-  const hiredAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', '==', 'tuition_started')));
-  const globallyHiredGroupIds = new Set();
-  const globallyHiredStudentIds = new Set();
-  hiredAppsSnap.docs.forEach(d => {
-    const data = d.data();
-    if (data.groupDocId) globallyHiredGroupIds.add(data.groupDocId);
-    if (data.studentDocId) globallyHiredStudentIds.add(data.studentDocId);
-    if (data.studentDocIds) data.studentDocIds.forEach((sid: string) => globallyHiredStudentIds.add(sid));
-  });
+  const availableStudentsRaw = studentsSnapResult.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+  availableStudentsRaw.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+  const availableStudents = availableStudentsRaw;
 
-  const lockedAppsSnap = await getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])));
   const globalLocks: Record<string, { unlockDate: number, tutorDocId: string }> = {};
-  
   lockedAppsSnap.docs.forEach(d => {
     const data = d.data();
     const gId = data.groupDocId || data.studentDocId;
@@ -255,17 +274,6 @@ export const fetchTeacherDashboardData = async () => {
     }
   });
 
-  let availableStudentsRaw: any[] = [];
-  try {
-    const requestsSnap = await getDocs(collection(db, 'students'));
-    availableStudentsRaw = requestsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-    availableStudentsRaw.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
-  } catch(e) {
-    console.warn("Failed to fetch students", e);
-  }
-
-  const availableStudents = availableStudentsRaw;
-
   const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
   
   // Group students first
@@ -287,11 +295,7 @@ export const fetchTeacherDashboardData = async () => {
     return acc;
   }, {});
 
-  const availableGroupsRaw = Object.values(groupedStudentsMap).filter((g: any) => {
-    if (globallyHiredGroupIds.has(g.id)) return false;
-    if (g.students.some((s: any) => globallyHiredStudentIds.has(s.id))) return false;
-    return true;
-  }).map((g: any) => ({
+  const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
     ...g,
     name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
     category: g.categories[0] || 'school',
@@ -311,25 +315,21 @@ export const fetchTeacherDashboardData = async () => {
       return true;
     });
   });
-
-  const referralsSnap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
-  const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
-
-  const pricingSnap = await getDocs(collection(db, 'marketplace_pricing'));
-  const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
-
   const groupIds = applications.map((app: any) => app.groupDocId || app.studentDocId).filter(Boolean);
   const studentIds = applications.flatMap((app: any) => app.studentDocIds || [app.studentDocId]).filter(Boolean);
 
   let studentsInfo: any[] = [];
   if (studentIds.length > 0) {
     const uniqueStudentIds = Array.from(new Set(studentIds));
+    const chunkPromises = [];
     for (let i = 0; i < uniqueStudentIds.length; i += 10) {
       const chunk = uniqueStudentIds.slice(i, i + 10);
-      const studentsQuery = query(collection(db, 'students'), where(documentId(), 'in', chunk));
-      const sSnap = await getDocs(studentsQuery);
-      studentsInfo = [...studentsInfo, ...sSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))];
+      chunkPromises.push(getDocs(query(collection(db, 'students'), where(documentId(), 'in', chunk))));
     }
+    const chunkSnaps = await Promise.all(chunkPromises);
+    chunkSnaps.forEach(sSnap => {
+      studentsInfo = [...studentsInfo, ...sSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))];
+    });
   }
 
   const now = Date.now();
