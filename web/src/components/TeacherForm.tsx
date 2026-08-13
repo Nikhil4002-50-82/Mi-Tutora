@@ -369,7 +369,7 @@ export default function TeacherForm({
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Fee Range</p>
-                  <p className="text-xl font-black text-emerald-600">₹{formData.feeRange || 0} <span className="text-sm text-gray-500 font-medium">/ month</span></p>
+                  <p className="text-xl font-black text-emerald-600">&#8377;{formData.feeRange || 0} <span className="text-sm text-gray-500 font-medium">/ month</span></p>
                 </div>
               </div>
 
@@ -1120,7 +1120,7 @@ export default function TeacherForm({
           </label>
 
           <div className="flex justify-between items-center mb-2">
-            <span className="text-emerald-600 font-bold">₹{formData.feeRange || 1000}</span>
+            <span className="text-emerald-600 font-bold">&#8377;{formData.feeRange || 1000}</span>
           </div>
           <input
             type="range"
@@ -1133,8 +1133,8 @@ export default function TeacherForm({
             className="w-full accent-emerald-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
-            <span>₹1,000</span>
-            <span>₹20,000</span>
+            <span>&#8377;1,000</span>
+            <span>&#8377;20,000</span>
           </div>
         </div>
 

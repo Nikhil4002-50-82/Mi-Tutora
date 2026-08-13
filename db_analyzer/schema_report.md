@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-12T13:48:06.511Z
+Generated on: 2026-08-13T17:31:09.246Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -19,7 +19,7 @@ Generated on: 2026-08-12T13:48:06.511Z
 ---
 
 ## Collection: `applications`
-*Documents sampled: 3*
+*Documents sampled: 4*
 
 | Field Path | Data Type |
 |---|---|
@@ -77,7 +77,7 @@ Generated on: 2026-08-12T13:48:06.511Z
 ---
 
 ## Collection: `groups`
-*Documents sampled: 19*
+*Documents sampled: 20*
 
 | Field Path | Data Type |
 |---|---|
@@ -177,7 +177,7 @@ Generated on: 2026-08-12T13:48:06.511Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 31*
+*Documents sampled: 33*
 
 | Field Path | Data Type |
 |---|---|
@@ -193,6 +193,7 @@ Generated on: 2026-08-12T13:48:06.511Z
 | `groupId` | `string` |
 | `guardianName` | `string` |
 | `id` | `string` |
+| `isAvailable` | `boolean` |
 | `languages` | `array | array of string` |
 | `learningGoal` | `string` |
 | `name` | `string` |
@@ -210,7 +211,7 @@ Generated on: 2026-08-12T13:48:06.511Z
 ---
 
 ## Collection: `tuition_requests`
-*Documents sampled: 1*
+*Documents sampled: 2*
 
 | Field Path | Data Type |
 |---|---|
@@ -259,6 +260,9 @@ Generated on: 2026-08-12T13:48:06.511Z
 | `category` | `string` |
 | `city` | `string` |
 | `classes` | `array of string | array` |
+| `dailyUsage` | `object` |
+| `dailyUsage.count` | `number` |
+| `dailyUsage.date` | `string` |
 | `email` | `string` |
 | `experience` | `string` |
 | `feeRange` | `string` |

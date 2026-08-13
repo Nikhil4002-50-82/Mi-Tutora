@@ -16,7 +16,7 @@ export function TutorJoin() {
   ];
 
   const stats = [
-    { icon: DollarSign, value: '₹25k-50k', label: 'Average Monthly Earnings' },
+    { icon: DollarSign, value: '&#8377;25k-50k', label: 'Average Monthly Earnings' },
     { icon: Clock, value: 'Flexible', label: 'Working Hours' },
     { icon: Users, value: '500+', label: 'Active Tutors' },
     { icon: TrendingUp, value: '4.9/5', label: 'Average Rating' },

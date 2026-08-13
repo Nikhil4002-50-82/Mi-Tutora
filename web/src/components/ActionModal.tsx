@@ -142,7 +142,7 @@ export default function ActionModal({
                   <div className="relative">
                     {type === "price" && (
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <span className="text-gray-500 font-bold">₹</span>
+                        <span className="text-gray-500 font-bold">&#8377;</span>
                       </div>
                     )}
                     {type === "price" ? (

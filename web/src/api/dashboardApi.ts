@@ -315,7 +315,7 @@ export const fetchTeacherDashboardData = async () => {
       return true;
     });
   });
-  const groupIds = applications.map((app: any) => app.groupDocId || app.studentDocId).filter(Boolean);
+
   const studentIds = applications.flatMap((app: any) => app.studentDocIds || [app.studentDocId]).filter(Boolean);
 
   let studentsInfo: any[] = [];

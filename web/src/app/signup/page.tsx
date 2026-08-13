@@ -284,7 +284,7 @@ function SignupContent() {
 
         {/* Footer */}
         <div className="hidden lg:flex relative z-10 text-emerald-100/60 text-sm font-medium justify-between">
-          <span>© {new Date().getFullYear()} MiTutora. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} MiTutora. All rights reserved.</span>
           <span className="opacity-50">Support: +91 7483034168</span>
         </div>
       </div>

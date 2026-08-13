@@ -1311,7 +1311,7 @@ export default function DemoForm({
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
           <label className="block text-sm font-semibold mb-2 flex justify-between">
             <span>💰 Expected Budget / Monthly Fee *</span>
-            <span className="text-emerald-600 font-bold">₹{student.budget}</span>
+            <span className="text-emerald-600 font-bold">&#8377;{student.budget}</span>
           </label>
           <input
             type="range"
@@ -1324,8 +1324,8 @@ export default function DemoForm({
             className="w-full accent-emerald-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
-            <span>₹1,000</span>
-            <span>₹20,000</span>
+            <span>&#8377;1,000</span>
+            <span>&#8377;20,000</span>
           </div>
         </div>
 

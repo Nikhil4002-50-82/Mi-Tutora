@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import axios from 'axios';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -197,7 +197,7 @@ function LoginContent() {
 
         {/* Footer */}
         <div className="hidden lg:flex relative z-10 text-emerald-100/60 text-sm font-medium justify-between">
-          <span>© {new Date().getFullYear()} MiTutora. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} MiTutora. All rights reserved.</span>
           <span className="opacity-50">Support: +91 7483034168</span>
         </div>
       </div>
