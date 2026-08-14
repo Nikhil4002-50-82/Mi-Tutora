@@ -3639,6 +3639,25 @@ export default function StudentDashboard() {
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 
+                    // Delete groups
+                    const groupQ = query(collection(db, 'groups'), where('parentDocId', '==', uid));
+                    const groupSnap = await getDocs(groupQ);
+                    for (const d of groupSnap.docs) await deleteDoc(doc(db, 'groups', d.id));
+
+                    // Delete notifications (Role-based)
+                    const notifQ = query(collection(db, 'notifications'), where('userId', '==', uid), where('role', '==', 'student'));
+                    const notifSnap = await getDocs(notifQ);
+                    for (const d of notifSnap.docs) await deleteDoc(doc(db, 'notifications', d.id));
+
+                    // Delete referrals
+                    const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
+                    const refSnap1 = await getDocs(refQ1);
+                    for (const d of refSnap1.docs) await deleteDoc(doc(db, 'referrals', d.id));
+                    
+                    const refQ2 = query(collection(db, 'referrals'), where('referredUserId', '==', uid));
+                    const refSnap2 = await getDocs(refQ2);
+                    for (const d of refSnap2.docs) await deleteDoc(doc(db, 'referrals', d.id));
+
                     if (isDualRole) {
                       const newRoles = roles.filter((r: string) => r !== 'student');
                       await updateDoc(userDocRef, {

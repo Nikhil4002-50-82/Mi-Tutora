@@ -2983,6 +2983,20 @@ export default function TeacherDashboard() {
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 
+                    // Delete notifications (Role-based)
+                    const notifQ = query(collection(db, 'notifications'), where('userId', '==', uid), where('role', '==', 'teacher'));
+                    const notifSnap = await getDocs(notifQ);
+                    for (const d of notifSnap.docs) await deleteDoc(doc(db, 'notifications', d.id));
+
+                    // Delete referrals
+                    const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
+                    const refSnap1 = await getDocs(refQ1);
+                    for (const d of refSnap1.docs) await deleteDoc(doc(db, 'referrals', d.id));
+                    
+                    const refQ2 = query(collection(db, 'referrals'), where('referredUserId', '==', uid));
+                    const refSnap2 = await getDocs(refQ2);
+                    for (const d of refSnap2.docs) await deleteDoc(doc(db, 'referrals', d.id));
+
                     if (isDualRole) {
                       const newRoles = roles.filter((r: string) => r !== 'teacher');
                       await updateDoc(userDocRef, {
