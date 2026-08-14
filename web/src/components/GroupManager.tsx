@@ -30,7 +30,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
   const [selectionMode, setSelectionMode] = useState<string | null>(null); // groupId that is currently in 'choose' mode
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
-  const resetGroups = (isManual = false) => {
+  const resetGroups = async (isManual = false) => {
     const initialGroups: GroupState = { unassigned: [] };
     const names: { [key: string]: string } = {};
     
@@ -49,7 +49,9 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     });
 
     if (Object.keys(initialGroups).length === 1 && initialGroups['unassigned'].length > 0) {
-      const defaultGroupId = `group_${Date.now()}`;
+      const { db } = await import('@/utils/firebase/client');
+      const { collection, doc } = await import('firebase/firestore');
+      const defaultGroupId = doc(collection(db, 'groups')).id;
       initialGroups[defaultGroupId] = [];
       names[defaultGroupId] = 'Group 1';
     }
@@ -106,8 +108,10 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
     }
   };
 
-  const addGroup = () => {
-    const newGroupId = `group_${Date.now()}`;
+  const addGroup = async () => {
+    const { db } = await import('@/utils/firebase/client');
+    const { collection, doc } = await import('firebase/firestore');
+    const newGroupId = doc(collection(db, 'groups')).id;
     setGroups({ ...groups, [newGroupId]: [] });
     setGroupNames({ ...groupNames, [newGroupId]: `Group ${Object.keys(groups).length}` });
   };

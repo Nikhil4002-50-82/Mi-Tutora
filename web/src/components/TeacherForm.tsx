@@ -271,7 +271,8 @@ export default function TeacherForm({
         city: (actualMode?.toLowerCase() === 'online') ? '' : (formData.city || ''),
         latitude: 0.0,
         longitude: 0.0,
-        hasProfile: true
+        hasProfile: true,
+        createdAt: Date.now()
       }, { merge: true });
 
       

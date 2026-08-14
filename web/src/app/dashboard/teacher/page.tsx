@@ -228,6 +228,7 @@ export default function TeacherDashboard() {
     if (!data?.user || !data?.tutorDocId) return;
     let isCancelled = false;
     let unsubscribe: any;
+    let unsubscribeStudents: any;
     
     const setupRealtime = async () => {
       const { db } = await import('@/utils/firebase/client');
@@ -278,12 +279,21 @@ export default function TeacherDashboard() {
       }, (error: any) => {
         console.error("Realtime listener error:", error);
       });
+      
+      const studentsQ = query(collection(db, 'students'), where('createdAt', '>=', Date.now()));
+      unsubscribeStudents = onSnapshot(studentsQ, (snapshot: any) => {
+        if (isCancelled) return;
+        if (!snapshot.empty && snapshot.docChanges().some((c: any) => c.type === 'added')) {
+          mutate();
+        }
+      });
     };
     setupRealtime();
 
     return () => {
       isCancelled = true;
       if (unsubscribe) unsubscribe();
+      if (unsubscribeStudents) unsubscribeStudents();
     };
   }, [data?.user?.uid, data?.tutorDocId, mutate]);
 

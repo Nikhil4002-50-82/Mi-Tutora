@@ -1256,7 +1256,7 @@ export default function DemoForm({
             : 'Details for Student'}
         </h3>
         
-        {!isDashboard && sIndex === 0 && (
+        {!hasProfile && sIndex === 0 && (
           <div className="my-6">
             <label className="block text-sm font-semibold mb-2">🔢 Number of Students</label>
             <input
