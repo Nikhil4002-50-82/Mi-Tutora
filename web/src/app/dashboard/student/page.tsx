@@ -497,38 +497,7 @@ export default function StudentDashboard() {
         const changedDocs = snapshot.docChanges();
         if (changedDocs.length === 0) return;
 
-        mutate((currentData: any) => {
-          if (!currentData) return currentData;
-          
-          let applicationsChanged = false;
-          const newApps = [...(currentData.applications || [])];
-
-          changedDocs.forEach((change: any) => {
-            const appData = { id: change.doc.id, ...change.doc.data() } as any;
-            const idx = newApps.findIndex(a => a.id === appData.id);
-
-            if (change.type === 'added' || change.type === 'modified') {
-              if (idx === -1) {
-                newApps.push(appData);
-                applicationsChanged = true;
-              } else if (JSON.stringify(newApps[idx]) !== JSON.stringify(appData)) {
-                newApps[idx] = appData;
-                applicationsChanged = true;
-              }
-            }
-            if (change.type === 'removed') {
-              if (idx !== -1) {
-                newApps.splice(idx, 1);
-                applicationsChanged = true;
-              }
-            }
-          });
-
-          if (applicationsChanged) {
-            return { ...currentData, applications: newApps };
-          }
-          return currentData;
-        }, { revalidate: false });
+        mutate();
       }, (error: any) => {
         console.error("Realtime listener error:", error);
       });
@@ -970,13 +939,49 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleDismissNotification = async (notifId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      if (data?.user?.uid) {
+        await updateDoc(doc(db, 'users', data.user.uid), {
+          dismissedNotifications: arrayUnion(notifId)
+        });
+        mutate();
+      }
+    } catch (err: any) {
+      toast.error('Failed to dismiss notification');
+    }
+  };
+  
+  const handleClearAllNotifications = async () => {
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      if (data?.allNotifications?.length && data?.user?.uid) {
+        const ids = data.allNotifications.map((n:any) => n.id);
+        await updateDoc(doc(db, 'users', data.user.uid), {
+          dismissedNotifications: arrayUnion(...ids)
+        });
+        mutate();
+        toast.success('All notifications cleared');
+      }
+    } catch (err: any) {
+      toast.error('Failed to clear notifications');
+    }
+  };
+
   const handleAppointTutor = async (appId: string) => {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove, getDocs, query, collection, where, addDoc } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'applications', appId), { 
+      const { doc, updateDoc, arrayRemove, getDocs, query, collection, where, addDoc, writeBatch } = await import('firebase/firestore');
+      
+      const batch = writeBatch(db);
+      
+      batch.update(doc(db, 'applications', appId), { 
         status: 'tuition_started', 
         startDate: Date.now(),
         feePaid: false
@@ -984,10 +989,10 @@ export default function StudentDashboard() {
       
       const app = data?.applications?.find((a: any) => a.id === appId);
       if (app) {
-        if (app.tutorDocId) await updateDoc(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
+        if (app.tutorDocId) batch.update(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
         if (app.studentDocIds) {
           for (const sid of app.studentDocIds) {
-            await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
+            batch.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
           }
         }
         
@@ -1002,7 +1007,7 @@ export default function StudentDashboard() {
           
           for (const [docId, docSnap] of Array.from(docsToProcess.entries())) {
              if (docId !== appId && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
-                await updateDoc(doc(db, 'applications', docId), {
+                batch.update(doc(db, 'applications', docId), {
                    status: 'declined',
                    reason: 'student_hired_another_tutor',
                    declinedAt: Date.now(),
@@ -1010,23 +1015,14 @@ export default function StudentDashboard() {
                 });
                 const d = docSnap.data();
                 if (d.tutorDocId) {
-                   await updateDoc(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
-                   const { addDoc } = await import('firebase/firestore');
-                   await addDoc(collection(db, 'notifications'), {
-                      userId: d.tutorDocId,
-                      type: 'application_declined',
-                      title: 'Update on Student Lead',
-                      message: 'This student has hired another tutor',
-                      read: false,
-                      createdAt: Date.now(),
-                      applicationId: docId,
-                      role: 'teacher'
-                   }).catch(console.error);
+                   batch.update(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
                 }
              }
           }
         }
       }
+      
+      await batch.commit();
       if (app) {
         const { syncStudentAvailability } = await import('@/utils/studentAvailability');
         await syncStudentAvailability(db, app.studentDocIds || [app.studentDocId]).catch(console.error);
@@ -1094,17 +1090,6 @@ export default function StudentDashboard() {
                 const d = docSnap.data();
                 if (d.tutorDocId) {
                    await updateDoc(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
-                   const { addDoc } = await import('firebase/firestore');
-                   await addDoc(collection(db, 'notifications'), {
-                      userId: d.tutorDocId,
-                      type: 'application_declined',
-                      title: 'Update on Student Lead',
-                      message: 'This student has hired another tutor',
-                      read: false,
-                      createdAt: Date.now(),
-                      applicationId: docId,
-                      role: 'teacher'
-                   }).catch(console.error);
                 }
              }
           }
@@ -1329,7 +1314,8 @@ export default function StudentDashboard() {
                     data?.allNotifications?.slice(0, 3).map((neg: any, idx: number) => {
                       const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
-                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
+                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-start gap-2">
+                          <div className="flex-1 cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
                           <p className="text-sm text-gray-800 font-medium line-clamp-2">
                             {neg.status === 'declined' ? (
                               <span>Request declined for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
@@ -1338,8 +1324,12 @@ export default function StudentDashboard() {
                             ) : (
                               <span>New update on request with <span className="font-bold">{neg.tutorName}</span> for <span className="font-bold">{studentForApp.name}</span></span>
                             )}
-                          </p>
-                          <p className="text-xs text-emerald-600 font-bold mt-1">Price: ₹{neg.finalPrice || neg.currentOffer}</p>
+                            </p>
+                            <p className="text-xs text-emerald-600 font-bold mt-1">Price: ₹{neg.finalPrice || neg.currentOffer}</p>
+                          </div>
+                          <button onClick={(e) => handleDismissNotification(neg.id, e)} className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors" title="Dismiss">
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       );
                     })
@@ -1961,14 +1951,21 @@ export default function StudentDashboard() {
             {/* TAB: NOTIFICATIONS */}
             {activeTab === 'notifications' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">All Notifications</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">All Notifications</h2>
+                  {((data?.allNotifications)?.length ?? 0) > 0 && (
+                    <button onClick={handleClearAllNotifications} className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl text-sm transition-colors self-start sm:self-auto">
+                      Clear All
+                    </button>
+                  )}
+                </div>
                 {((data?.allNotifications)?.length ?? 0) > 0 ? (
                   <div className="space-y-4">
                     {data?.allNotifications?.map((neg: any) => {
                       const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
-                        <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
-                          <div>
+                        <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
+                          <div className="flex-1 cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
                             <p className="text-gray-900 font-medium">
                               {neg.status === 'declined' ? (
                                 <span>Request declined for <span className="font-bold">{studentForApp.name}</span> with tutor <span className="font-bold">{neg.tutorName}</span></span>
@@ -1982,7 +1979,12 @@ export default function StudentDashboard() {
                               {new Date(neg.updatedAt || neg.createdAt || Date.now()).toLocaleString()}
                             </p>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                          <div className="flex items-center gap-3">
+                            <button onClick={(e) => handleDismissNotification(neg.id, e)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors" title="Dismiss">
+                              <X className="w-5 h-5" />
+                            </button>
+                            <ChevronRight className="w-5 h-5 text-gray-400" />
+                          </div>
                         </div>
                       );
                     })}
@@ -3549,17 +3551,14 @@ export default function StudentDashboard() {
                 </button>
                 <button 
                   onClick={async () => {
-                    if (isSubmittingRef.current) return;
-                    isSubmittingRef.current = true;
-                    try {
-                      if (actionConfirmModal.type === 'hire') {
-                        await handleAppointTutor(actionConfirmModal.appId);
-                      } else {
-                        await handleNegotiationAction(actionConfirmModal.appId, 'decline');
-                      }
+                    let success: boolean | void;
+                    if (actionConfirmModal.type === 'hire') {
+                      success = await handleAppointTutor(actionConfirmModal.appId);
+                    } else {
+                      success = await handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                    }
+                    if (success !== false) {
                       setActionConfirmModal(null);
-                    } finally {
-                      isSubmittingRef.current = false;
                     }
                   }}
                   className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'hire' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
@@ -3607,10 +3606,17 @@ export default function StudentDashboard() {
                   setIsDeletingAccount(true);
                   try {
                     const { db, auth } = await import('@/utils/firebase/client');
-                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc } = await import('firebase/firestore');
+                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc, arrayRemove } = await import('firebase/firestore');
                     const { deleteUser } = await import('firebase/auth');
                     
                     if(!auth.currentUser) throw new Error('Not logged in');
+                    
+                    const lastSignIn = new Date(auth.currentUser.metadata.lastSignInTime || 0).getTime();
+                    if (Date.now() - lastSignIn > 5 * 60 * 1000) {
+                      toast.error("For security reasons, you must have logged in recently to delete your account. Please sign out, sign back in, and try again.");
+                      setIsDeletingAccount(false);
+                      return;
+                    }
                     
                     const uid = auth.currentUser.uid;
                     const userDocRef = doc(db, 'users', uid);
@@ -3636,7 +3642,13 @@ export default function StudentDashboard() {
                     // Delete all applications
                     const appQ = query(collection(db, 'applications'), where('parentDocId', '==', uid));
                     const appSnap = await getDocs(appQ);
-                    for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
+                    for (const d of appSnap.docs) {
+                      const appData = d.data();
+                      if (appData.tutorDocId) {
+                        try { await updateDoc(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(d.id) }); } catch(e){}
+                      }
+                      await deleteDoc(doc(db, 'applications', d.id));
+                    }
                     
                     // Delete tutor requests
                     const tutorReqQ = query(collection(db, 'tutor_requests'), where('parentDocId', '==', uid));
@@ -3653,10 +3665,7 @@ export default function StudentDashboard() {
                     const groupSnap = await getDocs(groupQ);
                     for (const d of groupSnap.docs) await deleteDoc(doc(db, 'groups', d.id));
 
-                    // Delete notifications (Role-based)
-                    const notifQ = query(collection(db, 'notifications'), where('userId', '==', uid), where('role', '==', 'student'));
-                    const notifSnap = await getDocs(notifQ);
-                    for (const d of notifSnap.docs) await deleteDoc(doc(db, 'notifications', d.id));
+
 
                     // Delete referrals
                     const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));

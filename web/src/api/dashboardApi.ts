@@ -132,10 +132,12 @@ export const fetchStudentDashboardData = async () => {
     };
   })) || [];
 
+  const dismissedNotifs = userData?.dismissedNotifications || [];
   const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status));
   const allNotifications = [
     ...applicationsWithSubjects
     .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
+    .filter((app: any) => !dismissedNotifs.includes(app.id))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
   ];
   const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorDocId));
@@ -370,9 +372,11 @@ export const fetchTeacherDashboardData = async () => {
     };
   })) || [];
 
+  const dismissedNotifs = userData?.dismissedNotifications || [];
   const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status));
   const allNotifications = applicationsWithSubjects
     .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
+    .filter((app: any) => !dismissedNotifs.includes(app.id))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupDocId || app.studentDocId)));
 

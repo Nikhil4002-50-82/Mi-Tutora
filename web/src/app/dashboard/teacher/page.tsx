@@ -244,38 +244,7 @@ export default function TeacherDashboard() {
         const changedDocs = snapshot.docChanges();
         if (changedDocs.length === 0) return;
 
-        mutate((currentData: any) => {
-          if (!currentData) return currentData;
-          
-          let applicationsChanged = false;
-          const newApps = [...(currentData.applications || [])];
-
-          changedDocs.forEach((change: any) => {
-            const appData = { id: change.doc.id, ...change.doc.data() } as any;
-            const idx = newApps.findIndex(a => a.id === appData.id);
-
-            if (change.type === 'added' || change.type === 'modified') {
-              if (idx === -1) {
-                newApps.push(appData);
-                applicationsChanged = true;
-              } else if (JSON.stringify(newApps[idx]) !== JSON.stringify(appData)) {
-                newApps[idx] = appData;
-                applicationsChanged = true;
-              }
-            }
-            if (change.type === 'removed') {
-              if (idx !== -1) {
-                newApps.splice(idx, 1);
-                applicationsChanged = true;
-              }
-            }
-          });
-
-          if (applicationsChanged) {
-            return { ...currentData, applications: newApps };
-          }
-          return currentData;
-        }, { revalidate: false });
+        mutate();
       }, (error: any) => {
         console.error("Realtime listener error:", error);
       });
@@ -306,27 +275,62 @@ export default function TeacherDashboard() {
     window.location.href = '/login';
   };
 
+  const handleDismissNotification = async (notifId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      if (data?.user?.uid) {
+        await updateDoc(doc(db, 'users', data.user.uid), {
+          dismissedNotifications: arrayUnion(notifId)
+        });
+        mutate();
+      }
+    } catch (err: any) {
+      toast.error('Failed to dismiss notification');
+    }
+  };
+  
+  const handleClearAllNotifications = async () => {
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+      if (data?.allNotifications?.length && data?.user?.uid) {
+        const ids = data.allNotifications.map((n:any) => n.id);
+        await updateDoc(doc(db, 'users', data.user.uid), {
+          dismissedNotifications: arrayUnion(...ids)
+        });
+        mutate();
+        toast.success('All notifications cleared');
+      }
+    } catch (err: any) {
+      toast.error('Failed to clear notifications');
+    }
+  };
+
   const handlePaymentSubmit = async () => {
     setPaymentLoading(true);
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, arrayRemove, getDoc } = await import('firebase/firestore');
+      const { doc, updateDoc, arrayRemove, getDoc, writeBatch } = await import('firebase/firestore');
       
       // Update application directly to demo_booking_phase
       if (payingClass?.id && payingClass.id !== 'mock-id') {
-        await updateDoc(doc(db, 'applications', payingClass.id), { 
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'applications', payingClass.id), { 
           status: 'demo_booking_phase', 
           demoPaymentPaid: true,
           updatedAt: Date.now()
         });
-        await updateDoc(doc(db, 'tutors', data?.user?.uid as string), { pendingRequests: arrayRemove(payingClass.id) });
+        batch.update(doc(db, 'tutors', data?.user?.uid as string), { pendingRequests: arrayRemove(payingClass.id) });
         if (payingClass.studentsList) {
           for (const student of payingClass.studentsList) {
             if (student.id) {
-              await updateDoc(doc(db, 'students', student.id), { pendingRequests: arrayRemove(payingClass.id) });
+              batch.update(doc(db, 'students', student.id), { pendingRequests: arrayRemove(payingClass.id) });
             }
           }
         }
+        await batch.commit();
       }
       
       const finalPayingClass = { ...payingClass };
@@ -1018,7 +1022,8 @@ export default function TeacherDashboard() {
                   {((data?.allNotifications)?.length ?? 0) > 0 ? (
                     data?.allNotifications?.slice(0, 3).map((neg: any, idx: number) => {
                       return (
-                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
+                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-start gap-2">
+                          <div className="flex-1 cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
                           <p className="text-sm text-gray-800 font-medium line-clamp-2">
                             {neg.status === 'declined' ? (
                               <span>Request declined with <span className="font-bold">{neg.studentName || 'Student'}</span></span>
@@ -1030,7 +1035,11 @@ export default function TeacherDashboard() {
                           </p>
                           <p className="text-xs text-emerald-600 font-bold mt-1">Price: ₹{neg.finalPrice || neg.currentOffer}</p>
                         </div>
-                      );
+                        <button onClick={(e) => handleDismissNotification(neg.id, e)} className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors" title="Dismiss">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
                     })
                   ) : (
                     <div className="p-6 text-center text-gray-500 text-sm">
@@ -1624,13 +1633,20 @@ export default function TeacherDashboard() {
             {/* TAB: NOTIFICATIONS */}
             {activeTab === 'notifications' && (
               <div>
-                <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-8">All Notifications</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                  <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">All Notifications</h2>
+                  {((data?.allNotifications)?.length ?? 0) > 0 && (
+                    <button onClick={handleClearAllNotifications} className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl text-sm transition-colors self-start sm:self-auto">
+                      Clear All
+                    </button>
+                  )}
+                </div>
                 {((data?.allNotifications)?.length ?? 0) > 0 ? (
                   <div className="space-y-4">
                     {data?.allNotifications?.map((neg: any) => {
                       return (
-                        <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
-                          <div>
+                        <div key={neg.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
+                          <div className="flex-1 cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); }}>
                             <p className="text-gray-900 font-medium">
                               {neg.status === 'declined' ? (
                                 <span>Request declined with <span className="font-bold">{neg.studentName || 'Student'}</span></span>
@@ -1644,7 +1660,12 @@ export default function TeacherDashboard() {
                               {new Date(neg.updatedAt || neg.createdAt || Date.now()).toLocaleString()}
                             </p>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                          <div className="flex items-center gap-3">
+                            <button onClick={(e) => handleDismissNotification(neg.id, e)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors" title="Dismiss">
+                              <X className="w-5 h-5" />
+                            </button>
+                            <ChevronRight className="w-5 h-5 text-gray-400" />
+                          </div>
                         </div>
                       );
                     })}
@@ -2962,10 +2983,17 @@ export default function TeacherDashboard() {
                   setIsDeletingAccount(true);
                   try {
                     const { db, auth } = await import('@/utils/firebase/client');
-                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc } = await import('firebase/firestore');
+                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc, arrayRemove } = await import('firebase/firestore');
                     const { deleteUser } = await import('firebase/auth');
                     
                     if(!auth.currentUser) throw new Error('Not logged in');
+                    
+                    const lastSignIn = new Date(auth.currentUser.metadata.lastSignInTime || 0).getTime();
+                    if (Date.now() - lastSignIn > 5 * 60 * 1000) {
+                      toast.error("For security reasons, you must have logged in recently to delete your account. Please sign out, sign back in, and try again.");
+                      setIsDeletingAccount(false);
+                      return;
+                    }
                     
                     const uid = auth.currentUser.uid;
                     const userDocRef = doc(db, 'users', uid);
@@ -2981,7 +3009,15 @@ export default function TeacherDashboard() {
                     // Delete all applications for this tutor
                     const appQ = query(collection(db, 'applications'), where('tutorDocId', '==', uid));
                     const appSnap = await getDocs(appQ);
-                    for (const d of appSnap.docs) await deleteDoc(doc(db, 'applications', d.id));
+                    for (const d of appSnap.docs) {
+                      const appData = d.data();
+                      if (appData.studentDocIds) {
+                        for (const sid of appData.studentDocIds) {
+                          try { await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(d.id) }); } catch(e){}
+                        }
+                      }
+                      await deleteDoc(doc(db, 'applications', d.id));
+                    }
                     
                     // Delete tutor requests
                     const tutorReqQ = query(collection(db, 'tutor_requests'), where('tutorDocId', '==', uid));
@@ -2993,10 +3029,7 @@ export default function TeacherDashboard() {
                     const directReqSnap = await getDocs(directReqQ);
                     for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
 
-                    // Delete notifications (Role-based)
-                    const notifQ = query(collection(db, 'notifications'), where('userId', '==', uid), where('role', '==', 'teacher'));
-                    const notifSnap = await getDocs(notifQ);
-                    for (const d of notifSnap.docs) await deleteDoc(doc(db, 'notifications', d.id));
+
 
                     // Delete referrals
                     const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
@@ -3212,17 +3245,14 @@ export default function TeacherDashboard() {
                 </button>
                 <button 
                   onClick={async () => {
-                    if (isSubmittingRef.current) return;
-                    isSubmittingRef.current = true;
-                    try {
-                      if (actionConfirmModal.type === 'accept_demo') {
-                        setPayingClass(actionConfirmModal.payload);
-                      } else {
-                        await handleNegotiationAction(actionConfirmModal.appId, 'decline');
-                      }
+                    if (actionConfirmModal.type === 'accept_demo') {
+                      setPayingClass(actionConfirmModal.payload);
                       setActionConfirmModal(null);
-                    } finally {
-                      isSubmittingRef.current = false;
+                    } else {
+                      const success = await handleNegotiationAction(actionConfirmModal.appId, 'decline');
+                      if (success !== false) {
+                        setActionConfirmModal(null);
+                      }
                     }
                   }}
                   className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
