@@ -1256,7 +1256,22 @@ export default function DemoForm({
             : 'Details for Student'}
         </h3>
         
-
+        {!isDashboard && sIndex === 0 && (
+          <div className="my-6">
+            <label className="block text-sm font-semibold mb-2">🔢 Number of Students</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={formData.numberOfStudents}
+              onChange={(e) => updateNumberOfStudents(parseInt(e.target.value) || 1)}
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="text-xs text-slate-500 mt-2 font-medium">
+              Select how many students you'd like to register (you can add more later from your profile).
+            </p>
+          </div>
+        )}
         
         <div className="mb-6">
           <label className="block text-sm font-semibold mb-2">📚 Category *</label>
