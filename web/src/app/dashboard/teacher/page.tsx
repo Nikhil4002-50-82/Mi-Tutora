@@ -6,6 +6,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { WalletCard } from '@/components/dashboard/WalletCard';
 import { ReferralsList } from '@/components/dashboard/ReferralsList';
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { DeleteAccountModal } from '@/components/dashboard/DeleteAccountModal';
+import { TransactionConfirmModal } from '@/components/dashboard/TransactionConfirmModal';
+import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
+import { EarningsWidget } from '@/components/dashboard/EarningsWidget';
+import { StudentViewModal } from '@/components/dashboard/StudentViewModal';
 import Link from 'next/link';
 
 
@@ -20,8 +27,8 @@ import { calculateSuitabilityScore, doesClassMatch } from '@/utils/matching';
 import { toast } from 'sonner';
 
 
-import useSWR from 'swr';
-import { fetchTeacherDashboardData } from '@/api/dashboardApi';
+import { executeDeclineOffer } from '@/hooks/useDashboardActions';
+import { useTeacherData } from '@/hooks/useDashboardData';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 
 export const getStudentDemoFee = (student: any, pricingData: any[]) => {
@@ -118,24 +125,7 @@ export default function TeacherDashboard() {
   const [selectedPaymentHistoryApp, setSelectedPaymentHistoryApp] = useState<any>(null);
   const router = useRouter();
 
-  const { data, error: swrError, isLoading: loading, mutate } = useSWR(
-    'teacherDashboardData', 
-    fetchTeacherDashboardData,
-    { 
-      revalidateOnFocus: false,
-      dedupingInterval: 60000 
-    }
-  );
-
-  useEffect(() => {
-    if (swrError) {
-      if (swrError.message === 'Unauthenticated') {
-        router.push('/login');
-      } else if (swrError.message === 'Unauthorized') {
-        router.push('/dashboard/student');
-      }
-    }
-  }, [swrError, router]);
+  const { data, error: swrError, isLoading: loading, mutate } = useTeacherData();
 
 
   const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
@@ -224,47 +214,7 @@ export default function TeacherDashboard() {
 
 
 
-  useEffect(() => {
-    if (!data?.user || !data?.tutorDocId) return;
-    let isCancelled = false;
-    let unsubscribe: any;
-    let unsubscribeStudents: any;
-    
-    const setupRealtime = async () => {
-      const { db } = await import('@/utils/firebase/client');
-      const { collection, query, where, onSnapshot } = await import('firebase/firestore');
-      
-      if (isCancelled) return;
-      
-      const q = query(collection(db, 'applications'), where('tutorDocId', '==', data.tutorDocId));
-      unsubscribe = onSnapshot(q, (snapshot: any) => {
-        if (isCancelled) return;
-        if (snapshot.metadata.hasPendingWrites) return;
-
-        const changedDocs = snapshot.docChanges();
-        if (changedDocs.length === 0) return;
-
-        mutate();
-      }, (error: any) => {
-        console.error("Realtime listener error:", error);
-      });
-      
-      const studentsQ = query(collection(db, 'students'), where('createdAt', '>=', Date.now()));
-      unsubscribeStudents = onSnapshot(studentsQ, (snapshot: any) => {
-        if (isCancelled) return;
-        if (!snapshot.empty && snapshot.docChanges().some((c: any) => c.type === 'added')) {
-          mutate();
-        }
-      });
-    };
-    setupRealtime();
-
-    return () => {
-      isCancelled = true;
-      if (unsubscribe) unsubscribe();
-      if (unsubscribeStudents) unsubscribeStudents();
-    };
-  }, [data?.user?.uid, data?.tutorDocId, mutate]);
+  // Removed snapshot listeners, now handled in useTeacherData
 
   const handleLogout = async () => {
     const { auth } = await import('@/utils/firebase/client');
@@ -640,6 +590,20 @@ export default function TeacherDashboard() {
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
+    
+    if (action === 'decline') {
+      try {
+        await executeDeclineOffer(appId, 'teacher', data);
+        toast.success("Offer declined.");
+        mutate();
+        return true;
+      } catch (err: any) {
+        toast.error("Failed to decline: " + err.message);
+        return false;
+      } finally {
+        isSubmittingRef.current = false;
+      }
+    }
     if (action === 'counter_price' && newOffer && neg) {
       const minAllowed = neg.absoluteMin || (neg.initialBudget || 0);
       const maxAllowed = neg.absoluteMax || Math.floor((neg.initialBudget || 0) * 1.4);
@@ -695,10 +659,6 @@ export default function TeacherDashboard() {
         } else if (action === 'counter_price') {
           updateData.currentOffer = newOffer;
           updateData.lastUpdatedBy = 'tutor';
-        } else if (action === 'decline') {
-          updateData.status = 'declined';
-          updateData.declinedAt = Date.now();
-          isFinalState = true;
         }
         updateData.updatedAt = Date.now();
         
@@ -886,74 +846,17 @@ export default function TeacherDashboard() {
         </button>
       </div>
 
-      {/* MOBILE MENU OVERLAY */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
-      )}
-
-      {/* SIDEBAR (Desktop & Mobile Drawer) */}
-      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
-        <div className="h-[76px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
-          <div className="flex w-full justify-between items-center">
-            <div className="flex items-center gap-3">
-              <BookOpen className="w-8 h-8 text-emerald-400" />
-              <div className="flex flex-col">
-                <span className="font-black text-xl tracking-tight leading-none">MiTutora</span>
-                <span className="text-[#00a992] text-[10px] font-bold uppercase tracking-widest mt-1">Teacher</span>
-              </div>
-            </div>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-2 text-white/70 hover:text-white bg-white/5 rounded-lg">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <div className="px-3 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
-            Menu
-          </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            const isLocked = !hasProfile && item.id !== 'profile';
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (isLocked) {
-                    toast.error("Please complete your profile first!");
-                    return;
-                  }
-                  setActiveTab(item.id);
-                  setActiveRequestViewId(null);
-                  setIsMobileMenuOpen(false);
-                }}
-                disabled={isLocked}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
-                  isLocked ? "opacity-50 cursor-not-allowed text-gray-400" :
-                  isActive 
-                    ? "bg-[#00a992] text-white shadow-lg shadow-[#00a992]/20" 
-                    : "text-gray-300 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-emerald-400"}`} />
-                {item.label}
-                {isLocked && <Lock className="w-4 h-4 ml-auto opacity-50" />}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="mt-auto p-4 border-t border-white/10 flex items-center gap-3 bg-white/5">
-          <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-lg shadow-inner">
-            {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
-          </div>
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="font-bold text-sm truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
-            <p className="text-xs text-emerald-400 font-medium">Teacher Account</p>
-          </div>
-        </div>
-      </aside>
+      <DashboardSidebar 
+        role="teacher"
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setActiveRequestViewId={setActiveRequestViewId}
+        hasProfile={hasProfile}
+        navItems={navItems}
+        userName={data?.profile?.name || data?.user?.displayName || ''}
+      />
 
       {/* MAIN CONTENT */}
       {showCategoryPopup && !hasProfile && (
@@ -1000,99 +903,20 @@ export default function TeacherDashboard() {
       )}
       <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
-        <header className="h-[76px] bg-white border-b border-gray-200 flex items-center justify-end px-6 sticky top-0 z-30 shadow-sm flex-shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" ref={notificationsRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsNotificationsDropdownOpen(!isNotificationsDropdownOpen) }}>
-              <button className="text-gray-400 hover:text-emerald-600 transition-colors relative mt-1">
-                <Bell className="w-5 h-5" />
-                {((data?.allNotifications)?.length ?? 0) > 0 && (
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                )}
-              </button>
-              
-              <div 
-                className={`absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isNotificationsDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-gray-900">Notifications</h3>
-                  <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">{data?.allNotifications?.length || 0} New</span>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {((data?.allNotifications)?.length ?? 0) > 0 ? (
-                    data?.allNotifications?.slice(0, 3).map((neg: any, idx: number) => {
-                      return (
-                        <div key={idx} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-start gap-2">
-                          <div className="flex-1 cursor-pointer" onClick={() => { setActiveRequestViewId(neg.id); setActiveTab('requests'); setIsNotificationsDropdownOpen(false); }}>
-                          <p className="text-sm text-gray-800 font-medium line-clamp-2">
-                            {neg.status === 'declined' ? (
-                              <span>Request declined with <span className="font-bold">{neg.studentName || 'Student'}</span></span>
-                            ) : neg.status === 'tuition_started' ? (
-                              <span>Fees paid by <span className="font-bold">{neg.studentName || 'Student'}</span></span>
-                            ) : (
-                              <span>New update on request with <span className="font-bold">{neg.studentName || 'Student'}</span></span>
-                            )}
-                          </p>
-                          <p className="text-xs text-emerald-600 font-bold mt-1">Price: ₹{neg.finalPrice || neg.currentOffer}</p>
-                        </div>
-                        <button onClick={(e) => handleDismissNotification(neg.id, e)} className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors" title="Dismiss">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                    })
-                  ) : (
-                    <div className="p-6 text-center text-gray-500 text-sm">
-                      No new notifications
-                    </div>
-                  )}
-                </div>
-                <div className="p-2 border-t border-gray-50 bg-gray-50/50">
-                  <button 
-                    onClick={() => { setActiveTab('notifications'); setIsNotificationsDropdownOpen(false); }}
-                    className="w-full text-center px-4 py-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"
-                  >
-                    Show all notifications
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="relative group cursor-pointer" ref={profileRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsProfileDropdownOpen(!isProfileDropdownOpen) }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
-                  {(data?.profile?.name || data?.user?.displayName || 'T').charAt(0)}
-                </div>
-              </div>
-              
-              <div 
-                className={`absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all duration-200 z-50 overflow-hidden transform origin-top-right ${isProfileDropdownOpen ? 'opacity-100 visible scale-100' : 'opacity-0 invisible scale-95'} md:group-hover:opacity-100 md:group-hover:visible md:group-hover:scale-100`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                 <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-                   <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || 'Teacher'}</p>
-                   <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
-                   {data?.profile?.tutorId && <p className="text-xs text-gray-500 truncate mt-0.5 font-mono">ID: {data?.profile?.tutorId}</p>}
-                 </div>
-                 <div className="p-2">
-                   <button onClick={() => { setActiveTab('profile'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
-                     <User className="w-4 h-4" /> Profile Settings
-                   </button>
-                   <button onClick={() => { setActiveTab('my_students'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
-                     <BookOpen className="w-4 h-4" /> My Students
-                   </button>
-                   <button onClick={() => { setActiveTab('subscriptions'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
-                     <CreditCard className="w-4 h-4" /> Subscriptions
-                   </button>
-                   <div className="h-px bg-gray-100 my-1 mx-2"></div>
-                   <button onClick={() => { handleLogout(); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors">
-                     <LogOut className="w-4 h-4" /> Logout
-                   </button>
-                 </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader 
+          role="teacher"
+          data={data}
+          setActiveTab={setActiveTab}
+          setActiveRequestViewId={setActiveRequestViewId}
+          handleLogout={handleLogout}
+          handleDismissNotification={handleDismissNotification}
+          notificationsRef={notificationsRef}
+          profileRef={profileRef}
+          isNotificationsDropdownOpen={isNotificationsDropdownOpen}
+          setIsNotificationsDropdownOpen={setIsNotificationsDropdownOpen}
+          isProfileDropdownOpen={isProfileDropdownOpen}
+          setIsProfileDropdownOpen={setIsProfileDropdownOpen}
+        />
 
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
@@ -1140,49 +964,17 @@ export default function TeacherDashboard() {
 
                     <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
                       {/* Earnings Mini Widget */}
-                      <div 
+                      <EarningsWidget 
+                        netRevenue={data?.earningsData?.netRevenue || 0}
+                        activeMRR={data?.earningsData?.activeMRR || 0}
                         onClick={() => setActiveTab('earnings')}
-                        className="flex-1 bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group"
-                      >
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                              <IndianRupee className="w-4 h-4" />
-                            </div>
-                            <span className="text-sm text-slate-500 font-bold tracking-tight">Net Revenue</span>
-                          </div>
-                          <span className="text-xs font-bold text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full group-hover:bg-emerald-50 transition-colors">View All</span>
-                        </div>
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <h3 className="text-3xl font-black text-gray-900 tracking-tight">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
-                            <p className="text-xs text-emerald-600 font-bold mt-1">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'} Active MRR</p>
-                          </div>
-                          <TrendingUp className="w-12 h-12 text-emerald-400 opacity-50" strokeWidth={1.5} />
-                        </div>
-                      </div>
+                      />
 
                       {/* Profile Completeness Card */}
-                      <div 
+                      <ProfileCompletenessCard 
+                        completeness={profileCompleteness}
                         onClick={() => setActiveTab('profile')}
-                        className="flex-1 bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between"
-                      >
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <span className="text-sm font-bold text-gray-900 tracking-tight">Strengthen Profile</span>
-                        </div>
-                        <div className="flex-1 flex flex-col justify-end">
-                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-2">You're {profileCompleteness}% there!</p>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-3 bg-indigo-50 rounded-full overflow-hidden">
-                              <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${profileCompleteness}%` }}></div>
-                            </div>
-                            <span className="text-xs font-bold text-gray-900">{profileCompleteness}%</span>
-                          </div>
-                        </div>
-                      </div>
+                      />
                     </div>
                   </div>
 
@@ -2720,371 +2512,116 @@ export default function TeacherDashboard() {
       )}
 
       {/* View Student Profile Modal */}
-      {selectedViewUser && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
-            <button 
-              onClick={() => { setSelectedViewUser(null); setSelectedViewApp(null); }}
-              className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="bg-[#00a992] p-8 sm:p-10 text-white flex-shrink-0 relative overflow-hidden">
-              <div className="relative z-10 flex items-start gap-6">
-                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl font-black backdrop-blur-md shadow-inner border border-white/30">
-                  {((selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.guardianName || selectedViewUser.parentName || selectedViewUser.name)?.charAt(0) || 'S')}
-                </div>
-                <div>
-                  <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
-                  <div className="flex gap-2 mt-1.5 flex-wrap">
-                    {(selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds && selectedViewUser.id)) && (
-                      <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
-                        Parent ID: {selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds ? selectedViewUser.id : '')}
-                      </p>
-                    )}
-                    {(selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId) && (
-                      <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
-                        Group ID: {selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId}
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
-                    <Users className="w-4 h-4" /> {selectedViewUser.students?.length || 1} Student(s)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-8 sm:p-10 overflow-y-auto">
-              <div className="space-y-8">
-                {/* Contact Information Block */}
-                {(!selectedViewApp || !['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status)) ? (
-                  <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 flex items-center justify-center">
-                    <p className="text-sm font-bold text-orange-600 text-center">Contact details will be revealed once the demo is booked or tuition is active.</p>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                      Contact Information
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(() => {
-                        const contactSource = selectedViewUser.phoneNumber ? selectedViewUser : (selectedViewUser.students?.[0] || selectedViewUser);
-                        const phone = contactSource.phoneNumber || contactSource.whatsappNumber || contactSource.parentDetails?.phone || contactSource.parentDetails?.whatsapp || contactSource.phone || contactSource.whatsapp;
-                        const email = contactSource.email || contactSource.parentDetails?.email;
-                        return (
-                          <>
-                            {phone && (
-                              <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone</p>
-                                <p className="font-bold text-gray-800">{phone}</p>
-                              </div>
-                            )}
-                            {email && (
-                              <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
-                                <p className="font-bold text-gray-800 break-all">{email}</p>
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                )}
-
-                {(selectedViewUser.students && selectedViewUser.students.length > 0 ? selectedViewUser.students : [selectedViewUser]).map((studentDetail: any, index: number) => (
-                  <div key={studentDetail.id || index} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                      {studentDetail.name || 'Student'} <span className="text-sm font-medium text-gray-500">({studentDetail.category})</span>
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                      {studentDetail.classLevel && (
-                        <div>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Class</p>
-                          <p className="font-bold text-gray-800">{studentDetail.classLevel} {studentDetail.board && `(${studentDetail.board})`}</p>
-                        </div>
-                      )}
-                      
-                      {studentDetail.category === 'programming' && (studentDetail.technologies?.length ?? 0) > 0 && (
-                        <div className="sm:col-span-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Technologies</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {studentDetail.technologies.map((t: string) => (
-                              <span key={t} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{t}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {studentDetail.category === 'languages' && (studentDetail.languages?.length ?? 0) > 0 && (
-                        <div className="sm:col-span-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Languages</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {studentDetail.languages.map((l: string) => (
-                              <span key={l} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{l}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {(!studentDetail.category || studentDetail.category === 'school') && (studentDetail.subjects?.length ?? 0) > 0 && (
-                        <div className="sm:col-span-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Subjects</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {studentDetail.subjects.map((s: string) => (
-                              <span key={s} className="px-2 py-1 bg-white text-gray-700 text-xs font-bold rounded-md border border-gray-200 shadow-sm">{s}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Preferred Days</p>
-                        <p className="font-bold text-gray-800">
-                          {studentDetail.daysPerWeek || 'Flexible'}
-                          {studentDetail.specificDays?.length > 0 && ` (${studentDetail.specificDays.join(', ')})`}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Daily Duration</p>
-                        <p className="font-bold text-gray-800">{studentDetail.hoursPerDay || 'Flexible'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
-                      {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Amount Received' : 'Amount to be Received') : 'Total Budget'}
-                    </p>
-                    <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.budget || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
-                    <p className="font-bold text-emerald-800 capitalize">{selectedViewUser.students?.[0]?.preferredMode || selectedViewUser.preferredMode || 'Online'}</p>
-                    {(selectedViewUser.students?.[0]?.preferredMode || selectedViewUser.preferredMode)?.toLowerCase() !== 'online' && (
-                      <p className="text-sm font-medium text-emerald-700 mt-1 max-w-[200px] truncate" title={selectedViewUser.students?.[0]?.area || selectedViewUser.address}>
-                        {selectedViewUser.students?.[0]?.area || selectedViewUser.address || 'Address hidden'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            
-            {/* Actions */}
-            {(() => {
-              const hasNegotiation = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['negotiating'].includes(app.status));
-              const isPending = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
-              const isHired = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && ['tuition_started'].includes(app.status));
-              const cooldownApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === selectedViewUser.id && app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000));
-              
-              if (isHired || isPending || hasNegotiation || cooldownApp || selectedViewApp) {
-                let message = 'Currently unavailable for new requests.';
-                if (isHired) message = 'This student has already been hired.';
-                else if (cooldownApp) message = `Available in ${Math.ceil((cooldownApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days.`;
-                else if (hasNegotiation || isPending || selectedViewApp) message = 'You already have an active request or demo with this student.';
-                
-                return (
-                  <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center text-gray-500 font-medium text-sm">
-                    {message}
-                  </div>
-                );
-              }
-              
-              return (
-                <div className="mt-6 pt-6 border-t border-gray-100">
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
-                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
-                      <input 
-                        type="number"
-                        min={selectedViewUser.budget || 0}
-                        max={selectedViewUser.budget ? Math.floor(selectedViewUser.budget * 1.4) : undefined}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-emerald-700 bg-gray-50"
-                        placeholder={selectedViewUser.budget ? `e.g. ${selectedViewUser.budget}` : "e.g. 500"}
-                        value={negotiationOffer[selectedViewUser.id] || ''}
-                        onChange={(e) => setNegotiationOffer({...negotiationOffer, [selectedViewUser.id]: e.target.value})}
-                      />
-                      {selectedViewUser.budget && negotiationOffer[selectedViewUser.id] && parseInt(negotiationOffer[selectedViewUser.id]) >= selectedViewUser.budget * 1.3 && parseInt(negotiationOffer[selectedViewUser.id]) <= selectedViewUser.budget * 1.4 && (
-                        <p className="text-xs text-yellow-600 font-medium mt-1">Note: Your offer is quite high compared to the student's budget. They might reject it.</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {negotiationOffer[selectedViewUser.id] ? (
-                        <button 
-                          onClick={async () => { 
-                            const success = await handleSendOffer(selectedViewUser); 
-                            if (success) setSelectedViewUser(null); 
-                          }}
-                          disabled={offerLoading}
-                          className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
-                        >
-                          <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Negotiate'}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={async () => { 
-                            const success = await handleDirectRequestDemo(selectedViewUser); 
-                            if (success) setSelectedViewUser(null); 
-                          }}
-                          className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
-                        >
-                          <CheckCircle2 className="w-4 h-4" /> Request Demo
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            </div>
-          </div>
-        </div>
-      )}
+      <StudentViewModal
+        selectedViewUser={selectedViewUser}
+        selectedViewApp={selectedViewApp}
+        setSelectedViewUser={setSelectedViewUser}
+        setSelectedViewApp={setSelectedViewApp}
+        data={data}
+        negotiationOffer={negotiationOffer}
+        setNegotiationOffer={setNegotiationOffer}
+        handleSendOffer={handleSendOffer}
+        handleDirectRequestDemo={handleDirectRequestDemo}
+        dailyRequestsCount={dailyRequestsCount}
+        offerLoading={offerLoading}
+      />
       {/* Delete Account Modal */}
-      {showDeleteAccountModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-8">
-            <h3 className="text-2xl font-black text-red-600 mb-2">Delete Account</h3>
-            <p className="text-gray-600 font-medium mb-4">
-              This will permanently delete your account, teacher profile, and all tuition history.
-            </p>
-            <div className="bg-red-50 p-4 rounded-xl mb-6 border border-red-100">
-              <label className="text-sm font-bold text-red-800 block mb-2">Type "DELETE" to confirm</label>
-              <input 
-                type="text"
-                value={deleteAccountConfirm}
-                onChange={e => setDeleteAccountConfirm(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-red-200 focus:ring-2 focus:ring-red-500 font-bold"
-                placeholder="DELETE"
-              />
-            </div>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => { setShowDeleteAccountModal(false); setDeleteAccountConfirm(''); }}
-                className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                disabled={isDeletingAccount}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={async () => {
-                  if(deleteAccountConfirm !== 'DELETE') {
-                    toast.error('Please type DELETE to confirm');
-                    return;
-                  }
-                  setIsDeletingAccount(true);
-                  try {
-                    const { db, auth } = await import('@/utils/firebase/client');
-                    const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc, arrayRemove } = await import('firebase/firestore');
-                    const { deleteUser } = await import('firebase/auth');
-                    
-                    if(!auth.currentUser) throw new Error('Not logged in');
-                    
-                    const lastSignIn = new Date(auth.currentUser.metadata.lastSignInTime || 0).getTime();
-                    if (Date.now() - lastSignIn > 5 * 60 * 1000) {
-                      toast.error("For security reasons, you must have logged in recently to delete your account. Please sign out, sign back in, and try again.");
-                      setIsDeletingAccount(false);
-                      return;
-                    }
-                    
-                    const uid = auth.currentUser.uid;
-                    const userDocRef = doc(db, 'users', uid);
-                    const userDoc = await getDoc(userDocRef);
-                    const userData = userDoc.data() || {};
-                    const roles = userData.roles || (userData.role ? [userData.role] : []);
-                    
-                    const isDualRole = roles.length > 1;
-                    
-                    // Delete tutor doc
-                    await deleteDoc(doc(db, 'tutors', uid));
-                    
-                    // Delete all applications for this tutor
-                    const appQ = query(collection(db, 'applications'), where('tutorDocId', '==', uid));
-                    const appSnap = await getDocs(appQ);
-                    for (const d of appSnap.docs) {
-                      const appData = d.data();
-                      if (appData.studentDocIds) {
-                        for (const sid of appData.studentDocIds) {
-                          try { await updateDoc(doc(db, 'students', sid), { pendingRequests: arrayRemove(d.id) }); } catch(e){}
-                        }
-                      }
-                      await deleteDoc(doc(db, 'applications', d.id));
-                    }
-                    
-                    // Delete tutor requests
-                    const tutorReqQ = query(collection(db, 'tutor_requests'), where('tutorDocId', '==', uid));
-                    const tutorReqSnap = await getDocs(tutorReqQ);
-                    for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
+      <DeleteAccountModal
+        isOpen={showDeleteAccountModal}
+        onClose={() => setShowDeleteAccountModal(false)}
+        isDeleting={isDeletingAccount}
+        onConfirm={async () => {
+          setIsDeletingAccount(true);
+          try {
+            const { db, auth } = await import('@/utils/firebase/client');
+            const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc } = await import('firebase/firestore');
+            const { deleteUser } = await import('firebase/auth');
+            
+            if(!auth.currentUser) throw new Error('Not logged in');
+            
+            const lastSignIn = new Date(auth.currentUser.metadata.lastSignInTime || 0).getTime();
+            if (Date.now() - lastSignIn > 5 * 60 * 1000) {
+              toast.error("For security reasons, you must have logged in recently to delete your account. Please sign out, sign back in, and try again.");
+              setIsDeletingAccount(false);
+              return;
+            }
+            
+            const uid = auth.currentUser.uid;
+            
+            // Delete tutor doc
+            await deleteDoc(doc(db, 'tutors', uid));
+            
+            // Handle applications
+            const appQ = query(collection(db, 'applications'), where('tutorDocId', '==', uid));
+            const appSnap = await getDocs(appQ);
+            for (const d of appSnap.docs) {
+              await deleteDoc(doc(db, 'applications', d.id));
+            }
+            
+            // Handle requests
+            const reqQ = query(collection(db, 'tuition_requests'), where('tutorDocId', '==', uid));
+            const reqSnap = await getDocs(reqQ);
+            for (const d of reqSnap.docs) {
+              await updateDoc(doc(db, 'tuition_requests', d.id), { status: 'tutor_deleted' });
+            }
 
-                    // Delete direct requests
-                    const directReqQ = query(collection(db, 'direct_requests'), where('tutorDocId', '==', uid));
-                    const directReqSnap = await getDocs(directReqQ);
-                    for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
+            // Delete groups
+            const groupQ = query(collection(db, 'groups'), where('tutorDocId', '==', uid));
+            const groupSnap = await getDocs(groupQ);
+            for (const d of groupSnap.docs) await deleteDoc(doc(db, 'groups', d.id));
 
+            // Delete referrals
+            const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
+            const refSnap1 = await getDocs(refQ1);
+            for (const d of refSnap1.docs) await deleteDoc(doc(db, 'referrals', d.id));
+            
+            const refQ2 = query(collection(db, 'referrals'), where('referredUserId', '==', uid));
+            const refSnap2 = await getDocs(refQ2);
+            for (const d of refSnap2.docs) await deleteDoc(doc(db, 'referrals', d.id));
 
-
-                    // Delete referrals
-                    const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
-                    const refSnap1 = await getDocs(refQ1);
-                    for (const d of refSnap1.docs) await deleteDoc(doc(db, 'referrals', d.id));
-                    
-                    const refQ2 = query(collection(db, 'referrals'), where('referredUserId', '==', uid));
-                    const refSnap2 = await getDocs(refQ2);
-                    for (const d of refSnap2.docs) await deleteDoc(doc(db, 'referrals', d.id));
-
-                    if (isDualRole) {
-                      const newRoles = roles.filter((r: string) => r !== 'teacher');
-                      await updateDoc(userDocRef, {
-                        role: newRoles[0] || 'student',
-                        roles: newRoles
-                      });
-                      
-                      const updatedUser = { ...JSON.parse(localStorage.getItem('user') || '{}'), role: newRoles[0] || 'student', roles: newRoles };
-                      localStorage.setItem('user', JSON.stringify(updatedUser));
-                      
-                      toast.success('Teacher profile deleted successfully');
-                      window.location.href = '/dashboard/student';
-                    } else {
-                      await deleteDoc(userDocRef);
-                      try {
-                        await deleteUser(auth.currentUser);
-                        localStorage.removeItem('user');
-                        toast.success('Account deleted successfully');
-                        window.location.href = '/';
-                      } catch (e: any) {
-                        if(e.code === 'auth/requires-recent-login') {
-                          localStorage.removeItem('user');
-                          toast.success('Account deleted successfully');
-                          await auth.signOut();
-                          window.location.href = '/login';
-                        } else {
-                          throw e;
-                        }
-                      }
-                    }
-                  } catch (err: any) {
-                    toast.error(err.message);
-                    setIsDeletingAccount(false);
-                  }
-                }}
-                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50"
-                disabled={isDeletingAccount || deleteAccountConfirm !== 'DELETE'}
-              >
-                {isDeletingAccount ? 'Deleting...' : 'Permanently Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+            const userDocRef = doc(db, 'users', uid);
+            const userDoc = await getDoc(userDocRef);
+            const userData = userDoc.data() || {};
+            const roles = userData.roles || (userData.role ? [userData.role] : []);
+            
+            const isDualRole = roles.length > 1;
+            
+            if (isDualRole) {
+              const newRoles = roles.filter((r: string) => r !== 'teacher');
+              await updateDoc(userDocRef, {
+                role: newRoles[0] || 'student',
+                roles: newRoles
+              });
+              
+              const updatedUser = { ...JSON.parse(localStorage.getItem('user') || '{}'), role: newRoles[0] || 'student', roles: newRoles };
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              
+              toast.success('Teacher profile deleted successfully');
+              window.location.href = '/dashboard/student';
+            } else {
+              await deleteDoc(userDocRef);
+              try {
+                await deleteUser(auth.currentUser);
+                localStorage.removeItem('user');
+                toast.success('Account deleted successfully');
+                window.location.href = '/';
+              } catch (e: any) {
+                if(e.code === 'auth/requires-recent-login') {
+                  localStorage.removeItem('user');
+                  toast.success('Account deleted successfully');
+                  await auth.signOut();
+                  window.location.href = '/login';
+                } else {
+                  throw e;
+                }
+              }
+            }
+          } catch (err: any) {
+            toast.error(err.message);
+            setIsDeletingAccount(false);
+          }
+        }}
+      />
       {/* PAYMENT MODAL */}
       {payingClass && (() => {
         const payingStudents = payingClass.studentsList || (payingClass.studentDetails ? [payingClass.studentDetails] : []);
@@ -3221,49 +2758,26 @@ export default function TeacherDashboard() {
         );
       })()}
       {/* Action Confirm Modal */}
-      {actionConfirmModal?.isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                {actionConfirmModal.type === 'accept_demo' ? <CheckCircle2 className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
-              </div>
-              <h3 className="text-xl font-black text-gray-900 mb-2">
-                {actionConfirmModal.type === 'accept_demo' ? 'Confirm Acceptance' : 'Confirm Rejection'}
-              </h3>
-              <p className="text-slate-500 font-medium mb-8">
-                {actionConfirmModal.type === 'accept_demo' 
-                  ? `Are you sure you want to accept ${actionConfirmModal.studentName} and proceed to pay the demo fee?`
-                  : `Are you sure you want to decline ${actionConfirmModal.studentName}?`}
-              </p>
-              <div className="flex gap-3 w-full">
-                <button 
-                  onClick={() => setActionConfirmModal(null)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={async () => {
-                    if (actionConfirmModal.type === 'accept_demo') {
-                      setPayingClass(actionConfirmModal.payload);
-                      setActionConfirmModal(null);
-                    } else {
-                      const success = await handleNegotiationAction(actionConfirmModal.appId, 'decline');
-                      if (success !== false) {
-                        setActionConfirmModal(null);
-                      }
-                    }
-                  }}
-                  className={`flex-1 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors ${actionConfirmModal.type === 'accept_demo' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/25' : 'bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25'}`}
-                >
-                  Yes, Confirm
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <TransactionConfirmModal
+        isOpen={!!actionConfirmModal?.isOpen}
+        type={actionConfirmModal?.type === 'accept_demo' ? 'success' : 'warning'}
+        title={actionConfirmModal?.type === 'accept_demo' ? 'Confirm Acceptance' : 'Confirm Rejection'}
+        description={actionConfirmModal?.type === 'accept_demo' 
+          ? `Are you sure you want to accept ${actionConfirmModal.studentName} and proceed to pay the demo fee?`
+          : `Are you sure you want to decline ${actionConfirmModal?.studentName}?`}
+        onCancel={() => setActionConfirmModal(null)}
+        onConfirm={async () => {
+          if (actionConfirmModal?.type === 'accept_demo') {
+            setPayingClass(actionConfirmModal.payload);
+            setActionConfirmModal(null);
+          } else if (actionConfirmModal) {
+            const success = await handleNegotiationAction(actionConfirmModal.appId, 'decline');
+            if (success !== false) {
+              setActionConfirmModal(null);
+            }
+          }
+        }}
+      />
 
       </main>
       <WhatsAppButton />

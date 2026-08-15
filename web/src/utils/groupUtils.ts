@@ -10,7 +10,7 @@ export async function syncTuitionRequestForGroup(db: any, groupId: string, paren
   }
   
   const groupData = groupSnap.data();
-  const studentIds = groupData.studentDocIds || groupData.studentIds || [];
+  const studentIds = groupData.studentDocIds || [];
   
   // 2. Fetch all students in this group
   let studentsDetails: any[] = [];
@@ -50,18 +50,13 @@ export async function syncTuitionRequestForGroup(db: any, groupId: string, paren
   const requestSnap = await getDocs(requestQuery);
   
   if (studentIds.length === 0) {
-    // Delete group and request if empty
-    await deleteDoc(groupRef);
-    if (!requestSnap.empty) {
-      for (const reqDoc of requestSnap.docs) {
-        await deleteDoc(reqDoc.ref);
-      }
-    }
+    // We explicitly do not auto-delete groups or requests here anymore.
+    // Deletions must only happen explicitly via user action in the dashboard to prevent data loss.
     return;
   }
 
   const payload = {
-    groupId,
+    groupDocId: groupId,
     parentId,
     category,
     mode: groupData.mode || '',

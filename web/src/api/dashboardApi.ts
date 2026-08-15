@@ -73,13 +73,6 @@ export const fetchStudentDashboardData = async () => {
   
   const referrals = referralsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   const marketplacePricing = pricingSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-  const matchedTutors = availableTutors.filter((tutor: any) => {
-    if (!myStudent) return true;
-    const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
-    if (!tutorCategories.includes(myStudent.category)) return false;
-    
-    return true;
-  }) || [];
 
   const tutorIds = applications.map((app: any) => app.tutorDocId).filter(Boolean);
   let tutorsInfo: any[] = [];
@@ -96,11 +89,39 @@ export const fetchStudentDashboardData = async () => {
      });
   }
 
+  const baseData = {
+    user,
+    userData,
+    marketplacePricing,
+    parentData,
+    students,
+    myStudent,
+    requests,
+    myRequest,
+    groups,
+    applications,
+    availableTutors,
+    referrals,
+    tutorsInfo
+  };
+
+  return deriveStudentDashboardState(baseData);
+};
+
+export const deriveStudentDashboardState = (baseData: any) => {
+  const { user, userData, marketplacePricing, parentData, students, myStudent, requests, myRequest, groups, applications, availableTutors, referrals, tutorsInfo } = baseData;
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
-  const applicationsWithSubjects = await Promise.all(applications.map(async (app: any) => {
-    const tutor = tutorsInfo.find(t => t.id === app.tutorDocId);
+  const matchedTutors = availableTutors.filter((tutor: any) => {
+    if (!myStudent) return true;
+    const tutorCategories = tutor.category ? tutor.category.split(',').map((c: string) => c.trim()) : [];
+    if (!tutorCategories.includes(myStudent.category)) return false;
+    return true;
+  }) || [];
+
+  const applicationsWithSubjects = applications.map((app: any) => {
+    const tutor = tutorsInfo.find((t: any) => t.id === app.tutorDocId);
 
     let currentStatus = app.status;
     // Auto-expire if teacher hasn't paid demo fee within 7 days
@@ -130,7 +151,7 @@ export const fetchStudentDashboardData = async () => {
       technologies: tutor?.technologies || [],
       languagesTaught: tutor?.languagesTaught || []
     };
-  })) || [];
+  }) || [];
 
   const dismissedNotifs = userData?.dismissedNotifications || [];
   const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status));
@@ -140,7 +161,7 @@ export const fetchStudentDashboardData = async () => {
     .filter((app: any) => !dismissedNotifs.includes(app.id))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
   ];
-  const recommendedNegotiations = allNegotiations.filter(app => matchedTutors.some((t:any) => t.id === app.tutorDocId));
+  const recommendedNegotiations = allNegotiations.filter((app: any) => matchedTutors.some((t:any) => t.id === app.tutorDocId));
 
   return {
     user,
@@ -185,7 +206,8 @@ export const fetchStudentDashboardData = async () => {
       status: app.status,
       finalPrice: app.finalPrice || app.currentOffer || 4000,
       tutorDetails: app.tutorDetails
-    }))
+    })),
+    _baseData: baseData
   };
 };
 
@@ -278,45 +300,8 @@ export const fetchTeacherDashboardData = async () => {
 
   const teacherCategories = tutorData?.category ? tutorData.category.split(',').map((c:string) => c.trim()) : [];
   
-  // Group students first
-  const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
-    const gId = student.groupDocId || `indv_${student.id}`;
-    if (!acc[gId]) {
-      acc[gId] = { 
-        id: gId, 
-        students: [], 
-        totalBudget: 0,
-        parentDocId: student.parentDocId || student.parentId,
-        
-        categories: []
-      };
-    }
-    acc[gId].students.push(student);
-    acc[gId].totalBudget += (parseInt(student.budget) || 0);
-    if (student.category) acc[gId].categories.push(student.category);
-    return acc;
-  }, {});
 
-  const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
-    ...g,
-    name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
-    category: g.categories[0] || 'school',
-    budget: g.totalBudget
-  }));
   
-  const matchedGroups = availableGroupsRaw.filter((group: any) => {
-    if (!tutorData) return true;
-    
-    // A group matches if any student inside it matches the teacher's profile
-    return group.students.some((student: any) => {
-      const studentCat = (student.category || '').toLowerCase().trim();
-      const teacherCats = teacherCategories.map((c:string) => c.toLowerCase().trim());
-      
-      if (!teacherCats.includes(studentCat)) return false;
-      
-      return true;
-    });
-  });
 
   const studentIds = applications.flatMap((app: any) => app.studentDocIds || [app.studentDocId]).filter(Boolean);
 
@@ -334,12 +319,76 @@ export const fetchTeacherDashboardData = async () => {
     });
   }
 
+  const baseData = {
+    user,
+    userData,
+    tutorId,
+    tutorData,
+    teacherCategories,
+    globalLocks,
+    applications,
+    referrals,
+    marketplacePricing,
+    availableStudentsRaw,
+    availableStudents,
+    studentsInfo
+  };
+
+  return deriveTeacherDashboardState(baseData);
+};
+
+export const deriveTeacherDashboardState = (baseData: any) => {
+  const { 
+    user, userData, tutorId, tutorData, teacherCategories, globalLocks, 
+    applications, referrals, marketplacePricing, 
+    availableStudentsRaw, availableStudents, studentsInfo 
+  } = baseData;
+
+  // Group students first
+  const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
+    const gId = student.groupDocId || `indv_${student.id}`;
+    if (!acc[gId]) {
+      acc[gId] = { 
+        id: gId, 
+        students: [], 
+        totalBudget: 0,
+        parentDocId: student.parentDocId || student.parentId,
+        categories: []
+      };
+    }
+    acc[gId].students.push(student);
+    acc[gId].totalBudget += (parseInt(student.budget) || 0);
+    if (student.category) acc[gId].categories.push(student.category);
+    return acc;
+  }, {});
+
+  const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
+    ...g,
+    name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
+    category: g.categories[0] || 'school',
+    budget: g.totalBudget
+  }));
+
+  const matchedGroups = availableGroupsRaw.filter((group: any) => {
+    if (!tutorData) return true;
+    
+    // A group matches if any student inside it matches the teacher's profile
+    return group.students.some((student: any) => {
+      const studentCat = (student.category || '').toLowerCase().trim();
+      const teacherCats = teacherCategories.map((c:string) => c.toLowerCase().trim());
+      
+      if (!teacherCats.includes(studentCat)) return false;
+      
+      return true;
+    });
+  });
+
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
-  const applicationsWithSubjects = await Promise.all(applications.map(async (app: any) => {
-    const student = studentsInfo.find(s => s.id === app.studentDocId);
-    const appStudentsList = studentsInfo.filter(s => (app.studentDocIds || []).includes(s.id) || s.id === app.studentDocId);
+  const applicationsWithSubjects = applications.map((app: any) => {
+    const student = studentsInfo.find((s: any) => s.id === app.studentDocId);
+    const appStudentsList = studentsInfo.filter((s: any) => (app.studentDocIds || []).includes(s.id) || s.id === app.studentDocId);
     
     let currentStatus = app.status;
     // Auto-expire if teacher hasn't paid demo fee within 7 days
@@ -370,7 +419,7 @@ export const fetchTeacherDashboardData = async () => {
       technologies: student?.technologies || [],
       languages: student?.languages || []
     };
-  })) || [];
+  }) || [];
 
   const dismissedNotifs = userData?.dismissedNotifications || [];
   const allNegotiations = applicationsWithSubjects.filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status));
@@ -378,7 +427,7 @@ export const fetchTeacherDashboardData = async () => {
     .filter((app: any) => ['negotiating', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'declined', 'tuition_started'].includes(app.status))
     .filter((app: any) => !dismissedNotifs.includes(app.id))
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-  const recommendedNegotiations = allNegotiations.filter(app => matchedGroups.some((g:any) => g.id === (app.groupDocId || app.studentDocId)));
+  const recommendedNegotiations = allNegotiations.filter((app: any) => matchedGroups.some((g:any) => g.id === (app.groupDocId || app.studentDocId)));
 
   let totalRevenue = 0;
   let demoFeesPaid = 0;
@@ -387,7 +436,6 @@ export const fetchTeacherDashboardData = async () => {
 
   applicationsWithSubjects.forEach((app: any) => {
     // Track Demo Fee (Teacher Outflow)
-    // If the application reached demo_scheduled or beyond, the teacher paid the demo fee.
     const hasPassedDemoPhase = ['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status);
     if (hasPassedDemoPhase) {
       const dFee = 100; // Estimated fallback demo fee
@@ -436,7 +484,6 @@ export const fetchTeacherDashboardData = async () => {
     }
   });
 
-  // Sort ledger by date descending
   ledgerEntries.sort((a, b) => b.date - a.date);
 
   const earningsData = {
@@ -483,6 +530,7 @@ export const fetchTeacherDashboardData = async () => {
       date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
       status: app.status === 'tuition_started' ? 'confirmed' : 'pending',
       studentDetails: app.studentDetails
-    }))
+    })),
+    _baseData: baseData
   };
 };
