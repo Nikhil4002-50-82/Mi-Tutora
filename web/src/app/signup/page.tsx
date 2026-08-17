@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
@@ -16,6 +16,13 @@ function SignupContent() {
   
   const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
+  
+  useEffect(() => {
+    if (!referralCode) {
+      const savedRef = localStorage.getItem('mitutora_ref');
+      if (savedRef) setReferralCode(savedRef);
+    }
+  }, [referralCode]);
   
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -44,23 +51,15 @@ function SignupContent() {
       createdUser = user;
 
       if (user) {
-        // Insert into users collection
-        await setDoc(doc(db, 'users', user.uid), {
-          id: user.uid,
-          email: user.email,
-          name: name,
-          role: role,
-          roles: [role],
-          referredBy: referralCode.trim()
-        });
-
         // Process referral if exists
+        let finalReferrerName = '';
         if (referralCode.trim()) {
           const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
             const referrerUserDoc = querySnapshot.docs[0];
             const referrerUser = referrerUserDoc.data();
+            finalReferrerName = referrerUser.name || '';
             
             await addDoc(collection(db, 'referrals'), {
               referrerId: referrerUser.id,
@@ -76,6 +75,19 @@ function SignupContent() {
           }
         }
 
+        // Insert into users collection
+        const userPayload: any = {
+          id: user.uid,
+          email: user.email,
+          name: name,
+          role: role,
+          roles: [role],
+          referredBy: referralCode.trim()
+        };
+        if (finalReferrerName) userPayload.referrerName = finalReferrerName;
+        await setDoc(doc(db, 'users', user.uid), userPayload);
+
+
         // Insert into parents or tutors
         if (role === 'parent') {
           const parentId = generateCustomId('MTP');
@@ -88,6 +100,7 @@ function SignupContent() {
         const { sendEmailVerification } = await import('firebase/auth');
         await sendEmailVerification(user);
         await auth.signOut();
+        localStorage.removeItem('mitutora_ref');
         setSuccessMsg('Account created successfully! Please check your email to verify your account before logging in.');
         setTimeout(() => {
           router.push(`/login?role=${role}`);
@@ -153,22 +166,15 @@ function SignupContent() {
       }
       
       if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          id: user.uid,
-          email: user.email,
-          name: user.displayName || '',
-          role: role,
-          roles: [role],
-          referredBy: referralCode.trim()
-        });
-
         // Process referral if exists
+        let finalReferrerName = '';
         if (referralCode.trim()) {
           const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
             const referrerUserDoc = querySnapshot.docs[0];
             const referrerUser = referrerUserDoc.data();
+            finalReferrerName = referrerUser.name || '';
             
             await addDoc(collection(db, 'referrals'), {
               referrerId: referrerUser.id,
@@ -184,6 +190,17 @@ function SignupContent() {
           }
         }
 
+        const userPayload: any = {
+          id: user.uid,
+          email: user.email,
+          name: user.displayName || '',
+          role: role,
+          roles: [role],
+          referredBy: referralCode.trim()
+        };
+        if (finalReferrerName) userPayload.referrerName = finalReferrerName;
+        await setDoc(doc(db, 'users', user.uid), userPayload);
+
         if (accountType === 'parent') {
           const parentId = generateCustomId('MTP');
           await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
@@ -198,6 +215,7 @@ function SignupContent() {
       const roles = finalDoc.exists() ? (finalDoc.data().roles || [userRole]) : [userRole];
       
       localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
+      localStorage.removeItem('mitutora_ref');
       const searchParams = new URLSearchParams(window.location.search);
       let nextUrl = searchParams.get('next');
       if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {

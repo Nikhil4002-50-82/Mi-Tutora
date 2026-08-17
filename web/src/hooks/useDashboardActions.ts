@@ -1,5 +1,5 @@
 import { db } from '@/utils/firebase/client';
-import { doc, runTransaction, arrayRemove, collection, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { doc, runTransaction, arrayRemove, collection, getDocs, query, where, writeBatch, increment } from 'firebase/firestore';
 import { syncStudentAvailability } from '@/utils/studentAvailability';
 
 export const executeDeclineOffer = async (appId: string, role: 'student' | 'teacher', data?: any) => {
@@ -87,7 +87,37 @@ export const executeAppointTutor = async (appId: string, data?: any) => {
   }
   
   await batch.commit();
+  
   if (app) {
+    try {
+      const rewardBase = app.finalPrice || app.currentOffer || app.budget || 4000;
+      const rewardAmount = Math.round(rewardBase * 0.25);
+      
+      const studentUid = data?.user?.uid;
+      const teacherUid = app.tutorDocId;
+      
+      const processReferral = async (referredUid: string) => {
+        if (!referredUid) return;
+        const q = query(collection(db, 'referrals'), where('referredUserId', '==', referredUid), where('status', '==', 'pending'));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const refDoc = snap.docs[0];
+          const referrerId = refDoc.data().referrerId;
+          const refBatch = writeBatch(db);
+          refBatch.update(doc(db, 'referrals', refDoc.id), { status: 'qualified', reward: rewardAmount, qualifiedAt: Date.now() });
+          refBatch.update(doc(db, 'users', referrerId), { walletBalance: increment(rewardAmount) });
+          await refBatch.commit();
+        }
+      };
+      
+      await Promise.all([
+        processReferral(studentUid),
+        processReferral(teacherUid)
+      ]);
+    } catch (rewardErr) {
+      console.error('Failed to process referral rewards:', rewardErr);
+    }
+    
     await syncStudentAvailability(db, app.studentDocIds || [app.studentDocId]).catch(console.error);
   }
 };

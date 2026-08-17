@@ -23,7 +23,7 @@ import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { generateReferralCode } from '@/utils/referral';
-import { calculateSuitabilityScore, doesClassMatch } from '@/utils/matching';
+import { calculateSuitabilityScore, doesClassMatch, isStrictMatch } from '@/utils/matching';
 import { toast } from 'sonner';
 
 
@@ -186,15 +186,32 @@ export default function TeacherDashboard() {
         setIsGeneratingRef(true);
         try {
           const { db } = await import('@/utils/firebase/client');
-          const { doc, updateDoc } = await import('firebase/firestore');
+          const { doc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
           const baseName = data?.profile?.name || data?.user?.displayName || 'USER';
-          const newCode = generateReferralCode(baseName, data.user.uid);
           
-          mutate({ ...data, userData: { ...data.userData, referralCode: newCode, referralcode: newCode } }, false);
+          let uniqueCode = '';
+          let isUnique = false;
+          let attempts = 0;
           
-          await updateDoc(doc(db, 'users', data.user.uid), { referralCode: newCode });
+          while (!isUnique && attempts < 5) {
+            const entropy = attempts === 0 ? '' : Math.random().toString(36).substring(2, 5);
+            const tempCode = generateReferralCode(baseName, data.user.uid + entropy);
+            const q = query(collection(db, 'users'), where('referralCode', '==', tempCode));
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.empty) {
+              uniqueCode = tempCode;
+              isUnique = true;
+            }
+            attempts++;
+          }
           
-          toast.success("Generated referral code: " + newCode);
+          if (!uniqueCode) throw new Error("Could not generate a unique referral code");
+          
+          mutate({ ...data, userData: { ...data.userData, referralCode: uniqueCode, referralcode: uniqueCode } }, false);
+          
+          await updateDoc(doc(db, 'users', data.user.uid), { referralCode: uniqueCode });
+          
+          toast.success("Generated referral code: " + uniqueCode);
           mutate();
         } catch (e: any) {
           toast.error("Failed to generate referral code: " + e.message);
@@ -745,9 +762,11 @@ export default function TeacherDashboard() {
     const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
     const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getDetail(studentGroup, 'budget') || 0);
     const teacherFee = parseFloat((activeTeacher as any)?.feeRange || (activeTeacher as any)?.minFee || 0);
+    const strictMatch = isStrictMatch(studentGroup, activeTeacher);
     return {
       ...studentGroup,
-      suitabilityScore: calculateSuitabilityScore(studentGroup, activeTeacher),
+      strictMatch,
+      suitabilityScore: strictMatch ? calculateSuitabilityScore(studentGroup, activeTeacher) : 0,
       budgetDifference: Math.abs(studentBudget - teacherFee)
     };
   }).sort((a: any, b: any) => {
@@ -778,53 +797,7 @@ export default function TeacherDashboard() {
   }));
 
   const computedRecommendedStudents = allStudentsWithScores.filter((studentGroup: any) => {
-      if (studentGroup.suitabilityScore <= 0) return false;
-      
-      const getDetail = (obj: any, field: string) => obj[field] || (obj.students && obj.students[0] ? obj.students[0][field] : '') || '';
-
-      const studentCat = getDetail(studentGroup, 'category').toLowerCase().trim();
-      const teacherCats = activeTeacher?.category ? activeTeacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
-      if (studentCat && !teacherCats.includes(studentCat)) return false;
-
-      if (studentCat === 'school') {
-          const studentBoard = getDetail(studentGroup, 'board').toLowerCase().trim();
-          const teacherBoards = (activeTeacher?.boards || []).map((b: string) => b.toLowerCase().trim());
-          if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
-
-          const studentClass = (getDetail(studentGroup, 'classLevel') || getDetail(studentGroup, 'classGrade')).toLowerCase().trim();
-          const teacherClasses = (activeTeacher?.classes || []).map((c: string) => c.toLowerCase().trim());
-          if (!doesClassMatch(studentClass, teacherClasses)) return false;
-      }
-
-      const genderPref = studentGroup.requestDoc?.teacherGenderPreference || studentGroup.teacherGenderPreference;
-      if (genderPref && genderPref !== 'No Preference') {
-          if (activeTeacher?.gender !== genderPref) return false;
-      }
-
-      let studentNeeds: string[] = [];
-      let teacherOffers: string[] = [];
-      
-      if (studentCat === 'school') {
-        studentNeeds = getDetail(studentGroup, 'subjects') || getDetail(studentGroup, 'combinedSubjects') || [];
-        teacherOffers = activeTeacher?.subjects || [];
-      } else if (studentCat === 'programming') {
-        studentNeeds = getDetail(studentGroup, 'technologies') || getDetail(studentGroup, 'combinedTechnologies') || [];
-        teacherOffers = activeTeacher?.technologies || [];
-      } else if (studentCat === 'languages') {
-        studentNeeds = getDetail(studentGroup, 'languages') || getDetail(studentGroup, 'combinedLanguages') || [];
-        teacherOffers = activeTeacher?.languagesTaught || activeTeacher?.languages || [];
-      }
-      
-      if (studentNeeds.length > 0) {
-        if (teacherOffers.length === 0) return false;
-        const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        const allSubjectsMatched = studentNeeds.every((need:string) => {
-          const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
-        });
-        if (!allSubjectsMatched) return false;
-      }
-
+      if (studentGroup.suitabilityScore <= 0 || !studentGroup.strictMatch) return false;
       return true;
   });
 
@@ -2127,6 +2100,19 @@ export default function TeacherDashboard() {
             {/* TAB: REFERRALS */}
             {activeTab === 'referrals' && (
               <div>
+                {/* "Invited By" Banner */}
+                {data?.userData?.referrerName && (
+                  <div className="mb-8 bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                      <span className="text-xl">🤝</span>
+                    </div>
+                    <div>
+                      <h4 className="text-emerald-900 font-bold">Welcome to the community!</h4>
+                      <p className="text-emerald-700 text-sm font-medium">You joined MiTutora via <span className="font-bold">{data.userData.referrerName}'s</span> invite link.</p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex flex-col mb-10">
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Refer & Earn</h2>
                   <p className="text-slate-500 font-medium mt-2">Invite your friends and earn rewards when they join.</p>
@@ -2153,25 +2139,64 @@ export default function TeacherDashboard() {
                         </p>
                       </div>
                       
-                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl inline-flex flex-col sm:flex-row sm:items-center gap-6 justify-between transform transition-all hover:bg-white/15">
+                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-white/15">
                         <div>
                           <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Unique Code</p>
                           <span className="text-3xl sm:text-4xl font-black tracking-widest text-white drop-shadow-md">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
                         </div>
-                        <button onClick={() => {
-                          navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
-                          toast.success("Code copied to clipboard!");
-                        }} className="w-full sm:w-auto bg-white text-[#063831] px-6 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2">
-                          <Copy className="w-4 h-4" /> Copy Code
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button onClick={() => {
+                            navigator.clipboard.writeText(data?.userData?.referralCode || data?.userData?.referralcode || '');
+                            toast.success("Code copied to clipboard!");
+                          }} className="flex-1 bg-white/20 text-white px-4 py-3.5 rounded-xl font-bold text-sm shadow-sm hover:bg-white/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <Copy className="w-4 h-4" /> Copy Code
+                          </button>
+                          <button onClick={() => {
+                            const code = data?.userData?.referralCode || data?.userData?.referralcode || '';
+                            const link = `${window.location.origin}/signup?ref=${code}`;
+                            navigator.clipboard.writeText(link);
+                            toast.success("Invite Link copied to clipboard!");
+                          }} className="flex-1 bg-white text-[#063831] px-4 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <Copy className="w-4 h-4" /> Copy Invite Link
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <WalletCard 
-                    balance={data?.userData?.walletBalance || data?.userData?.walletbalance || 0}
-                    onWithdrawClick={() => setWithdrawModal(true)}
-                  />
+                  {/* Wallet Card */}
+                  <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between group hover:shadow-2xl transition-all duration-300">
+                    <div>
+                      <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center mb-6 text-teal-600 group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Wallet Balance</p>
+                      <h4 className="text-5xl font-black text-gray-900 mb-4 tracking-tight flex items-baseline gap-1">
+                        <span className="text-2xl text-slate-400">₹</span>{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}
+                      </h4>
+                      <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2 overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(((data?.userData?.walletBalance || data?.userData?.walletbalance || 0) / 1000) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8 flex justify-between">
+                        <span>Min Withdrawal: ₹1000</span>
+                        <span className="font-bold text-emerald-600">{Math.min(((data?.userData?.walletBalance || data?.userData?.walletbalance || 0) / 1000) * 100, 100).toFixed(0)}%</span>
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const bal = data?.userData?.walletBalance || data?.userData?.walletbalance || 0;
+                        const msg = `Hello Admin, I would like to request a referral withdrawal.\n\nMy User ID is: ${data?.user?.uid}\nMy current Wallet Balance is: ₹${bal}`;
+                        window.open(`https://api.whatsapp.com/send?phone=+917483034168&text=${encodeURIComponent(msg)}`, '_blank');
+                      }}
+                      disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
+                      className="w-full py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 shadow-lg shadow-gray-900/20 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ArrowRight className="w-4 h-4" /> Withdraw via WhatsApp
+                    </button>
+                  </div>
                 </div>
 
                 {/* Referrals List */}

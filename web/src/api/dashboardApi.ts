@@ -273,6 +273,21 @@ export const fetchTeacherDashboardData = async () => {
   availableStudentsRaw.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
   const availableStudents = availableStudentsRaw;
 
+  // Phase 1: API Stitching - Fetch related groups for students to get teacherGenderPreference
+  const uniqueGroupIds = Array.from(new Set(availableStudentsRaw.map((s: any) => s.groupDocId).filter(Boolean))) as string[];
+  let fetchedGroups: any[] = [];
+  if (uniqueGroupIds.length > 0) {
+    const chunkPromises = [];
+    for (let i = 0; i < uniqueGroupIds.length; i += 10) {
+      const chunk = uniqueGroupIds.slice(i, i + 10);
+      chunkPromises.push(getDocs(query(collection(db, 'groups'), where(documentId(), 'in', chunk))));
+    }
+    const chunkSnaps = await Promise.all(chunkPromises);
+    chunkSnaps.forEach(gSnap => {
+      fetchedGroups = [...fetchedGroups, ...gSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))];
+    });
+  }
+
   const globalLocks: Record<string, { unlockDate: number, tutorDocId: string }> = {};
   lockedAppsSnap.docs.forEach(d => {
     const data = d.data();
@@ -331,7 +346,8 @@ export const fetchTeacherDashboardData = async () => {
     marketplacePricing,
     availableStudentsRaw,
     availableStudents,
-    studentsInfo
+    studentsInfo,
+    fetchedGroups
   };
 
   return deriveTeacherDashboardState(baseData);
@@ -341,7 +357,7 @@ export const deriveTeacherDashboardState = (baseData: any) => {
   const { 
     user, userData, tutorId, tutorData, teacherCategories, globalLocks, 
     applications, referrals, marketplacePricing, 
-    availableStudentsRaw, availableStudents, studentsInfo 
+    availableStudentsRaw, availableStudents, studentsInfo, fetchedGroups 
   } = baseData;
 
   // Group students first
@@ -353,7 +369,8 @@ export const deriveTeacherDashboardState = (baseData: any) => {
         students: [], 
         totalBudget: 0,
         parentDocId: student.parentDocId || student.parentId,
-        categories: []
+        categories: [],
+        requestDoc: (fetchedGroups || []).find((g: any) => g.id === gId) || null
       };
     }
     acc[gId].students.push(student);

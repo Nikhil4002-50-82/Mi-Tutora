@@ -94,3 +94,52 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
 
   return score;
 }
+
+export function isStrictMatch(studentGroup: any, teacher: any): boolean {
+  if (!studentGroup || !teacher) return false;
+
+  const studentCat = (getAcademicDetail(studentGroup, 'category') || '').toLowerCase().trim();
+  const teacherCats = teacher.category ? teacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
+  if (studentCat && !teacherCats.includes(studentCat)) return false;
+
+  if (studentCat === 'school') {
+      const studentBoard = (getAcademicDetail(studentGroup, 'board') || '').toLowerCase().trim();
+      const teacherBoards = (teacher.boards || []).map((b: string) => b.toLowerCase().trim());
+      if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
+
+      const studentClass = (getAcademicDetail(studentGroup, 'classLevel') || getAcademicDetail(studentGroup, 'classGrade') || '').toLowerCase().trim();
+      const teacherClasses = (teacher.classes || []).map((c: string) => c.toLowerCase().trim());
+      if (!doesClassMatch(studentClass, teacherClasses)) return false;
+  }
+
+  const genderPref = getAcademicDetail(studentGroup, 'teacherGenderPreference');
+  if (genderPref && genderPref !== 'No Preference') {
+      if (teacher.gender !== genderPref) return false;
+  }
+
+  let studentNeeds: string[] = [];
+  let teacherOffers: string[] = [];
+  
+  if (studentCat === 'school') {
+    studentNeeds = getAcademicDetail(studentGroup, 'subjects') || getAcademicDetail(studentGroup, 'combinedSubjects') || [];
+    teacherOffers = teacher.subjects || [];
+  } else if (studentCat === 'programming') {
+    studentNeeds = getAcademicDetail(studentGroup, 'technologies') || getAcademicDetail(studentGroup, 'combinedTechnologies') || [];
+    teacherOffers = teacher.technologies || [];
+  } else if (studentCat === 'languages') {
+    studentNeeds = getAcademicDetail(studentGroup, 'languages') || getAcademicDetail(studentGroup, 'combinedLanguages') || [];
+    teacherOffers = teacher.languagesTaught || teacher.languages || [];
+  }
+  
+  if (studentNeeds.length > 0) {
+    if (teacherOffers.length === 0) return false;
+    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const allSubjectsMatched = studentNeeds.every((need:string) => {
+      const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
+    });
+    if (!allSubjectsMatched) return false;
+  }
+
+  return true;
+}

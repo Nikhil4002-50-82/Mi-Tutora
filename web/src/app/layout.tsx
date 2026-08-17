@@ -64,6 +64,8 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
+import { Suspense } from "react";
+import { ReferralTracker } from "@/components/ReferralTracker";
 
 export default function RootLayout({
   children,
@@ -97,6 +99,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-white">
+        <Suspense fallback={null}>
+          <ReferralTracker />
+        </Suspense>
         {children}
         <Toaster position="top-right" richColors expand={true} />
       </body>
