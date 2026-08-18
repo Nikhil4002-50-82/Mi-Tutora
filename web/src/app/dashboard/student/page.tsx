@@ -293,8 +293,7 @@ export default function StudentDashboard() {
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
       if (tutor.id === data?.userData?.id || (tutor.email && tutor.email === data?.userData?.email)) return false; // Prevent self-hiring
       const matchGroup = (app: any) => {
-          if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-          return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
+          return app.groupDocId === activeGroup?.id;
       };
       const app = data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app));
       if (app && app.status === 'tuition_started') return false;
@@ -313,8 +312,7 @@ export default function StudentDashboard() {
   }).sort((a: any, b: any) => {
       const getStatus = (tutorId: string) => {
           const matchGroup = (app: any) => {
-              if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-              return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
+              return app.groupDocId === activeGroup?.id;
           };
           const app = data?.applications?.find((app: any) => app.tutorDocId === tutorId && matchGroup(app));
           if (!app) return '';
@@ -471,8 +469,12 @@ export default function StudentDashboard() {
   const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'student' && app.createdAt >= todayStart.getTime()).length || 0;
 
   const handleRequestTutor = async (tutor: any) => {
+    const matchGroup = (app: any) => {
+      return app.groupDocId === activeGroup?.id;
+    };
+
     const pendingStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked'];
-    const studentPendingCount = data?.applications?.filter((app: any) => pendingStatuses.includes(app.status)).length || 0;
+    const studentPendingCount = data?.applications?.filter((app: any) => matchGroup(app) && pendingStatuses.includes(app.status)).length || 0;
     if (studentPendingCount >= 5) {
       setMessageModalConfig({ isOpen: true, title: 'Queue Full', message: 'You already have 5 pending requests. Please wait for a response or cancel an existing request before sending a new one.' });
       return;
@@ -481,11 +483,6 @@ export default function StudentDashboard() {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
     if (requestLoading) { isSubmittingRef.current = false; return false; }
-
-    const matchGroup = (app: any) => {
-      if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-      return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
-    };
     
     const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
     
@@ -515,7 +512,7 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
@@ -541,31 +538,6 @@ export default function StudentDashboard() {
             throw new Error("DAILY_LIMIT_EXCEEDED");
          }
 
-         const tutorRef = doc(db, 'tutors', tutor.id);
-         const tutorSnap = await transaction.get(tutorRef);
-         const tutorData = tutorSnap.data() || {};
-         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
-         
-         let verifiedCount = 0;
-         const orphanedIds: string[] = [];
-         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
-         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-         
-         if (reqIds.length > 0) {
-             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
-             appSnaps.forEach((appSnap, index) => {
-                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
-                     verifiedCount++;
-                 } else {
-                     orphanedIds.push(reqIds[index]);
-                 }
-             });
-         }
-         
-         if (verifiedCount >= teacherLimit) {
-             throw new Error("TEACHER_QUEUE_FULL");
-         }
-         
          transaction.set(appRef, {
             applicationId: appId,
             tutorDocId: tutor.id,
@@ -589,16 +561,8 @@ export default function StudentDashboard() {
          });
 
          transaction.update(parentRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1 }
+            dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
          });
-         
-         if (orphanedIds.length > 0) {
-            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
-         }
-         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
-         for (const s of groupToUse.students) {
-            transaction.update(doc(db, 'students', s.id), { pendingRequests: arrayUnion(appRef.id) });
-         }
       });
 
       toast.success("Tutor request & offer sent successfully!");
@@ -618,8 +582,13 @@ export default function StudentDashboard() {
   };
 
   const handleDirectRequestDemo = async (tutor: any) => {
+    const matchGroup = (app: any) => {
+      return app.groupDocId === activeGroup?.id;
+    };
+
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const recentDemosCount = data?.applications?.filter((app: any) => 
+      matchGroup(app) &&
       ['demo_requested_by_student', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status) &&
       (Date.now() - (app.updatedAt || app.createdAt || 0) < SEVEN_DAYS)
     ).length || 0;
@@ -629,18 +598,13 @@ export default function StudentDashboard() {
       return;
     }
     const pendingStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked'];
-    const studentPendingCount = data?.applications?.filter((app: any) => pendingStatuses.includes(app.status)).length || 0;
+    const studentPendingCount = data?.applications?.filter((app: any) => matchGroup(app) && pendingStatuses.includes(app.status)).length || 0;
     if (studentPendingCount >= 5) {
       setMessageModalConfig({ isOpen: true, title: 'Queue Full', message: 'You already have 5 pending requests. Please wait for a response or cancel an existing request before sending a new one.' });
       return;
     }
     
     if (requestLoading) return;
-
-    const matchGroup = (app: any) => {
-      if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-      return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
-    };
     
     const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
     
@@ -651,7 +615,7 @@ export default function StudentDashboard() {
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
       
@@ -679,31 +643,6 @@ export default function StudentDashboard() {
             throw new Error("DAILY_LIMIT_EXCEEDED");
          }
 
-         const tutorRef = doc(db, 'tutors', tutor.id);
-         const tutorSnap = await transaction.get(tutorRef);
-         const tutorData = tutorSnap.data() || {};
-         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
-         
-         let verifiedCount = 0;
-         const orphanedIds: string[] = [];
-         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
-         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
-         
-         if (reqIds.length > 0) {
-             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
-             appSnaps.forEach((appSnap, index) => {
-                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
-                     verifiedCount++;
-                 } else {
-                     orphanedIds.push(reqIds[index]);
-                 }
-             });
-         }
-         
-         if (verifiedCount >= teacherLimit) {
-             throw new Error("TEACHER_QUEUE_FULL");
-         }
-         
          transaction.set(appRef, {
             applicationId: appId,
             tutorDocId: tutor.id,
@@ -729,16 +668,8 @@ export default function StudentDashboard() {
          });
 
          transaction.update(parentRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1 }
+            dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
          });
-         
-         if (orphanedIds.length > 0) {
-            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
-         }
-         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
-         for (const s of groupToUse.students) {
-            transaction.update(doc(db, 'students', s.id), { pendingRequests: arrayUnion(appRef.id) });
-         }
       });
 
       toast.success("Demo requested successfully!");
@@ -762,8 +693,11 @@ export default function StudentDashboard() {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
     if (['request_demo', 'accept_demo'].includes(action)) {
+      const currentApp = data?.applications?.find((a: any) => a.id === appId);
+      const targetGroupId = currentApp?.groupDocId || activeGroup?.id;
       const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
       const recentDemosCount = data?.applications?.filter((app: any) => 
+        app.groupDocId === targetGroupId &&
         ['demo_requested_by_student', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(app.status) &&
         (Date.now() - (app.updatedAt || app.createdAt || 0) < SEVEN_DAYS)
       ).length || 0;
@@ -852,16 +786,7 @@ export default function StudentDashboard() {
         
         transaction.update(appRef, updateData);
         
-        if (isFinalState) {
-          if (appData.tutorDocId) {
-            transaction.update(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(appId) });
-          }
-          if (appData.studentDocIds) {
-            for (const sid of appData.studentDocIds) {
-              transaction.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
-            }
-          }
-        }
+        // Legacy pendingRequests removal removed
       });
       const appDataSync = data?.applications?.find((a: any) => a.id === appId);
       if (appDataSync) {
@@ -978,10 +903,7 @@ export default function StudentDashboard() {
                    declinedAt: Date.now(),
                    updatedAt: Date.now()
                 });
-                const d = docSnap.data();
-                if (d.tutorDocId) {
-                   await updateDoc(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
-                }
+                // Legacy pendingRequests removal removed
              }
           }
       }
@@ -1305,31 +1227,24 @@ export default function StudentDashboard() {
                           <div className="space-y-6">
                             {computedRecommendedTutors.filter((tutor: any) => {
                                const matchGroup = (app: any) => {
-                                 if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-                                 return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
+                                 return app.groupDocId === activeGroup?.id;
                                };
                                const isLocked = !!data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                                return !isLocked;
                             }).slice(0, 4).map((tutor: any, index: number) => {
                               const matchGroup = (app: any) => {
-                                if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-                                return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
+                                return app.groupDocId === activeGroup?.id;
                               };
                               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
                               const offerApp = activeAppForGroup?.tutorDocId === tutor.id ? activeAppForGroup : undefined;
                               
-                              const teacherLimit = tutor.isSubscribed ? 15 : 5;
-                              const teacherPendingCount = tutor.pendingRequests?.length || 0;
-                              const isTeacherFull = teacherPendingCount >= teacherLimit;
-
-                              const isLocked = !!activeAppForGroup || !!hiredAppForGroup || isTeacherFull; 
-                              const isRed = isTeacherFull || (isLocked && !offerApp); 
+                              const isLocked = !!activeAppForGroup || !!hiredAppForGroup; 
+                              const isRed = (isLocked && !offerApp); 
                               const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                               
                               let labelText = '';
-                              if (isTeacherFull) labelText = 'Queue Full';
-                              else if (hiredAppForGroup) labelText = 'Teacher Assigned';
+                              if (hiredAppForGroup) labelText = 'Teacher Assigned';
                               else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
                               else if (activeAppForGroup) labelText = 'Busy with Another Demo';
 
@@ -1468,35 +1383,28 @@ export default function StudentDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                       const matchGroup = (app: any) => {
-                        if (app.groupDocId) return app.groupDocId === activeGroup?.id;
-                        return activeGroup?.students?.some((s:any) => s.id === app.studentDocId) || false;
+                        return app.groupDocId === activeGroup?.id;
                       };
                       const lockedApp = data?.applications?.find((app: any) => app.tutorDocId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                       const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                       const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
                       const offerApp = activeAppForGroup?.tutorDocId === teacher.id ? activeAppForGroup : undefined;
                       
-                      const teacherLimit = teacher.isSubscribed ? 15 : 5;
-                      const teacherPendingCount = teacher.pendingRequests?.length || 0;
-                      const isTeacherFull = teacherPendingCount >= teacherLimit;
-
                       const isPending = offerApp && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(offerApp.status);
                       const isHired = offerApp && ['tuition_started'].includes(offerApp.status);
                       
-                      const isLocked = !!lockedApp || isTeacherFull;
-                      const isRed = !!lockedApp || isTeacherFull || (!!activeAppForGroup && !offerApp);
+                      const isLocked = !!lockedApp;
+                      const isRed = !!lockedApp || (!!activeAppForGroup && !offerApp);
                       const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                       
                       let labelText = '';
-                      if (isTeacherFull) labelText = 'Queue Full';
-                      else if (lockedApp) labelText = 'Locked';
+                      if (lockedApp) labelText = 'Locked';
                       else if (hiredAppForGroup) labelText = 'Teacher Assigned';
                       else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
                       else if (activeAppForGroup) labelText = 'Busy with Another Demo';
                       
                       let subText = '';
-                      if (isTeacherFull) subText = 'Teacher is unavailable';
-                      else if (lockedApp) subText = lockedApp.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable';
+                      if (lockedApp) subText = lockedApp.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable';
                       else if (hiredAppForGroup) subText = 'This group already has a teacher';
                       else if (offerApp) subText = isDemoPhase ? 'Demo in progress...' : (offerApp.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...');
                       else if (activeAppForGroup) subText = 'Active demo with another tutor';
@@ -2823,23 +2731,7 @@ export default function StudentDashboard() {
                     for (const appDoc of appSnap.docs) {
                       const appData = appDoc.data();
                       
-                      // Remove from Tutor's pending queue
-                      if (appData.tutorDocId) {
-                        batch.update(doc(db, 'tutors', appData.tutorDocId), {
-                          pendingRequests: arrayRemove(appDoc.id)
-                        });
-                      }
-                      
-                      // Remove from Siblings' pending queues
-                      if (appData.studentDocIds) {
-                        for (const sid of appData.studentDocIds) {
-                          if (sid !== studentToRemove.id) { // No need to update the student we are about to delete
-                            batch.update(doc(db, 'students', sid), {
-                              pendingRequests: arrayRemove(appDoc.id)
-                            });
-                          }
-                        }
-                      }
+                      // Legacy pendingRequests removal removed
                       
                       // Queue application deletion
                       batch.delete(doc(db, 'applications', appDoc.id));
@@ -2957,10 +2849,6 @@ export default function StudentDashboard() {
             const appQ = query(collection(db, 'applications'), where('parentDocId', '==', uid));
             const appSnap = await getDocs(appQ);
             for (const d of appSnap.docs) {
-              const appData = d.data();
-              if (appData.tutorDocId) {
-                try { await updateDoc(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(d.id) }); } catch(e){}
-              }
               await deleteDoc(doc(db, 'applications', d.id));
             }
             

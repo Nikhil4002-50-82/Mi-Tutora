@@ -1,6 +1,6 @@
 # Firestore Database Schema Report
 
-Generated on: 2026-08-14T11:26:31.207Z
+Generated on: 2026-08-18T11:51:12.461Z
 
 ## Collection: `admin_activity`
 *Documents sampled: 6*
@@ -15,6 +15,43 @@ Generated on: 2026-08-14T11:26:31.207Z
 | `message` | `string` |
 | `timestamp` | `timestamp` |
 | `type` | `string` |
+
+---
+
+## Collection: `applications`
+*Documents sampled: 2*
+
+| Field Path | Data Type |
+|---|---|
+| `absoluteMax` | `number` |
+| `absoluteMin` | `number` |
+| `applicationId` | `string` |
+| `category` | `string` |
+| `createdAt` | `number` |
+| `currentOffer` | `number` |
+| `declinedAt` | `number` |
+| `demoDate` | `string` |
+| `demoHours` | `string` |
+| `demoPaymentPaid` | `boolean` |
+| `demoTime` | `string` |
+| `finalPrice` | `number` |
+| `groupDocId` | `string` |
+| `initialBudget` | `number` |
+| `initiator` | `string` |
+| `lastUpdatedBy` | `string` |
+| `mode` | `string` |
+| `parentDocId` | `string` |
+| `proposedDate` | `string` |
+| `proposedTime` | `string` |
+| `requestDocId` | `string` |
+| `source` | `string` |
+| `status` | `string` |
+| `studentDocId` | `string` |
+| `studentDocIds` | `array of string` |
+| `studentName` | `string` |
+| `tutorDocId` | `string` |
+| `tutorName` | `string` |
+| `updatedAt` | `number` |
 
 ---
 
@@ -45,7 +82,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 ---
 
 ## Collection: `groups`
-*Documents sampled: 2*
+*Documents sampled: 5*
 
 | Field Path | Data Type |
 |---|---|
@@ -90,11 +127,14 @@ Generated on: 2026-08-14T11:26:31.207Z
 ---
 
 ## Collection: `parents`
-*Documents sampled: 1*
+*Documents sampled: 2*
 
 | Field Path | Data Type |
 |---|---|
 | `authUid` | `string` |
+| `dailyUsage` | `object` |
+| `dailyUsage.count` | `number` |
+| `dailyUsage.date` | `string` |
 | `email` | `string` |
 | `name` | `string` |
 | `parentDocId` | `string` |
@@ -105,7 +145,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 ---
 
 ## Collection: `students`
-*Documents sampled: 4*
+*Documents sampled: 7*
 
 | Field Path | Data Type |
 |---|---|
@@ -124,6 +164,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 | `languages` | `array` |
 | `name` | `string` |
 | `parentDocId` | `string` |
+| `pendingRequests` | `array` |
 | `phoneNumber` | `string` |
 | `studentType` | `string` |
 | `subjects` | `array of string` |
@@ -133,7 +174,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 ---
 
 ## Collection: `tuition_requests`
-*Documents sampled: 2*
+*Documents sampled: 5*
 
 | Field Path | Data Type |
 |---|---|
@@ -172,7 +213,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 ---
 
 ## Collection: `tutors`
-*Documents sampled: 1*
+*Documents sampled: 3*
 
 | Field Path | Data Type |
 |---|---|
@@ -183,6 +224,10 @@ Generated on: 2026-08-14T11:26:31.207Z
 | `category` | `string` |
 | `city` | `string` |
 | `classes` | `array of string` |
+| `createdAt` | `number` |
+| `dailyUsage` | `object` |
+| `dailyUsage.count` | `number` |
+| `dailyUsage.date` | `string` |
 | `email` | `string` |
 | `experience` | `string` |
 | `feeRange` | `string` |
@@ -195,6 +240,7 @@ Generated on: 2026-08-14T11:26:31.207Z
 | `mode` | `string` |
 | `name` | `string` |
 | `occupation` | `string` |
+| `pendingRequests` | `array` |
 | `phone` | `string` |
 | `preferredLocations` | `string` |
 | `preferredTimeRange` | `string` |
@@ -204,24 +250,30 @@ Generated on: 2026-08-14T11:26:31.207Z
 | `schoolNames` | `string` |
 | `studentCount` | `string` |
 | `subjects` | `array of string` |
+| `subscriptionPlan` | `string` |
 | `teachingApproach` | `string` |
 | `technologies` | `array` |
 | `travelDistance` | `string` |
 | `tutorId` | `string` |
+| `weeklyQuota` | `object` |
+| `weeklyQuota.tokensUsed` | `number` |
+| `weeklyQuota.weekStartDate` | `string` |
 | `whatsapp` | `string` |
 
 ---
 
 ## Collection: `users`
-*Documents sampled: 2*
+*Documents sampled: 5*
 
 | Field Path | Data Type |
 |---|---|
+| `dismissedNotifications` | `array of string` |
 | `email` | `string` |
 | `hasProfile` | `boolean` |
 | `id` | `string` |
 | `name` | `string` |
 | `referralCode` | `string` |
+| `referredBy` | `string` |
 | `role` | `string` |
 | `roles` | `array of string` |
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, X, CheckCircle2, TrendingUp, CalendarDays } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface StudentViewModalProps {
   selectedViewUser: any;
@@ -11,7 +12,8 @@ interface StudentViewModalProps {
   setNegotiationOffer: (offer: Record<string, string>) => void;
   handleSendOffer: (user: any) => Promise<any>;
   handleDirectRequestDemo: (user: any) => Promise<any>;
-  dailyRequestsCount: number;
+  quotaExceeded: boolean;
+  onUpgradeRequested?: () => void;
   offerLoading: boolean;
 }
 
@@ -25,7 +27,8 @@ export function StudentViewModal({
   setNegotiationOffer,
   handleSendOffer,
   handleDirectRequestDemo,
-  dailyRequestsCount,
+  quotaExceeded,
+  onUpgradeRequested,
   offerLoading
 }: StudentViewModalProps) {
   if (!selectedViewUser) return null;
@@ -230,21 +233,33 @@ export function StudentViewModal({
                   {negotiationOffer[selectedViewUser.id] ? (
                     <button 
                       onClick={async () => { 
+                        if (quotaExceeded) {
+                          toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                          setSelectedViewUser(null);
+                          onUpgradeRequested?.();
+                          return;
+                        }
                         const success = await handleSendOffer(selectedViewUser); 
                         if (success) setSelectedViewUser(null); 
                       }}
                       disabled={offerLoading}
-                      className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
+                      className={`flex-1 font-bold py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${quotaExceeded ? 'bg-gray-300 text-gray-500 hover:bg-gray-300' : 'bg-[#00a992] hover:bg-[#008f7b] text-white'}`}
                     >
                       <CheckCircle2 className="w-4 h-4" /> {offerLoading ? 'Sending...' : 'Negotiate'}
                     </button>
                   ) : (
                     <button 
                       onClick={async () => { 
+                        if (quotaExceeded) {
+                          toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                          setSelectedViewUser(null);
+                          onUpgradeRequested?.();
+                          return;
+                        }
                         const success = await handleDirectRequestDemo(selectedViewUser); 
                         if (success) setSelectedViewUser(null); 
                       }}
-                      className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${dailyRequestsCount >= 5 ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
+                      className={`flex-1 py-3 px-6 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${quotaExceeded ? 'bg-gray-300 text-gray-500 hover:bg-gray-300 shadow-none' : 'bg-[#00a992] hover:bg-[#008f7b] text-white shadow-[#00a992]/20'}`}
                     >
                       <CheckCircle2 className="w-4 h-4" /> Request Demo
                     </button>

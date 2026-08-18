@@ -1,6 +1,6 @@
 # Firestore Data Dump
 
-Generated on: 2026-08-17T17:36:50.615Z
+Generated on: 2026-08-18T11:51:14.742Z
 
 This file contains the raw data from all documents in the database to help trace foreign keys and logic.
 
@@ -1253,7 +1253,12 @@ This file contains the raw data from all documents in the database to help trace
     "date": "2026-08-14",
     "count": 1
   },
-  "pendingRequests": []
+  "pendingRequests": [],
+  "subscriptionPlan": "basic",
+  "weeklyQuota": {
+    "weekStartDate": "2026-08-16",
+    "tokensUsed": 0
+  }
 }
 ```
 
@@ -1263,7 +1268,12 @@ This file contains the raw data from all documents in the database to help trace
   "tutorId": "MTT6KFPAB",
   "authUid": "2TOQOnqT4RZvSTY9U6i8vmB8g843",
   "name": "Areesha afak",
-  "email": "areeshaafak@gmail.com"
+  "email": "areeshaafak@gmail.com",
+  "subscriptionPlan": "basic",
+  "weeklyQuota": {
+    "weekStartDate": "2026-08-16",
+    "tokensUsed": 0
+  }
 }
 ```
 
@@ -1310,7 +1320,12 @@ This file contains the raw data from all documents in the database to help trace
   "phone": "1010101010",
   "teachingApproach": "",
   "preferredLocations": "",
-  "category": "school"
+  "category": "school",
+  "subscriptionPlan": "basic",
+  "weeklyQuota": {
+    "weekStartDate": "2026-08-16",
+    "tokensUsed": 0
+  }
 }
 ```
 

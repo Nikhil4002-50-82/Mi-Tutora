@@ -113,6 +113,7 @@ export default function TeacherDashboard() {
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
@@ -289,14 +290,6 @@ export default function TeacherDashboard() {
           demoPaymentPaid: true,
           updatedAt: Date.now()
         });
-        batch.update(doc(db, 'tutors', data?.user?.uid as string), { pendingRequests: arrayRemove(payingClass.id) });
-        if (payingClass.studentsList) {
-          for (const student of payingClass.studentsList) {
-            if (student.id) {
-              batch.update(doc(db, 'students', student.id), { pendingRequests: arrayRemove(payingClass.id) });
-            }
-          }
-        }
         await batch.commit();
       }
       
@@ -353,12 +346,24 @@ export default function TeacherDashboard() {
     }
   };
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'teacher' && app.createdAt >= todayStart.getTime()).length || 0;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  const currentWeekStart = d.toISOString().split('T')[0];
+
+  const isProPlan = data?.userData?.subscriptionPlan === 'pro' || data?.userData?.isSubscribed;
+  const quotaLimit = isProPlan ? 15 : 5;
+  const isCurrentWeek = data?.userData?.weeklyQuota?.weekStartDate === currentWeekStart;
+  const tokensUsed = isCurrentWeek ? (data?.userData?.weeklyQuota?.tokensUsed || 0) : 0;
+  const tokensRemaining = Math.max(0, quotaLimit - tokensUsed);
+  const ALL_ACTIVE_STATUSES = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+  const activePendingOffers = data?.applications?.filter((app: any) => app.tutorDocId === data?.userData?.id && ALL_ACTIVE_STATUSES.includes(app.status)).length || 0;
 
   const handleSendOffer = async (student: any) => {
-    const studentPendingCount = student.pendingRequests?.length || 0;
+    const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+    const studentPendingCount = data?.applications?.filter((app: any) => app.groupDocId === student.id && activeStatuses.includes(app.status)).length || 0;
     if (studentPendingCount >= 5) {
       toast.error("This student already has the maximum number of pending offers.");
       return;
@@ -389,7 +394,7 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       
       const appId = generateCustomId('APP');
@@ -399,32 +404,23 @@ export default function TeacherDashboard() {
          const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
          const tutorSnap = await transaction.get(tutorRef);
          const tutorData = tutorSnap.data() || {};
-         const today = new Date().toISOString().split('T')[0];
-         const currentDailyCount = tutorData.dailyUsage?.date === today ? tutorData.dailyUsage.count : 0;
+         const isPro = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
+         const teacherLimit = isPro ? 15 : 5;
          
-         if (currentDailyCount >= 5) {
-            throw new Error("DAILY_LIMIT_EXCEEDED");
-         }
-
-         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
-         let verifiedCount = 0;
-         const orphanedIds: string[] = [];
-         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
-         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         const d = new Date();
+         d.setHours(0, 0, 0, 0);
+         const day = d.getDay();
+         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+         d.setDate(diff);
+         const currentWeekStart = d.toISOString().split('T')[0];
          
-         if (reqIds.length > 0) {
-             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
-             appSnaps.forEach((appSnap, index) => {
-                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
-                     verifiedCount++;
-                 } else {
-                     orphanedIds.push(reqIds[index]);
-                 }
-             });
+         let currentTokens = 0;
+         if (tutorData.weeklyQuota?.weekStartDate === currentWeekStart) {
+             currentTokens = tutorData.weeklyQuota.tokensUsed || 0;
          }
          
-         if (verifiedCount >= teacherLimit) {
-             throw new Error("TEACHER_QUEUE_FULL");
+         if (currentTokens >= teacherLimit) {
+             throw new Error("WEEKLY_QUOTA_EXCEEDED");
          }
          
          transaction.set(appRef, {
@@ -451,18 +447,12 @@ export default function TeacherDashboard() {
          });
 
          transaction.update(tutorRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1 }
+            weeklyQuota: {
+                weekStartDate: currentWeekStart,
+                tokensUsed: currentTokens + 1,
+                lastUpdated: serverTimestamp()
+            }
          });
-         
-         if (orphanedIds.length > 0) {
-            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
-         }
-         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
-         
-         const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
-         for (const sid of studentIdsToUpdate) {
-            transaction.update(doc(db, 'students', sid), { pendingRequests: arrayUnion(appRef.id) });
-         }
       });
 
       const syncIds = student.students ? student.students.map((s:any)=>s.id) : [student.id];
@@ -472,10 +462,8 @@ export default function TeacherDashboard() {
       mutate();
       return true;
     } catch (e: any) {
-      if (e.message === "DAILY_LIMIT_EXCEEDED") {
-         toast.error("You have reached your daily limit of 5 requests.");
-      } else if (e.message === "TEACHER_QUEUE_FULL") {
-         toast.error("You already have the maximum number of pending requests in your queue. Please accept or decline some before sending more.");
+      if (e.message === "WEEKLY_QUOTA_EXCEEDED") {
+         toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
       } else {
          toast.error("Error sending offer: " + e.message);
       }
@@ -486,7 +474,8 @@ export default function TeacherDashboard() {
   };
 
   const handleDirectRequestDemo = async (student: any) => {
-    const studentPendingCount = student.pendingRequests?.length || 0;
+    const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+    const studentPendingCount = data?.applications?.filter((app: any) => app.groupDocId === student.id && activeStatuses.includes(app.status)).length || 0;
     if (studentPendingCount >= 5) {
       toast.error("This student already has the maximum number of pending offers.");
       return;
@@ -504,7 +493,7 @@ export default function TeacherDashboard() {
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
-      const { collection, doc, arrayUnion, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       const user = auth.currentUser;
 
@@ -517,32 +506,23 @@ export default function TeacherDashboard() {
          const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
          const tutorSnap = await transaction.get(tutorRef);
          const tutorData = tutorSnap.data() || {};
-         const today = new Date().toISOString().split('T')[0];
-         const currentDailyCount = tutorData.dailyUsage?.date === today ? tutorData.dailyUsage.count : 0;
+         const isPro = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
+         const teacherLimit = isPro ? 15 : 5;
          
-         if (currentDailyCount >= 5) {
-            throw new Error("DAILY_LIMIT_EXCEEDED");
-         }
-
-         const teacherLimit = tutorData.isSubscribed ? 15 : 5;
-         let verifiedCount = 0;
-         const orphanedIds: string[] = [];
-         const reqIds = (tutorData.pendingRequests || []).slice(0, 30);
-         const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+         const d = new Date();
+         d.setHours(0, 0, 0, 0);
+         const day = d.getDay();
+         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+         d.setDate(diff);
+         const currentWeekStart = d.toISOString().split('T')[0];
          
-         if (reqIds.length > 0) {
-             const appSnaps = await Promise.all(reqIds.map((id: string) => transaction.get(doc(db, 'applications', id))));
-             appSnaps.forEach((appSnap, index) => {
-                 if (appSnap.exists() && activeStatuses.includes(appSnap.data().status)) {
-                     verifiedCount++;
-                 } else {
-                     orphanedIds.push(reqIds[index]);
-                 }
-             });
+         let currentTokens = 0;
+         if (tutorData.weeklyQuota?.weekStartDate === currentWeekStart) {
+             currentTokens = tutorData.weeklyQuota.tokensUsed || 0;
          }
          
-         if (verifiedCount >= teacherLimit) {
-             throw new Error("TEACHER_QUEUE_FULL");
+         if (currentTokens >= teacherLimit) {
+             throw new Error("WEEKLY_QUOTA_EXCEEDED");
          }
          
          transaction.set(appRef, {
@@ -571,18 +551,12 @@ export default function TeacherDashboard() {
          });
 
          transaction.update(tutorRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1 }
+            weeklyQuota: {
+                weekStartDate: currentWeekStart,
+                tokensUsed: currentTokens + 1,
+                lastUpdated: serverTimestamp()
+            }
          });
-         
-         if (orphanedIds.length > 0) {
-            transaction.update(tutorRef, { pendingRequests: arrayRemove(...orphanedIds) });
-         }
-         transaction.update(tutorRef, { pendingRequests: arrayUnion(appRef.id) });
-         
-         const studentIdsToUpdate = student.students ? student.students.map((s:any)=>s.id) : [student.id];
-         for (const sid of studentIdsToUpdate) {
-            transaction.update(doc(db, 'students', sid), { pendingRequests: arrayUnion(appRef.id) });
-         }
       });
 
       const syncIds = student.students ? student.students.map((s:any)=>s.id) : [student.id];
@@ -592,10 +566,8 @@ export default function TeacherDashboard() {
       mutate();
       return true;
     } catch (e: any) {
-      if (e.message === "DAILY_LIMIT_EXCEEDED") {
-         toast.error("You have reached your daily limit of 5 requests.");
-      } else if (e.message === "TEACHER_QUEUE_FULL") {
-         toast.error("You already have the maximum number of pending requests in your queue. Please accept or decline some before sending more.");
+      if (e.message === "WEEKLY_QUOTA_EXCEEDED") {
+         toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
       } else {
          toast.error("Error requesting demo: " + e.message);
       }
@@ -681,16 +653,7 @@ export default function TeacherDashboard() {
         
         transaction.update(appRef, updateData);
         
-        if (isFinalState) {
-          if (appData.tutorDocId) {
-            transaction.update(doc(db, 'tutors', appData.tutorDocId), { pendingRequests: arrayRemove(appId) });
-          }
-          if (appData.studentDocIds) {
-            for (const sid of appData.studentDocIds) {
-              transaction.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
-            }
-          }
-        }
+        // Removed legacy arrayRemove for pendingRequests
       });
       
       const appDataSync = data?.applications?.find((a: any) => a.id === appId);
@@ -747,6 +710,21 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleUpgradeToPro = async () => {
+    setUpgradeModalOpen(false);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'tutors', data?.user?.uid as string), {
+        subscriptionPlan: 'pro',
+        isSubscribed: true
+      });
+      toast.success("Successfully upgraded to Pro! You now have 15 tokens per week.");
+      mutate();
+    } catch (e: any) {
+      toast.error("Failed to upgrade: " + e.message);
+    }
+  };
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'new_tuition', label: 'New Tuition', icon: Globe },
@@ -1243,9 +1221,27 @@ export default function TeacherDashboard() {
                           const isHired = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['tuition_started'].includes(app.status));
                           
                           const isLocked = false;
-                          const isRed = !!lockedApp;
+                          const lockInfo = data?.globalLocks?.[group.id];
+                          const isGloballyLocked = lockInfo && lockInfo.unlockDate > Date.now() && lockInfo.tutorDocId !== data?.user?.uid;
+                          
                           const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
-                          const labelText = isRed ? 'Busy with another demo' : (isDemoPhase ? 'Demo in Progress' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : (offerApp ? 'Offer Received' : '')));
+                          
+                          let labelText = '';
+                          let isRed = false;
+                          
+                          if (isGloballyLocked) {
+                            isRed = true;
+                            labelText = 'Busy with another demo';
+                          } else if (lockedApp) {
+                            isRed = true;
+                            labelText = 'Recently Withdrawn / Cooldown';
+                          } else if (isDemoPhase) {
+                            labelText = 'Demo in Progress';
+                          } else if (offerApp?.lastUpdatedBy === 'tutor') {
+                            labelText = 'Offer Sent';
+                          } else if (offerApp) {
+                            labelText = 'Offer Received';
+                          }
 
                           return (
                             <div key={group.id} className="bg-white rounded-3xl shadow-md border border-gray-100 flex flex-col h-full overflow-hidden relative group">
@@ -1338,6 +1334,11 @@ export default function TeacherDashboard() {
                                           {negotiationOffer[group.id] ? (
                                             <button 
                                               onClick={() => {
+                                                if (tokensUsed >= quotaLimit) {
+                                                  toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                                                  setActiveTab('subscriptions');
+                                                  return;
+                                                }
                                                 if (!!offerApp) {
                                                   toast.error("You already have an active request or offer sent to this group.");
                                                   return;
@@ -1345,20 +1346,26 @@ export default function TeacherDashboard() {
                                                 handleSendOffer(group);
                                               }}
                                               disabled={offerLoading && !offerApp}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                             >
                                               {offerLoading && !offerApp ? 'Sending...' : 'Make Offer'} <ArrowRight className="w-4 h-4" />
                                             </button>
                                           ) : (
                                             <button
                                               onClick={() => {
+                                                if (tokensUsed >= quotaLimit) {
+                                                  toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                                                  setActiveTab('subscriptions');
+                                                  return;
+                                                }
                                                 if (!!offerApp) {
                                                   toast.error("You already have an active request or offer sent to this group.");
                                                   return;
                                                 }
                                                 handleDirectRequestDemo(group);
                                               }}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              disabled={!!offerApp}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                             >
                                               Request Demo <ArrowRight className="w-4 h-4" />
                                             </button>
@@ -2020,19 +2027,37 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
 
-                {/* Current Plan Widget */}
-                <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Current Plan</p>
-                    <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                      Free <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-md">Active</span>
+                {/* Detailed Stats Dashboard */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Current Plan Card */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Current Plan</p>
+                    <h3 className="text-3xl font-black text-gray-900 flex items-center gap-2">
+                      {isProPlan ? 'Pro' : 'Basic'} 
+                      <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-md ml-2">Active</span>
                     </h3>
                   </div>
-                  <div className="text-right max-w-xs w-full">
-                    <p className="text-sm font-bold text-gray-900 mb-2">{dailyRequestsCount || 0} / 5 Requests Used This Week</p>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#00a992] rounded-full" style={{ width: `${Math.min(((dailyRequestsCount || 0) / 5) * 100, 100)}%` }}></div>
+                  
+                  {/* Quota Progress */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm col-span-1 md:col-span-2 flex flex-col justify-center">
+                    <div className="flex justify-between items-end mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Weekly Tokens</p>
+                        <p className="text-2xl font-black text-gray-900">{tokensUsed} / {quotaLimit} Used</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full inline-block">
+                          {tokensRemaining} Tokens Left
+                        </p>
+                      </div>
                     </div>
+                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden mt-2">
+                      <div className="h-full bg-[#00a992] rounded-full transition-all duration-500" style={{ width: `${Math.min((tokensUsed / quotaLimit) * 100, 100)}%` }}></div>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-3 flex justify-between">
+                      <span>Resets on Monday</span>
+                      <span>{activePendingOffers} Total Pending Offers</span>
+                    </p>
                   </div>
                 </div>
 
@@ -2057,8 +2082,8 @@ export default function TeacherDashboard() {
                       </li>
                     </ul>
                     
-                    <button className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50" disabled>
-                      Current Plan
+                    <button className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50" disabled={!isProPlan}>
+                      {!isProPlan ? 'Current Plan' : 'Downgrade (Coming Soon)'}
                     </button>
                   </div>
 
@@ -2088,8 +2113,12 @@ export default function TeacherDashboard() {
                         </li>
                       </ul>
                       
-                      <button onClick={() => toast("Payments coming soon!", { icon: '🚧' })} className="w-full bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] font-black py-4 px-6 rounded-xl transition-all shadow-lg shadow-emerald-900/50 hover:shadow-emerald-900/80 active:scale-95">
-                        Upgrade to Pro
+                      <button 
+                        onClick={isProPlan ? undefined : () => setUpgradeModalOpen(true)} 
+                        disabled={isProPlan}
+                        className={`w-full font-black py-4 px-6 rounded-xl transition-all active:scale-95 ${isProPlan ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] shadow-lg shadow-emerald-900/50 hover:shadow-emerald-900/80'}`}
+                      >
+                        {isProPlan ? 'Active Plan' : 'Upgrade to Pro'}
                       </button>
                     </div>
                   </div>
@@ -2547,8 +2576,19 @@ export default function TeacherDashboard() {
         setNegotiationOffer={setNegotiationOffer}
         handleSendOffer={handleSendOffer}
         handleDirectRequestDemo={handleDirectRequestDemo}
-        dailyRequestsCount={dailyRequestsCount}
+        quotaExceeded={tokensUsed >= quotaLimit}
+        onUpgradeRequested={() => setActiveTab('subscriptions')}
         offerLoading={offerLoading}
+      />
+      {/* Upgrade to Pro Confirm Modal */}
+      <TransactionConfirmModal
+        isOpen={upgradeModalOpen}
+        type="success"
+        title="Upgrade to Pro"
+        description="Are you sure you want to upgrade to the Pro plan for ₹499/month? You will receive 15 tokens per week and priority matching."
+        confirmText="Confirm & Pay"
+        onConfirm={handleUpgradeToPro}
+        onCancel={() => setUpgradeModalOpen(false)}
       />
       {/* Delete Account Modal */}
       <DeleteAccountModal

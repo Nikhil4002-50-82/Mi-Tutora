@@ -1,133 +1,117 @@
-# Project Architecture & Documentation
+# Platform Business & Technical Architecture
 
-## 1. Project Overview
+Welcome! This document explains how the platform works from both a business perspective and a technical perspective. We've designed this to be easy to understand for everyone, while still listing the exact database collections developers need.
 
-This platform is an educational marketplace designed to connect **Tutors, Students, and Parents**. It facilitates the process of finding tutors, requesting tuitions, managing applications, and forming tutoring groups. 
+---
 
-The application streamlines the entire lifecycle: from the initial search and tuition request, through negotiation and demo scheduling, to the finalization of the tutoring arrangement.
+## The Big Picture: How the Platform Works
 
-## 2. High-Level System Architecture
+At its core, the platform connects **Students/Parents** with **Teachers**. The journey goes through four main phases:
 
-The system utilizes a modern, serverless architecture optimized for performance, SEO, and real-time data sync.
+1. **Onboarding & Grouping:** Parents create profiles and add their kids.
+2. **Discovery & Negotiation:** Teachers and Students find each other and haggle on price.
+3. **Demo Phase:** The teacher pays a fee and a trial class is scheduled.
+4. **The 7-Day Trial:** The final decision and payment phase.
 
-```mermaid
-flowchart LR
-    subgraph webApp ["Next.js Web Application"]
-        client("Client / Browser")
-        nextServer("Next.js Server")
-    end
-    
-    subgraph firebase ["Firebase Backend"]
-        firestore[("Firestore DB")]
-        auth{"Firebase Auth"}
-    end
-    
-    client -->|API Requests| nextServer
-    nextServer -->|Server SDK| firestore
-    client -->|Client SDK| firestore
-    client -->|Auth Sync| auth
-```
-
-*   **Frontend/Backend Layer**: Built with **Next.js 16 (App Router)**. It leverages Server Components for data fetching and SEO, and Client Components for interactive UI elements. API Routes or Server Actions handle sensitive operations.
-*   **Database**: **Firebase Firestore**, a NoSQL document database, providing real-time data synchronization and scalable document storage.
-*   **Authentication**: Managed by **Firebase Authentication** (implicitly required for secure access to Firestore rules and user management).
-*   **Hosting/Deployment**: Configured for deployment on **Netlify** (indicated by `netlify.toml`), though fully compatible with Vercel.
-
-## 3. Technology Stack & UI Architecture
-
-*   **Core Framework**: React 19, Next.js 16
-*   **Styling**: Tailwind CSS v4 is the primary utility-first CSS framework.
-*   **UI Components**: Heavily relies on **Radix UI** primitives for accessible, headless components (Dialogs, Menus, Accordions). **Emotion/MUI** is also present for specific complex components.
-*   **Animations**: **Framer Motion** (`motion`) and `tw-animate-css` are used for micro-interactions and page transitions.
-*   **Complex Interactions**: Drag-and-drop functionality is powered by `@hello-pangea/dnd` and `react-dnd`.
-*   **Data Visualization**: `recharts` for displaying statistics and analytics.
-*   **Form Handling**: `react-hook-form` for robust client-side form validation.
-
-## 4. Core Data Model & Database Schema
-
-The Firestore database is designed to handle multiple user roles and the complex lifecycle of a tutoring arrangement.
-
-```mermaid
-erDiagram
-    USERS ||--o{ STUDENTS : "is a"
-    USERS ||--o{ TUTORS : "is a"
-    USERS ||--o{ PARENTS : "is a"
-    
-    PARENTS ||--o{ GROUPS : "creates"
-    STUDENTS }|--|{ GROUPS : "belongs to (solo or multiple)"
-    
-    GROUPS ||--o{ TUITION_REQUESTS : "creates"
-    
-    TUITION_REQUESTS ||--o{ APPLICATIONS : "results in"
-    TUTORS ||--o{ APPLICATIONS : "receives/bids on"
-```
-
-### Primary Collections:
-*   **`users`**: Base collection for all authenticated identities. Stores roles, FCM tokens, and wallet balances.
-*   **`tutors`**: Detailed profiles for educators (subjects, experience, pricing, location, rating).
-*   **`students`**: Learner profiles (class level, goals, subjects, budget).
-*   **`parents`**: Guardian profiles linked to students.
-*   **`groups`**: Created by parents (or students) to group learners together. Even a solo student is represented as a group of one.
-*   **`tuition_requests`**: Inquiries created by groups detailing their requirements (budget, subjects, preferred time).
-*   **`applications`**: The active negotiation state between a tutor and a group for a specific request. Tracks proposed prices, demo dates, and status.
-*   **`admin_activity` & `notifications`**: System logging and user alerts.
-*   **`global_config`**: App-wide feature flags (e.g., enabling payments, recommendations, marketplace).
-
-## 5. Key Workflows & System Behaviors
-
-### The Application Lifecycle
+Here is a visual map of the entire business flow:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> TuitionRequestCreated: Group submits
+    %% Phases
+    state "1. Onboarding" as Phase1 {
+        ParentSignsUp --> AddsStudents
+        AddsStudents --> GroupCreated
+    }
     
-    TuitionRequestCreated --> ApplicationInitiated: Tutor shows interest
+    state "2. Discovery & Negotiation" as Phase2 {
+        GroupCreated --> RecommendedTab
+        RecommendedTab --> Negotiation
+        Negotiation --> PriceAgreed
+    }
     
-    ApplicationInitiated --> Negotiation: Proposing Time/Price
-    Negotiation --> ApplicationInitiated: Counter-offer
+    state "3. Demo Phase" as Phase3 {
+        PriceAgreed --> TeacherPaysDemoFee
+        TeacherPaysDemoFee --> DemoScheduled
+        DemoScheduled --> DemoCompleted
+    }
     
-    ApplicationInitiated --> DemoScheduled: Demo agreed
-    DemoScheduled --> DemoCompleted: Demo conducted
-    
-    DemoCompleted --> FinalizingPayment: Both parties agree
-    DemoCompleted --> Rejected: Not a fit
-    
-    FinalizingPayment --> ArrangementFinalized: Payment confirmed (Success)
-    
-    ArrangementFinalized --> [*]
-    Rejected --> [*]
+    state "4. The 7-Day Trial" as Phase4 {
+        DemoCompleted --> WaitingForDecision
+        WaitingForDecision --> Hired(TuitionStarted)
+        WaitingForDecision --> Rejected(Within7Days)
+        Hired(TuitionStarted) --> Discontinued(After7Days)
+    }
+
+    Phase1 --> Phase2
+    Phase2 --> Phase3
+    Phase3 --> Phase4
 ```
 
-1.  **Request Generation**: A group creates a `tuition_request` specifying their needs.
-2.  **Application / Bidding**: Tutors can view requests and initiate an `application`, establishing a connection.
-3.  **Negotiation & Demo**: The `application` document tracks the negotiation of price, timings, and the scheduling of a demo session.
-4.  **Finalization**: Upon a successful demo and agreement (payment confirmation), the application is marked complete, and the arrangement is finalized.
+---
 
-## 6. Directory Structure
+## 1. Student Onboarding & The "Group" Logic
 
-```text
-mushi/
-├── db_analyzer/           # Scripts and tools for analyzing Firestore schema
-│   ├── analyze.js
-│   └── schema_report.md   # Auto-generated snapshot of the DB structure
-├── docs/                  # Project documentation (You are here)
-│   ├── negotiation_plan.md# Strategy document for the negotiation feature
-│   ├── ranking_plan.md    # Strategy document for tutor ranking algorithm
-│   └── whatsapp_automation_options.md # Plans for WhatsApp integration
-├── web/                   # The main Next.js Application
-│   ├── public/            # Static assets
-│   ├── src/
-│   │   ├── api/           # Backend API routes / endpoints
-│   │   ├── app/           # Next.js App Router pages (auth, dashboard, etc.)
-│   │   ├── components/    # Reusable React components
-│   │   ├── styles/        # Global CSS and Tailwind configs
-│   │   └── utils/         # Helper functions and constants
-│   ├── package.json       # App dependencies
-│   └── tailwind.config.ts # Tailwind UI styling configuration
-```
+When a Parent signs up, they create a profile and add their children (Students). 
 
-## 7. Strategic & Planned Features (Roadmap)
+**The Business Rule:** Every student *must* belong to a "Group". 
+- If a parent adds 1 student, they are placed in a solo group.
+- If a parent adds 3 students, the parent can put all 3 in a single group (so they are taught together) or split them into different groups.
 
-Based on internal planning documents, the following major features are in focus:
+**Database Architecture:**
+- **Collections used:** `parents`, `students`, `groups`
+- **How it connects:** The system creates a `groupDocId` in the `groups` collection. Every student inside that group has this `groupDocId` saved on their profile. 
+- **Why?** Because Teachers don't apply to individual students; they apply to the **Group**. This makes batch-teaching seamless.
 
-1.  **WhatsApp Automation (`whatsapp_automation_options.md`)**: Integrating WhatsApp APIs to send critical notifications (e.g., demo scheduled, payment received) to parents and tutors who are more active on WhatsApp than email/app notifications.
+---
+
+## 2. Discovery & 2-Way Negotiation
+
+**The Business Rule:** Teachers see matching Student Groups in their "Recommended" tab. Both the Teacher and the Student can start negotiating the tuition fee.
+
+**Database Architecture:**
+- **Collections used:** `applications`
+- **How it connects:** When someone clicks "Send Offer", an `applications` document is created.
+- **The 2-Way Negotiation:** 
+  - Both portals (Teacher and Student) can negotiate and they share the exact same `currentOffer` field in the database.
+  - If a Teacher asks for Rs 4000, they update `currentOffer: 4000`. 
+  - If the Student counters with Rs 3000, they update `currentOffer: 3000`. 
+  - This ping-pong continues seamlessly across both portals until one side clicks "Accept".
+
+---
+
+## 3. The Demo Fee & Scheduling
+
+**The Business Rule:** Once a price is agreed upon, the Teacher MUST pay a small "Demo Fee" to the platform before the demo class can be scheduled.
+
+**Database Architecture:**
+- **Fields used:** `status`, `demoPaymentPaid`
+- **How it connects:** 
+  1. Once accepted, the application `status` changes to `demo_pending_payment`.
+  2. The Teacher pays the fee (which is dynamically calculated based on the category).
+  3. `demoPaymentPaid` is set to `true`, and the status moves to `demo_booking_phase`.
+  4. They propose a date/time and it becomes `demo_scheduled`.
+
+---
+
+## 4. The 7-Day Trial & Payment Logic
+
+**The Business Rule:** After the demo class finishes, a 7-day countdown begins. The Parent must decide whether to permanently hire the Teacher or reject them.
+
+**Scenario A: Rejection within 7 days**
+- **Business Rule:** The Parent only pays for the exact number of days they used.
+- **Technical Logic:** The system calculates the days elapsed. If it is less than 7, it calculates a `proratedFee` (Monthly Fee divided by Days in Month, multiplied by Days Elapsed). The Parent pays this small amount to disconnect.
+
+**Scenario B: Discontinuation AFTER 7 days**
+- **Business Rule:** If the Parent tries to cancel the teacher *after* the 7-day safety window, they are penalized and must pay the **FULL** monthly fee to cancel.
+- **Technical Logic:** If 7 or more days have elapsed, the proration calculation is ignored. The system forces the payment of the `finalPrice` (the full monthly fee) to discontinue.
+
+**Scenario C: Hired!**
+- **Technical Logic:** The status becomes `tuition_started`.
+- **Auto-Rejection Automation:** The system automatically finds every *other* teacher who was negotiating with this group, and changes their status to `declined` with the reason `student_hired_another_tutor`. This keeps the database clean.
+
+---
+
+## Anti-Spam Safety Rules
+To prevent abuse, the system has strict automated limits built-in to the architecture:
+1. **Student Demo Limit:** A student can only have a maximum of **2 active demos** in a 7-day period. (This prevents parents from endlessly collecting free trial classes).
+2. **Teacher Request Limit:** A teacher on the Basic plan can only send **5 requests per day**. (This prevents spamming students).
