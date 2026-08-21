@@ -39,6 +39,138 @@ function LoginContent() {
   const role = ['student', 'teacher', 'parent'].includes(urlRole as string) ? (urlRole as string) : 'student';
   const isTeacher = role === 'teacher';
 
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
+  const [showGoogleRefModal, setShowGoogleRefModal] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (!referralCode) {
+      const savedRef = localStorage.getItem('mitutora_ref');
+      if (savedRef) setReferralCode(savedRef);
+    }
+  }, [referralCode]);
+
+  const handleGoogleLogin = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const { auth, db } = await import('@/utils/firebase/client');
+    const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+    const { doc, getDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
+    
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      let userRole = role;
+      
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        let roles = data.roles || (data.role ? [data.role] : []);
+        
+        if (!roles.includes(role)) {
+          const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
+          await updateDoc(doc(db, 'users', user.uid), payload);
+          roles.push(role);
+          
+          const { setDoc } = await import('firebase/firestore');
+          if (role === 'parent') {
+            const parentId = generateCustomId('MTP');
+            await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
+          } else if (role === 'teacher') {
+            const tutorId = generateCustomId('MTT');
+            await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+          }
+        }
+        userRole = role;
+        
+        localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
+        localStorage.removeItem('mitutora_ref');
+        let nextUrl = searchParams.get('next');
+        if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
+          nextUrl = null;
+        }
+        router.push(nextUrl || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
+      } else {
+        // User is brand new!
+        if (referralCode.trim()) {
+          // If code is already present, just complete it
+          await completeGoogleLogin(user);
+        } else {
+          // No code, prompt them
+          setPendingGoogleUser(user);
+          setShowGoogleRefModal(true);
+          setIsSubmitting(false);
+        }
+      }
+    } catch (error: any) {
+      toast.error(getFriendlyAuthError(error));
+      setIsSubmitting(false);
+    }
+  };
+
+  const completeGoogleLogin = async (user: any) => {
+    setIsSubmitting(true);
+    const { db } = await import('@/utils/firebase/client');
+    const { doc, setDoc, collection, query, where, getDocs, addDoc } = await import('firebase/firestore');
+    
+    try {
+      let finalReferrerName = '';
+      if (referralCode.trim()) {
+        const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const referrerUserDoc = querySnapshot.docs[0];
+          const referrerUser = referrerUserDoc.data();
+          finalReferrerName = referrerUser.name || '';
+          
+          await addDoc(collection(db, 'referrals'), {
+            referrerId: referrerUser.id,
+            referrerName: referrerUser.name,
+            referredUserId: user.uid,
+            referredUserName: user.displayName || '',
+            referralCode: referralCode.trim().toUpperCase(),
+            referralType: role,
+            status: 'pending',
+            estimatedReward: 0,
+            createdAt: Date.now()
+          });
+        }
+      }
+
+      const userPayload: any = {
+        id: user.uid,
+        email: user.email,
+        name: user.displayName || '',
+        role: role,
+        roles: [role],
+        referredBy: referralCode.trim()
+      };
+      if (finalReferrerName) userPayload.referrerName = finalReferrerName;
+      await setDoc(doc(db, 'users', user.uid), userPayload);
+
+      if (role === 'student' || role === 'parent') {
+        const parentId = generateCustomId('MTP');
+        await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
+      } else if (role === 'teacher') {
+        const tutorId = generateCustomId('MTT');
+        await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+      }
+      
+      localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: role, roles: [role] }));
+      localStorage.removeItem('mitutora_ref');
+      let nextUrl = searchParams.get('next');
+      if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
+        nextUrl = null;
+      }
+      router.push(nextUrl || (role === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
+    } catch (error: any) {
+      toast.error(getFriendlyAuthError(error));
+      setIsSubmitting(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -245,59 +377,7 @@ function LoginContent() {
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={async () => {
-                if (isSubmitting) return;
-                setIsSubmitting(true);
-                const { auth, db } = await import('@/utils/firebase/client');
-                const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
-                const { doc, getDoc, setDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
-                try {
-                  const provider = new GoogleAuthProvider();
-                  const result = await signInWithPopup(auth, provider);
-                  const user = result.user;
-                  
-                  const userDoc = await getDoc(doc(db, 'users', user.uid));
-                  let userRole = role;
-                  let roles = [role];
-
-                  if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    roles = data.roles || (data.role ? [data.role] : []);
-                    
-                    if (!roles.includes(role)) {
-                      const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
-                      await updateDoc(doc(db, 'users', user.uid), payload);
-                      roles.push(role);
-                    }
-                    userRole = role;
-                  } else {
-                    await setDoc(doc(db, 'users', user.uid), {
-                      id: user.uid,
-                      email: user.email,
-                      name: user.displayName || '',
-                      role: role,
-                      roles: [role]
-                    });
-                    if (role === 'student') {
-                      const parentId = generateCustomId('MTP');
-                      await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid });
-                    } else {
-                      const tutorId = generateCustomId('MTT');
-                      await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
-                    }
-                  }
-                  
-                  localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
-                  let nextUrl = searchParams.get('next');
-                  if (nextUrl && (!nextUrl.startsWith('/') || nextUrl.startsWith('//'))) {
-                    nextUrl = null;
-                  }
-                  router.push(nextUrl || (userRole === 'student' ? '/dashboard/student' : '/dashboard/teacher'));
-                } catch (error: any) {
-                  toast.error(getFriendlyAuthError(error));
-                  setIsSubmitting(false);
-                }
-              }}
+              onClick={handleGoogleLogin}
               className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700 disabled:opacity-70"
             >
               <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -407,6 +487,72 @@ function LoginContent() {
 
         </motion.div>
       </div>
+
+      {/* Google Referral Modal */}
+      <AnimatePresence>
+        {showGoogleRefModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+              onClick={() => setShowGoogleRefModal(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                  <Sparkles className="w-6 h-6 text-[#00a992]" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Have a Referral Code?</h3>
+                <p className="text-sm text-gray-500 mb-5 font-medium">
+                  If a friend invited you, enter their code now to claim your network benefits!
+                </p>
+                
+                <div className="relative mb-6">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Award className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. JOHN-X8B2"
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#00a992]/20 focus:border-[#00a992] transition-all font-medium uppercase"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowGoogleRefModal(false);
+                      if (pendingGoogleUser) completeGoogleLogin(pendingGoogleUser);
+                    }}
+                    className="w-full bg-[#00a992] hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all"
+                  >
+                    Submit & Continue
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReferralCode('');
+                      setShowGoogleRefModal(false);
+                      if (pendingGoogleUser) completeGoogleLogin(pendingGoogleUser);
+                    }}
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold text-sm transition-all"
+                  >
+                    Skip, I don't have one
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

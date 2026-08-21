@@ -13,6 +13,7 @@ import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompleten
 import { StudentMotivationBanner } from '@/components/dashboard/StudentMotivationBanner';
 import { ParentProfileCard } from '@/components/dashboard/ParentProfileCard';
 import { TutorViewModal } from '@/components/dashboard/TutorViewModal';
+import { ReviewModal } from '@/components/dashboard/ReviewModal';
 import { TuitionGroupCard } from '@/components/dashboard/TuitionGroupCard';
 
 import { motion } from 'motion/react';
@@ -122,6 +123,7 @@ export default function StudentDashboard() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
+  const [reviewModalConfig, setReviewModalConfig] = useState({ isOpen: false, applicationId: '', tutorName: '', parentDocId: '' });
   const [isEditingParentProfile, setIsEditingParentProfile] = useState(false);
   const [parentFormData, setParentFormData] = useState({ name: '', email: '', phone: '', whatsapp: '', address: '' });
   const [parentSameAsPhone, setParentSameAsPhone] = useState(false);
@@ -467,6 +469,28 @@ export default function StudentDashboard() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'student' && app.createdAt >= todayStart.getTime()).length || 0;
+  const handleReviewSubmit = async (rating: number, comment: string) => {
+    try {
+      const response = await fetch('/api/submit-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: reviewModalConfig.applicationId,
+          parentDocId: reviewModalConfig.parentDocId,
+          rating,
+          comment
+        })
+      });
+      const result = await response.json();
+      if (!result.success) {
+        toast.error(result.error || 'Failed to submit review');
+        return;
+      }
+      toast.success('Review submitted successfully!');
+    } catch (err) {
+      toast.error('An error occurred. Please try again.');
+    }
+  };
 
   const handleRequestTutor = async (tutor: any) => {
     const matchGroup = (app: any) => {
@@ -1505,6 +1529,14 @@ export default function StudentDashboard() {
                                   <span className="text-slate-500 truncate">{teacher.subjects.join(', ')}</span>
                                 </div>
                               )}
+                              {teacher.rating ? (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                  <span className="text-slate-600 font-bold">Rating:</span>
+                                  <span className="text-amber-600 font-bold">{teacher.rating.toFixed(1)}</span>
+                                  <span className="text-slate-400 text-xs">({teacher.reviewCount || 0} reviews)</span>
+                                </div>
+                              ) : null}
                               {teacher.experience && (
                                 <div className="flex items-center gap-2 text-sm">
                                   <LayoutDashboard className="w-4 h-4 text-[#00a992]" />
@@ -2236,6 +2268,23 @@ export default function StudentDashboard() {
                             >
                                 View Details
                             </button>
+                            {cls.status === 'tuition_started' && (
+                              <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReviewModalConfig({
+                                      isOpen: true,
+                                      applicationId: cls.app?.id,
+                                      tutorName: cls.teacher,
+                                      parentDocId: cls.app?.parentDocId || data?.userData?.id
+                                    });
+                                  }}
+                                  className="w-full bg-amber-50 border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-100 text-amber-700 px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1"
+                              >
+                                  <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                                  Review
+                              </button>
+                            )}
                           </div>
 
                           {/* Action Button */}
@@ -2714,7 +2763,12 @@ export default function StudentDashboard() {
 
       {/* Modals and Overlays */}
       {/* View Teacher Profile Modal */}
-      {/* View Tutor Profile Modal */}
+      {/* View Tutor Profile Modal */}      <ReviewModal
+        isOpen={reviewModalConfig.isOpen}
+        onClose={() => setReviewModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onSubmit={handleReviewSubmit}
+        tutorName={reviewModalConfig.tutorName}
+      />
       <TutorViewModal
         selectedViewUser={selectedViewUser}
         selectedViewApp={selectedViewApp}

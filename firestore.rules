@@ -87,10 +87,19 @@ service cloud.firestore {
       allow write: if false; 
     }
 
+    // -------------------------------------------------------------------------
+    // REVIEW SYSTEM: Secure the reviews collection
+    // -------------------------------------------------------------------------
+    match /reviews/{reviewId} {
+      allow read: if true; 
+      // Only the Backend API (via firebase-admin) can create reviews to enforce true average calculations
+      allow write: if false; 
+    }
+
     // Keep the rest of the database completely open (as it was before)
     // This ensures we do not break any existing design or logic in your app.
     match /{collection}/{document=**} {
-      allow read, write: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments';
+      allow read, write: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
     }
   }
 }
