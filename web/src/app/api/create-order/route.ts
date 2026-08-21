@@ -60,8 +60,21 @@ export async function POST(req: NextRequest) {
     // SIMULATION MODE: If credentials are missing, instantly return a mock order
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
       console.warn('RAZORPAY credentials not found. Returning MOCK order.');
+      const mockOrderId = `mock_order_${Date.now()}`;
+      
+      await adminDb.collection('payments').add({
+        razorpayOrderId: mockOrderId,
+        applicationId,
+        userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
+        amount: totalToPay,
+        currency: 'INR',
+        status: 'created',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
       return NextResponse.json({
-        id: `mock_order_${Date.now()}`,
+        id: mockOrderId,
         amount: amountInPaise,
         currency: 'INR',
         mockMode: true,

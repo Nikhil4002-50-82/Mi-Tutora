@@ -83,15 +83,8 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
             updatedAt: new Date()
         });
     } else {
-        // If it was mock mode and we didn't create a created entry, create a paid entry directly
-        batch.set(adminDb.collection('payments').doc(), {
-            razorpayOrderId: orderId,
-            razorpayPaymentId: paymentId,
-            applicationId,
-            status: 'paid',
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
+        // SECURITY PATCH: Do not blindly accept unknown order IDs
+        throw new Error("Order ID not found in secure ledger. Payment rejected.");
     }
 
     // Fetch app data to execute logic

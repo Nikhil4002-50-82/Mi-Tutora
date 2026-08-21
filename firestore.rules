@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Secure the "users" collection against privilege escalation
+    // Secure the "users" collection against privilege escalation and mass deletion
     match /users/{userId} {
       allow read: if true; 
       
@@ -14,11 +14,14 @@ service cloud.firestore {
       allow update: if (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'roles'])) 
                     || (request.resource.data.roles.hasOnly(['student', 'teacher', 'parent']));
                     
-      allow delete: if true; // Kept open like the rest of the DB
+      // Lock down deletion to the actual user
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
-    // Secure the "tutors" collection against Quota Hackers
+    
+    // Secure the "tutors" collection against Quota Hackers and mass deletion
     match /tutors/{tutorId} {
-      allow read, create, delete: if true;
+      allow read, create: if true;
+      allow delete: if request.auth != null && request.auth.uid == tutorId;
       
       // Enforce the Weekly Token limits
       allow update: if 
@@ -31,9 +34,10 @@ service cloud.firestore {
         );
     }
 
-    // Secure the "parents" collection to enforce daily usage quotas securely
+    // Secure the "parents" collection to enforce daily usage quotas securely and prevent mass deletion
     match /parents/{parentId} {
-      allow read, create, delete: if true;
+      allow read, create: if true;
+      allow delete: if request.auth != null && request.auth.uid == parentId;
       
       allow update: if 
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyUsage']))
@@ -52,15 +56,20 @@ service cloud.firestore {
         );
     }
 
-    // Secure the "applications" collection to enforce the quota chain
+    // Secure the "applications" collection against price manipulation and fake payments
     match /applications/{appId} {
-      allow read, update, delete: if true; // Existing behavior preserved
+      allow read, delete: if true; 
       
-      // ⚠️ FUTURE RAZORPAY LOCKDOWN: When you are ready to switch to Razorpay, 
-      // replace the `allow update: if true;` above with the following to block frontend hackers:
-      // allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['feePaid', 'demoPaymentPaid'])
-      //               && (request.resource.data.status == resource.data.status 
-      //                   || !(request.resource.data.status in ['tuition_started', 'demo_booking_phase']));
+      // 1. Prevent ANY frontend modification of feePaid or demoPaymentPaid (Backend only)
+      // 2. Lock down finalPrice, budget, and currentOffer if the app has moved past the negotiation phase
+      allow update: if 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['feePaid', 'demoPaymentPaid']))
+        &&
+        (
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['finalPrice', 'budget', 'currentOffer']))
+          || 
+          !(resource.data.status in ['accepted', 'tuition_started', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_pending_payment'])
+        );
 
       // Creating an application requires updating the initiator's quota tracker in the exact same batch/transaction
       allow create: if true 
@@ -76,14 +85,10 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    // FUTURE RAZORPAY INTEGRATION: Secure the new "payments" ledger
+    // PAYMENTS LEDGER: Strictly backend only writes
     // -------------------------------------------------------------------------
     match /payments/{paymentId} {
-      // Anyone involved in the application can read the receipt
       allow read: if true; 
-      
-      // ABSOLUTELY NO FRONTEND WRITES. Only the secure Backend API (which bypasses rules) 
-      // is allowed to create or modify financial ledgers after verifying Razorpay signatures.
       allow write: if false; 
     }
 
@@ -92,14 +97,13 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /reviews/{reviewId} {
       allow read: if true; 
-      // Only the Backend API (via firebase-admin) can create reviews to enforce true average calculations
       allow write: if false; 
     }
 
-    // Keep the rest of the database completely open (as it was before)
-    // This ensures we do not break any existing design or logic in your app.
+    // Prevent anonymous mass-deletion on the rest of the DB while keeping it open for logic
     match /{collection}/{document=**} {
-      allow read, write: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
+      allow read, create, update: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
+      allow delete: if request.auth != null && collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
     }
   }
 }
