@@ -856,66 +856,97 @@ export default function StudentDashboard() {
   const handlePaymentSubmit = async () => {
     setPaymentLoading(true);
     try {
-      const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc, collection, query, where, getDocs, arrayRemove } = await import('firebase/firestore');
+      // 1. Fetch Order from our secure backend
+      const res = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: payingClass.id,
+          role: 'student',
+          useWallet
+        })
+      });
+      const order = await res.json();
+      if (!res.ok) throw new Error(order.error || 'Failed to create order');
+
+      // 2. Load Razorpay SDK
+      const loadRazorpay = () => new Promise(resolve => {
+         if ((window as any).Razorpay) return resolve(true);
+         const script = document.createElement('script');
+         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+         script.onload = () => resolve(true);
+         script.onerror = () => resolve(false);
+         document.body.appendChild(script);
+      });
       
-      const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
-      const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
-      
-      const walletBalance = data?.userData?.walletBalance || 0;
-      
-      // Deduct wallet if used
-      if (useWallet && walletBalance > 0) {
-        const usedAmount = Math.min(totalToPay, walletBalance);
-        await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: walletBalance - usedAmount });
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) throw new Error('Razorpay SDK failed to load');
+
+      // 3. Setup Razorpay Options
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'mock_key', // Required field, backend handles real verification
+        amount: order.amount,
+        currency: order.currency,
+        name: 'MiTutora',
+        description: payingClass.isRemoval ? 'Tuition Fee Payment (Removal)' : 'Tuition Fee Payment',
+        order_id: order.id,
+        handler: async function (response: any) {
+           // 4. Verify Payment securely on the backend
+           const verifyRes = await fetch('/api/verify-payment', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+               razorpay_order_id: response.razorpay_order_id || order.id,
+               razorpay_payment_id: response.razorpay_payment_id || 'mock_payment_id',
+               razorpay_signature: response.razorpay_signature || 'mock_signature',
+               applicationId: payingClass.id,
+               role: 'student',
+               isRemoval: !!payingClass.isRemoval,
+               useWallet
+             })
+           });
+           
+           const verifyData = await verifyRes.json();
+           if (!verifyRes.ok) {
+              toast.error(verifyData.error || 'Payment verification failed');
+           } else {
+              // 5. Success! Sync Availability and update UI
+              const { db } = await import('@/utils/firebase/client');
+              const { syncStudentAvailability } = await import('@/utils/studentAvailability');
+              await syncStudentAvailability(db, payingClass.studentDocIds || [payingClass.studentDocId]).catch(console.error);
+              
+              toast.success("Payment completed successfully!");
+              setPayingClass(null);
+              setUseWallet(false);
+              mutate();
+           }
+        },
+        prefill: {
+           name: data?.userData?.name || '',
+           email: data?.userData?.email || '',
+           contact: data?.userData?.phone || ''
+        },
+        theme: {
+           color: '#4F46E5'
+        }
+      };
+
+      // 4. MOCK MODE BYPASS (If no RAZORPAY_KEY_ID in backend, it returned mockMode: true)
+      if (order.mockMode) {
+          options.handler({
+             razorpay_order_id: order.id,
+             razorpay_payment_id: 'mock_payment_id',
+             razorpay_signature: 'mock_signature'
+          });
+          return; // Skip opening real Razorpay widget
       }
 
-      if (payingClass.isRemoval) {
-        await updateDoc(doc(db, 'applications', payingClass.id), { 
-          status: 'declined', 
-          feePaid: true,
-          updatedAt: Date.now()
-        });
-      } else {
-        await updateDoc(doc(db, 'applications', payingClass.id), { 
-          status: 'tuition_started', 
-          feePaid: true,
-          updatedAt: Date.now()
-        });
-      }
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+         toast.error(response.error.description || 'Payment Failed');
+      });
+      rzp.open();
 
-      // Note: We no longer auto-decline other applications here because hiring (which auto-declines) happens earlier.
-
-      const qGroupId = payingClass.groupDocId || payingClass.studentDocId;
-      if (qGroupId) {
-          const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupDocId', '==', qGroupId)));
-          const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentDocId', '==', qGroupId)));
-          
-          const docsToProcess = new Map();
-          otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
-          otherAppsSnap2.docs.forEach(d => docsToProcess.set(d.id, d));
-          
-          for (const [docId, docSnap] of Array.from(docsToProcess.entries())) {
-             if (docId !== payingClass.id && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
-                await updateDoc(doc(db, 'applications', docId), {
-                   status: 'declined',
-                   reason: 'student_hired_another_tutor',
-                   declinedAt: Date.now(),
-                   updatedAt: Date.now()
-                });
-                // Legacy pendingRequests removal removed
-             }
-          }
-      }
-      const appDataSync = payingClass;
-      if (appDataSync) {
-        const { syncStudentAvailability } = await import('@/utils/studentAvailability');
-        await syncStudentAvailability(db, appDataSync.studentDocIds || [appDataSync.studentDocId]).catch(console.error);
-      }
-      toast.success("Payment completed successfully!");
-      setPayingClass(null);
-      setUseWallet(false);
-      mutate();
     } catch (e: any) {
       toast.error(e.message || "Payment failed");
     } finally {
