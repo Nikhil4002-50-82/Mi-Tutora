@@ -27,7 +27,7 @@ export const fetchStudentDashboardData = async () => {
       id: user.uid,
       email: user.email,
       name: user.displayName || 'Student',
-      role: 'student',
+      roles: ['student'],
       hasProfile: false,
       walletBalance: 0
     };
@@ -236,7 +236,7 @@ export const fetchTeacherDashboardData = async () => {
       id: user.uid,
       email: user.email,
       name: user.displayName || 'Teacher',
-      role: 'teacher',
+      roles: ['teacher'],
       hasProfile: false,
       walletBalance: 0
     };

@@ -7,7 +7,7 @@ Welcome! This document explains how the Referral and Rewards system works. We've
 ## The Big Picture: How It Works
 
 Imagine you are a player in a game. 
-1. **The Code:** You generate a special secret code (your Referral Code).
+1. **The Code:** After completing your formal Profile Setup, the system generates a unique secret code (your Referral Code) using your professional identity.
 2. **The Link:** You share a link with your friend.
 3. **The Cookie:** When your friend clicks the link, the website "remembers" your code in their browser cookie.
 4. **The Signup:** When your friend signs up, the website permanently links your account to theirs.
@@ -22,8 +22,8 @@ Here is exactly where all the referral data is stored in the Firebase Database:
 
 | Step | What happens? | Collection | Fields Used |
 | :--- | :--- | :--- | :--- |
-| **Identity** | A user's total money and unique code. | `users` | `referralCode` (String), `walletBalance` (Number) |
-| **Signup** | When a new user joins using a link. | `users` | `referredBy` (UID of referrer), `referrerName` (Name of referrer) |
+| **Identity** | A user's total money, code, and formal name. | `users` | `referralCode` (String), `walletBalance` (Number), `name` (Formal Profile Name) |
+| **Signup** | When a new user joins using a link. | `users` | `referredBy` (UID of referrer), `referrerName` (Formal Name of referrer) |
 | **Tracking** | A ticket proving the referral happened. | `referrals` | `referrerId`, `referredId`, `status` ("pending" or "qualified"), `rewardAmount` |
 | **Trigger** | The moment the 25% reward is calculated. | `applications` | `finalPrice` or `budget` (Number), `status` (changes to "tuition_started") |
 
@@ -37,7 +37,15 @@ When someone clicks `mitutora.com?ref=JOHN123`:
 
 ---
 
-## 3. The 25% Magic Math (How you get paid)
+## 3. Real-Time Tracking (How it feels like magic)
+
+When a friend signs up using your link, they appear on your dashboard **instantly**. 
+- The dashboards use a Firebase `onSnapshot` websocket listener to continuously monitor the `referrals` collection.
+- You do not need to refresh the page. The moment their account is created, your "Your Referrals" list updates in real-time.
+
+---
+
+## 4. The 25% Magic Math (How you get paid)
 
 Because we run on a free database, we don't use expensive background servers to calculate money. Instead, the magic happens exactly when a Student clicks **"Hire Teacher"**.
 
@@ -49,7 +57,7 @@ Because we run on a free database, we don't use expensive background servers to 
 
 ---
 
-## 4. The WhatsApp Security Firewall
+## 5. The WhatsApp Security Firewall
 
 Because the math happens in the browser, a hacker could theoretically try to trick the system into giving them Rs 1,000,000. 
 

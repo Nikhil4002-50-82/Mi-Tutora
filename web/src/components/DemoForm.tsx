@@ -88,7 +88,7 @@ export default function DemoForm({
     return {
       step: (hasProfile && !parentOnly) ? 2 : 1,
       numberOfStudents: 1,
-      parentName: '',
+      parentName: initialData?.guardianName || initialData?.parentName || '',
       phone: '',
       whatsapp: '',
       email: '',
@@ -363,8 +363,9 @@ export default function DemoForm({
   const updateNumberOfStudents = (num: number) => {
     setFormData((prev: any) => {
       const currentStudents = [...prev.students];
-      if (num > currentStudents.length) {
-        for (let i = currentStudents.length; i < num; i++) {
+      const targetLen = Math.max(1, num);
+      if (targetLen > currentStudents.length) {
+        for (let i = currentStudents.length; i < targetLen; i++) {
           currentStudents.push({
             id: `new_${Date.now()}_${i}`,
             fullName: '',
@@ -380,8 +381,8 @@ export default function DemoForm({
             groupId: 'unassigned'
           });
         }
-      } else if (num < currentStudents.length) {
-        currentStudents.length = num;
+      } else if (targetLen < currentStudents.length) {
+        currentStudents.length = targetLen;
       }
       return { ...prev, numberOfStudents: num, students: currentStudents };
     });
@@ -397,6 +398,11 @@ export default function DemoForm({
 
   const handleSubmit = async (e?: React.FormEvent, skipGroupingCheck = false) => {
     if (e) e.preventDefault();
+    
+    if (!formData.numberOfStudents || formData.numberOfStudents < 1) {
+      alert("Please enter a valid number of students (e.g. 1)");
+      return;
+    }
     
     if (!parentOnly && !skipGroupingCheck) {
       if (formData.step < formData.numberOfStudents + 1) {
@@ -443,7 +449,16 @@ export default function DemoForm({
         const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
         const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.parentName, user.uid);
-        await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
+        await setDoc(userDocRef, { hasProfile: true, referralCode: newCode, name: formData.parentName }, { merge: true });
+
+        // Retroactively update pending referral tickets with formal name
+        const refQ = query(collection(db, 'referrals'), where('referredUserId', '==', user.uid));
+        const refSnap = await getDocs(refQ);
+        if (!refSnap.empty) {
+          for (const rDoc of refSnap.docs) {
+            await updateDoc(doc(db, 'referrals', rDoc.id), { referredUserName: formData.parentName });
+          }
+        }
       }
 
       let customParentId = user.uid;
@@ -885,7 +900,7 @@ export default function DemoForm({
     );
   };
 
-  const isGroupPreferencesStep = !parentOnly && formData.step === formData.numberOfStudents + 3;
+  const isGroupPreferencesStep = !parentOnly && formData.step === (formData.numberOfStudents || 1) + 3;
 
   const renderFormStep = () => {
     if (formData.step === 1) {
@@ -1260,12 +1275,16 @@ export default function DemoForm({
           <div className="my-6">
             <label className="block text-sm font-semibold mb-2">🔢 Number of Students</label>
             <input
-              type="number"
-              min="1"
-              max="10"
-              value={formData.numberOfStudents}
-              onChange={(e) => updateNumberOfStudents(parseInt(e.target.value) || 1)}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={formData.numberOfStudents || ""}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                updateNumberOfStudents(val === '' ? 0 : parseInt(val));
+              }}
+              placeholder="Enter number of students (e.g. 1)"
+              className="w-full border border-slate-300 rounded-xl px-4 py-4 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <p className="text-xs text-slate-500 mt-2 font-medium">
               Select how many students you'd like to register (you can add more later from your profile).
@@ -1477,7 +1496,7 @@ export default function DemoForm({
     );
   };
 
-  const isGroupingStep = !parentOnly && formData.step === formData.numberOfStudents + 2;
+  const isGroupingStep = !parentOnly && formData.step === (formData.numberOfStudents || 1) + 2;
 
   if (isGroupingStep) {
     const handleGroupingStrategy = (strategy: string, existingGroupId?: string) => {
@@ -1691,41 +1710,40 @@ export default function DemoForm({
               </div>
             )}
 
-            {!hasProfile && formData.step >= (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) && (
-              <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <input 
-                  type="checkbox" 
-                  id="legal-accept-demo"
+            {!hasProfile && formData.step >= ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) && (
+              <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl flex items-start gap-4">
+                <input
+                  type="checkbox"
+                  id="legalConsent"
                   checked={acceptedLegal}
                   onChange={(e) => setAcceptedLegal(e.target.checked)}
-                  className="mt-1 w-5 h-5 rounded border-gray-300 text-[#00a992] focus:ring-[#00a992]"
+                  className="mt-1 w-5 h-5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
                 />
-                <label htmlFor="legal-accept-demo" className="text-sm text-gray-700 leading-tight">
+                <label htmlFor="legalConsent" className="text-sm text-slate-600 leading-relaxed cursor-pointer select-none">
                   I have read and accept the{' '}
-                  <Link href="/legal/terms-and-conditions" target="_blank" className="text-[#00a992] hover:underline font-semibold">Terms & Conditions</Link>,{' '}
-                  <Link href="/legal/privacy-policy" target="_blank" className="text-[#00a992] hover:underline font-semibold">Privacy Policy</Link>, and{' '}
-                  <Link href="/legal/refund-policy" target="_blank" className="text-[#00a992] hover:underline font-semibold">Refund Policy</Link>.
+                  <Link href="/legal/terms-and-conditions" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Terms & Conditions</Link>,{' '}
+                  <Link href="/legal/privacy-policy" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Privacy Policy</Link>, and{' '}
+                  <Link href="/legal/refund-policy" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Refund Policy</Link>. I consent to being contacted by MiTutora via WhatsApp or phone.
                 </label>
               </div>
             )}
-
-            <div className="flex gap-4 pt-4 border-t border-slate-100">
+            
+            <div className="flex gap-4 pt-6 border-t border-slate-100">
               {formData.step > (hasProfile ? 2 : 1) && (
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
-                  className="px-6 py-4 rounded-xl font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all"
+                  className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95"
                 >
                   ← Back
                 </button>
               )}
-              
               <button
                 type="submit"
-                disabled={loading || (!hasProfile && formData.step >= (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) && !acceptedLegal)}
-                className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 disabled:opacity-50 disabled:hover:from-[#00a992] disabled:hover:to-teal-500 disabled:hover:-translate-y-0 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-teal-500/25 text-lg hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2"
+                disabled={loading || (!hasProfile && formData.step >= ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) && !acceptedLegal)}
+                className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-teal-500/25 hover:-translate-y-1 active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
-                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < (formData.numberOfStudents > 1 ? formData.numberOfStudents + 3 : formData.numberOfStudents + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
+                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
               </button>
             </div>
 

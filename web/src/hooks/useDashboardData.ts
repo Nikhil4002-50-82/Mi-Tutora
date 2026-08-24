@@ -32,6 +32,7 @@ export function useStudentData() {
     let isCancelled = false;
     let unsubscribe: any;
     let unsubscribeTutors: any;
+    let unsubscribeReferrals: any;
     
     const setupRealtime = async () => {
       if (isCancelled) return;
@@ -90,6 +91,38 @@ export function useStudentData() {
           return deriveStudentDashboardState(newBaseData);
         }, { revalidate: false });
       });
+
+      const refsQ = query(collection(db, 'referrals'), where('referrerId', '==', data.user.uid));
+      unsubscribeReferrals = onSnapshot(refsQ, (snapshot: any) => {
+        if (isCancelled) return;
+        if (snapshot.metadata.hasPendingWrites) return;
+        
+        const changedDocs = snapshot.docChanges();
+        if (changedDocs.length === 0) return;
+        
+        mutate((currentData: any) => {
+          if (!currentData || !currentData._baseData) return currentData;
+          let refs = [...(currentData._baseData.referrals || [])];
+          let updated = false;
+
+          changedDocs.forEach((change: any) => {
+            const docData = { id: change.doc.id, ...change.doc.data() };
+            if (change.type === 'added' || change.type === 'modified') {
+               const index = refs.findIndex((r: any) => r.id === docData.id);
+               if (index !== -1) refs[index] = docData;
+               else refs.push(docData);
+               updated = true;
+            } else if (change.type === 'removed') {
+               refs = refs.filter((r: any) => r.id !== docData.id);
+               updated = true;
+            }
+          });
+
+          if (!updated) return currentData;
+          const newBaseData = { ...currentData._baseData, referrals: refs };
+          return deriveStudentDashboardState(newBaseData);
+        }, { revalidate: false });
+      });
     };
     setupRealtime();
 
@@ -97,6 +130,7 @@ export function useStudentData() {
       isCancelled = true;
       if (unsubscribe) unsubscribe();
       if (unsubscribeTutors) unsubscribeTutors();
+      if (unsubscribeReferrals) unsubscribeReferrals();
     };
   }, [data?.user?.uid, mutate]);
 
@@ -130,6 +164,7 @@ export function useTeacherData() {
     let isCancelled = false;
     let unsubscribe: any;
     let unsubscribeStudents: any;
+    let unsubscribeReferrals: any;
     
     const setupRealtime = async () => {
       if (isCancelled) return;
@@ -186,6 +221,37 @@ export function useTeacherData() {
           return deriveTeacherDashboardState(newBaseData);
         }, { revalidate: false });
       });
+      const refsQ = query(collection(db, 'referrals'), where('referrerId', '==', data.user.uid));
+      unsubscribeReferrals = onSnapshot(refsQ, (snapshot: any) => {
+        if (isCancelled) return;
+        if (snapshot.metadata.hasPendingWrites) return;
+        
+        const changedDocs = snapshot.docChanges();
+        if (changedDocs.length === 0) return;
+        
+        mutate((currentData: any) => {
+          if (!currentData || !currentData._baseData) return currentData;
+          let refs = [...(currentData._baseData.referrals || [])];
+          let updated = false;
+
+          changedDocs.forEach((change: any) => {
+            const docData = { id: change.doc.id, ...change.doc.data() };
+            if (change.type === 'added' || change.type === 'modified') {
+               const index = refs.findIndex((r: any) => r.id === docData.id);
+               if (index !== -1) refs[index] = docData;
+               else refs.push(docData);
+               updated = true;
+            } else if (change.type === 'removed') {
+               refs = refs.filter((r: any) => r.id !== docData.id);
+               updated = true;
+            }
+          });
+
+          if (!updated) return currentData;
+          const newBaseData = { ...currentData._baseData, referrals: refs };
+          return deriveTeacherDashboardState(newBaseData);
+        }, { revalidate: false });
+      });
     };
     setupRealtime();
 
@@ -193,6 +259,7 @@ export function useTeacherData() {
       isCancelled = true;
       if (unsubscribe) unsubscribe();
       if (unsubscribeStudents) unsubscribeStudents();
+      if (unsubscribeReferrals) unsubscribeReferrals();
     };
   }, [data?.user?.uid, mutate]);
 

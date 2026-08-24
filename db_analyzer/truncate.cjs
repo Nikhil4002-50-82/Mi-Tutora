@@ -37,6 +37,29 @@ async function truncateCollection(collectionName) {
     console.log(`Deleted ${count} documents from ${collectionName}.`);
 }
 
+async function truncateAuth() {
+    console.log("Starting Firebase Authentication truncation...");
+    try {
+        let nextPageToken;
+        let count = 0;
+        do {
+            const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+            const uids = listUsersResult.users.map(userRecord => userRecord.uid);
+            if (uids.length > 0) {
+                const deleteResult = await admin.auth().deleteUsers(uids);
+                count += deleteResult.successCount;
+                if (deleteResult.failureCount > 0) {
+                    console.log(`Failed to delete ${deleteResult.failureCount} auth users.`);
+                }
+            }
+            nextPageToken = listUsersResult.pageToken;
+        } while (nextPageToken);
+        console.log(`Deleted ${count} users from Firebase Authentication.`);
+    } catch (error) {
+        console.error("Error deleting auth users:", error);
+    }
+}
+
 async function runTruncation() {
     console.log("Starting full database truncation...");
     const collections = [
@@ -55,7 +78,9 @@ async function runTruncation() {
         await truncateCollection(col);
     }
     
-    console.log("Truncation complete! All specified collections are now completely empty.");
+    await truncateAuth();
+    
+    console.log("Truncation complete! All specified collections and auth users are now completely empty.");
 }
 
 runTruncation().catch(console.error);

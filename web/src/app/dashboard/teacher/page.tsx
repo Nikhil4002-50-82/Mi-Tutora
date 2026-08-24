@@ -97,7 +97,7 @@ export default function TeacherDashboard() {
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedViewApp, setSelectedViewApp] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
+  const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('all');
   const [isSwitchingTab, setIsSwitchingTab] = useState(false);
   const [subTab, setSubTab] = useState<string>('');
   const [negotiationOffer, setNegotiationOffer] = useState<{ [key: string]: string }>({});
@@ -182,7 +182,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
-    if (data && !existingCode && !isGeneratingRef && data.user) {
+    if (data && hasProfile && !existingCode && !isGeneratingRef && data.user) {
       const generateCode = async () => {
         setIsGeneratingRef(true);
         try {
@@ -222,7 +222,7 @@ export default function TeacherDashboard() {
       };
       generateCode();
     }
-  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.profile?.name, mutate, data, isGeneratingRef]);
+  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.profile?.name, mutate, data, isGeneratingRef, hasProfile]);
 
   useEffect(() => {
     if ((data?.teacherCategories?.length ?? 0) > 0 && !subTab) {
@@ -2732,7 +2732,6 @@ export default function TeacherDashboard() {
             if (isDualRole) {
               const newRoles = roles.filter((r: string) => r !== 'teacher');
               await updateDoc(userDocRef, {
-                role: newRoles[0] || 'student',
                 roles: newRoles
               });
               

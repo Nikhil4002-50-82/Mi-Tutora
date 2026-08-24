@@ -116,7 +116,7 @@ export default function StudentDashboard() {
   const [activeStudentId, setActiveStudentId] = useState<string>('');
   const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [editingStudentId, setEditingStudentId] = useState<string>('');
-  const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('recommendation');
+  const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('all');
   const [isSwitchingTab, setIsSwitchingTab] = useState(false);
   const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
@@ -401,7 +401,7 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const existingCode = data?.userData?.referralCode || data?.userData?.referralcode;
-    if (data && !existingCode && !isGeneratingRef && data.user) {
+    if (data && hasProfile && !existingCode && !isGeneratingRef && data.user) {
       const generateCode = async () => {
         setIsGeneratingRef(true);
         try {
@@ -442,7 +442,7 @@ export default function StudentDashboard() {
       };
       generateCode();
     }
-  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.myStudent?.name, mutate, data, isGeneratingRef]);
+  }, [data?.userData?.referralCode, data?.userData?.referralcode, data?.user, data?.myStudent?.name, mutate, data, isGeneratingRef, hasProfile]);
 
 
 
@@ -2964,7 +2964,6 @@ export default function StudentDashboard() {
             if (isDualRole) {
               const newRoles = roles.filter((r: string) => r !== 'student');
               await updateDoc(userDocRef, {
-                role: newRoles[0] || 'teacher',
                 roles: newRoles
               });
               

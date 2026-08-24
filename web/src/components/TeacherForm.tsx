@@ -210,16 +210,25 @@ export default function TeacherForm({
 
     try {
       const { auth, db } = await import('@/utils/firebase/client');
-      const { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+      const { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, query, where, getDocs, updateDoc } = await import('firebase/firestore');
       
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
 
-      // Update user hasProfile flag and referral code
+      // Update user hasProfile flag, name, and referral code
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
       const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.fullName, user.uid);
-      await setDoc(userDocRef, { hasProfile: true, referralCode: newCode }, { merge: true });
+      await setDoc(userDocRef, { hasProfile: true, referralCode: newCode, name: formData.fullName }, { merge: true });
+
+      // Retroactively update pending referral tickets with formal name
+      const refQ = query(collection(db, 'referrals'), where('referredUserId', '==', user.uid));
+      const refSnap = await getDocs(refQ);
+      if (!refSnap.empty) {
+        for (const rDoc of refSnap.docs) {
+          await updateDoc(doc(db, 'referrals', rDoc.id), { referredUserName: formData.fullName });
+        }
+      }
 
       // Find the tutor document using user.uid (since tutorDocId is user.uid now)
       const tutorDocId = user.uid;
@@ -1156,9 +1165,9 @@ export default function TeacherForm({
             />
             <label htmlFor="legal-accept-teacher" className="text-sm text-gray-700 leading-tight">
               I have read and accept the{' '}
-              <Link href="/legal/terms-and-conditions" target="_blank" className="text-emerald-600 hover:underline font-semibold">Terms & Conditions</Link>,{' '}
-              <Link href="/legal/privacy-policy" target="_blank" className="text-emerald-600 hover:underline font-semibold">Privacy Policy</Link>, and{' '}
-              <Link href="/legal/refund-policy" target="_blank" className="text-emerald-600 hover:underline font-semibold">Refund Policy</Link>.
+              <Link href="/legal/terms-and-conditions" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Terms & Conditions</Link>,{' '}
+              <Link href="/legal/privacy-policy" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Privacy Policy</Link>, and{' '}
+              <Link href="/legal/refund-policy" target="_blank" onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline font-semibold">Refund Policy</Link>.
             </label>
           </div>
         )}
