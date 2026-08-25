@@ -475,63 +475,23 @@ export default function TeacherDashboard() {
       const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       
-      const appId = generateCustomId('APP');
-      const appRef = doc(collection(db, 'applications'));
-      
-      await runTransaction(db, async (transaction) => {
-         const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
-         const tutorSnap = await transaction.get(tutorRef);
-         const tutorData = tutorSnap.data() || {};
-         const isPro = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
-         const teacherLimit = isPro ? 15 : 5;
-         
-         const d = new Date();
-         d.setHours(0, 0, 0, 0);
-         const day = d.getDay();
-         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-         d.setDate(diff);
-         const currentWeekStart = d.toISOString().split('T')[0];
-         
-         let currentTokens = 0;
-         if (tutorData.weeklyQuota?.weekStartDate === currentWeekStart) {
-             currentTokens = tutorData.weeklyQuota.tokensUsed || 0;
-         }
-         
-         if (currentTokens >= teacherLimit) {
-             throw new Error("WEEKLY_QUOTA_EXCEEDED");
-         }
-         
-         transaction.set(appRef, {
-            applicationId: appId,
-            tutorDocId: data?.user?.uid,
-            tutorName: data?.profile?.name,
-            requestDocId: '',
-            parentDocId: student.parentDocId || student.parentId,
-            studentDocId: student.students?.[0]?.id || student.id,
-            groupDocId: student.id,
-            studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
-            studentName: student.name,
-            currentOffer: offerPrice,
-            initialBudget: student.budget || offerPrice,
-            absoluteMin: student.budget || offerPrice,
-            absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
-            initiator: 'teacher',
-            lastUpdatedBy: 'teacher',
-            status: 'negotiating',
-            source: 'direct',
-            category: student.category || 'general',
-            demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
-            createdAt: Date.now()
-         });
-
-         transaction.update(tutorRef, {
-            weeklyQuota: {
-                weekStartDate: currentWeekStart,
-                tokensUsed: currentTokens + 1,
-                lastUpdated: serverTimestamp()
-            }
-         });
+      const response = await fetch('/api/transactions/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'teacher',
+          userId: data?.user?.uid,
+          teacherName: data?.profile?.name,
+          studentData: student,
+          offerPrice,
+          actionType: 'make_offer'
+        })
       });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to make offer");
+      }
 
       const syncIds = student.students ? student.students.map((s:any)=>s.id) : [student.id];
       const { syncStudentAvailability } = await import('@/utils/studentAvailability');
@@ -577,65 +537,22 @@ export default function TeacherDashboard() {
 
       const offerPrice = student.budget || 500;
 
-      const appId = generateCustomId('APP');
-      const appRef = doc(collection(db, 'applications'));
-      
-      await runTransaction(db, async (transaction) => {
-         const tutorRef = doc(db, 'tutors', data?.user?.uid as string);
-         const tutorSnap = await transaction.get(tutorRef);
-         const tutorData = tutorSnap.data() || {};
-         const isPro = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
-         const teacherLimit = isPro ? 15 : 5;
-         
-         const d = new Date();
-         d.setHours(0, 0, 0, 0);
-         const day = d.getDay();
-         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-         d.setDate(diff);
-         const currentWeekStart = d.toISOString().split('T')[0];
-         
-         let currentTokens = 0;
-         if (tutorData.weeklyQuota?.weekStartDate === currentWeekStart) {
-             currentTokens = tutorData.weeklyQuota.tokensUsed || 0;
-         }
-         
-         if (currentTokens >= teacherLimit) {
-             throw new Error("WEEKLY_QUOTA_EXCEEDED");
-         }
-         
-         transaction.set(appRef, {
-            applicationId: appId,
-            tutorDocId: data?.user?.uid,
-            tutorName: data?.profile?.name,
-            requestDocId: '',
-            parentDocId: student.parentDocId || student.parentId,
-            studentDocId: student.students?.[0]?.id || student.id,
-            groupDocId: student.id,
-            studentDocIds: student.students ? student.students.map((s:any)=>s.id) : [student.id],
-            studentName: student.name,
-            currentOffer: offerPrice,
-            finalPrice: offerPrice,
-            initialBudget: student.budget || offerPrice,
-            absoluteMin: student.budget || offerPrice,
-            absoluteMax: student.budget ? Math.floor(student.budget * 1.4) : Math.floor(offerPrice * 1.4),
-            initiator: 'teacher',
-            lastUpdatedBy: 'tutor',
-            status: 'demo_requested_by_teacher',
-            source: 'direct',
-            category: student.category || 'general',
-            demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-         });
-
-         transaction.update(tutorRef, {
-            weeklyQuota: {
-                weekStartDate: currentWeekStart,
-                tokensUsed: currentTokens + 1,
-                lastUpdated: serverTimestamp()
-            }
-         });
+      const response = await fetch('/api/transactions/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'teacher',
+          userId: data?.user?.uid,
+          teacherName: data?.profile?.name,
+          studentData: student,
+          offerPrice
+        })
       });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to make offer");
+      }
 
       const syncIds = student.students ? student.students.map((s:any)=>s.id) : [student.id];
       const { syncStudentAvailability } = await import('@/utils/studentAvailability');
@@ -692,7 +609,7 @@ export default function TeacherDashboard() {
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { doc, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       
       await runTransaction(db, async (transaction) => {
         const appRef = doc(db, 'applications', appId);
@@ -731,7 +648,7 @@ export default function TeacherDashboard() {
           updateData.currentOffer = newOffer;
           updateData.lastUpdatedBy = 'tutor';
         }
-        updateData.updatedAt = Date.now();
+        updateData.updatedAt = serverTimestamp();
         
         transaction.update(appRef, updateData);
         
@@ -1728,7 +1645,10 @@ export default function TeacherDashboard() {
                                         Counter Offer
                                       </button>
                                       <button 
-                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        onClick={() => {
+                                          const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
+                                          setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
+                                        }}
                                         disabled={actionLoadingAppId === neg.id}
                                         className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
@@ -1741,7 +1661,10 @@ export default function TeacherDashboard() {
                                         <p className="text-sm font-semibold text-slate-500">Waiting for student response...</p>
                                       </div>
                                       <button 
-                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        onClick={() => {
+                                          const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
+                                          setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
+                                        }}
                                         disabled={actionLoadingAppId === neg.id}
                                         className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
@@ -1758,7 +1681,10 @@ export default function TeacherDashboard() {
                                       <p className="text-sm font-semibold text-blue-600">Waiting for student to accept...</p>
                                     </div>
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => {
+                                        const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
+                                        setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
+                                      }}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Withdraw Offer
@@ -1842,7 +1768,10 @@ export default function TeacherDashboard() {
                                       </div>
                                     )}
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => {
+                                        const displayNames = neg.studentName || (neg.studentDocIds?.length > 1 ? 'Group' : 'Student');
+                                        setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, studentName: displayNames });
+                                      }}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Cancel Demo
@@ -2924,7 +2853,7 @@ export default function TeacherDashboard() {
       {postPaymentPopup && (() => {
         const student = postPaymentPopup.studentsList?.[0] || postPaymentPopup.studentDetails || {};
         const isOffline = postPaymentPopup.mode === 'offline';
-        const phone = student.phoneNumber || student.whatsappNumber || student.parentDetails?.phone || student.parentDetails?.whatsapp || 'Not provided';
+        const phone = postPaymentPopup.parentDetails?.phone || postPaymentPopup.parentDetails?.whatsapp || postPaymentPopup.parentDetails?.phoneNumber || postPaymentPopup.parentDetails?.whatsappNumber || student.phoneNumber || student.whatsappNumber || student.parentDetails?.phone || student.parentDetails?.whatsapp || 'Not provided';
         const address = student.address || student.area || student.city || 'Not provided';
         
         return (
@@ -2997,7 +2926,7 @@ export default function TeacherDashboard() {
         title={actionConfirmModal?.type === 'accept_demo' ? 'Confirm Acceptance' : 'Confirm Rejection'}
         description={actionConfirmModal?.type === 'accept_demo' 
           ? `Are you sure you want to accept ${actionConfirmModal.studentName} and proceed to pay the demo fee?`
-          : `Are you sure you want to decline ${actionConfirmModal?.studentName}?`}
+          : `Are you sure you want to decline or withdraw your request with ${actionConfirmModal?.studentName}?`}
         onCancel={() => setActionConfirmModal(null)}
         onConfirm={async () => {
           if (actionConfirmModal?.type === 'accept_demo') {

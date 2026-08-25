@@ -58,7 +58,25 @@ export const fetchStudentDashboardData = async () => {
     getDocs(collection(db, 'marketplace_pricing'))
   ]);
 
-  const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const parseTimestamp = (val: any) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (val.toMillis) return val.toMillis();
+    if (val._seconds) return val._seconds * 1000;
+    return 0;
+  };
+
+  const applications = applicationsSnap.docs.map(d => {
+    const data = d.data() as any;
+    return { 
+      id: d.id, 
+      ...data,
+      createdAt: parseTimestamp(data.createdAt),
+      updatedAt: parseTimestamp(data.updatedAt),
+      declinedAt: parseTimestamp(data.declinedAt),
+      startDate: parseTimestamp(data.startDate)
+    };
+  });
   
   const students = studentsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   students.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -71,7 +89,15 @@ export const fetchStudentDashboardData = async () => {
 
   const availableTutors = tutorsSnapResult.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
   
-  const referrals = referralsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const referrals = referralsSnap.docs.map(d => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      ...data,
+      createdAt: parseTimestamp(data.createdAt),
+      qualifiedAt: parseTimestamp(data.qualifiedAt)
+    };
+  });
   const marketplacePricing = pricingSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
   const tutorIds = applications.map((app: any) => app.tutorDocId).filter(Boolean);
@@ -265,8 +291,35 @@ export const fetchTeacherDashboardData = async () => {
     getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])))
   ]);
 
-  const applications = applicationsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-  const referrals = referralsSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+  const parseTimestamp = (val: any) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (val.toMillis) return val.toMillis();
+    if (val._seconds) return val._seconds * 1000;
+    return 0;
+  };
+
+  const applications = applicationsSnap.docs.map(d => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      ...data,
+      createdAt: parseTimestamp(data.createdAt),
+      updatedAt: parseTimestamp(data.updatedAt),
+      declinedAt: parseTimestamp(data.declinedAt),
+      startDate: parseTimestamp(data.startDate)
+    };
+  });
+  
+  const referrals = referralsSnap.docs.map((d: any) => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      ...data,
+      createdAt: parseTimestamp(data.createdAt),
+      qualifiedAt: parseTimestamp(data.qualifiedAt)
+    };
+  });
   const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
   const availableStudentsRaw = studentsSnapResult.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
@@ -304,7 +357,7 @@ export const fetchTeacherDashboardData = async () => {
           unlockDate = demoDateObj.getTime() + 48 * 60 * 60 * 1000;
         }
       } else {
-         const paidDate = data.updatedAt || data.createdAt || Date.now();
+         const paidDate = parseTimestamp(data.updatedAt) || parseTimestamp(data.createdAt) || Date.now();
          unlockDate = paidDate + 14 * 24 * 60 * 60 * 1000;
       }
       if (!globalLocks[gId] || unlockDate > globalLocks[gId].unlockDate) {
@@ -334,6 +387,37 @@ export const fetchTeacherDashboardData = async () => {
     });
   }
 
+  // Phase 1: Securely Fetch Parent Phone Numbers for Authorized Applications
+  const authorizedAppStatuses = ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'tuition_started'];
+  const authorizedParentIds = applications
+    .filter((app: any) => authorizedAppStatuses.includes(app.status))
+    .map((app: any) => app.parentDocId || (app.studentDetails?.parentDocId))
+    .filter(Boolean);
+
+  let parentsInfo: Record<string, any> = {};
+  if (authorizedParentIds.length > 0) {
+    const uniqueParentIds = Array.from(new Set(authorizedParentIds));
+    const parentPromises = [];
+    for (let i = 0; i < uniqueParentIds.length; i += 10) {
+      const chunk = uniqueParentIds.slice(i, i + 10);
+      parentPromises.push(getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk))));
+    }
+    const parentSnaps = await Promise.all(parentPromises);
+    parentSnaps.forEach(pSnap => {
+      pSnap.docs.forEach(d => {
+        parentsInfo[d.id] = { id: d.id, ...d.data() as any };
+      });
+    });
+  }
+
+  const stitchedApplications = applications.map((app: any) => {
+    const parentId = app.parentDocId;
+    if (parentId && parentsInfo[parentId]) {
+      return { ...app, parentDetails: parentsInfo[parentId] };
+    }
+    return app;
+  });
+
   const baseData = {
     user,
     userData,
@@ -341,7 +425,7 @@ export const fetchTeacherDashboardData = async () => {
     tutorData,
     teacherCategories,
     globalLocks,
-    applications,
+    applications: stitchedApplications,
     referrals,
     marketplacePricing,
     availableStudentsRaw,
@@ -427,11 +511,14 @@ export const deriveTeacherDashboardState = (baseData: any) => {
       }
     }
 
+    const stitchedStudent = student ? { ...student, parentDetails: app.parentDetails } : null;
+    const stitchedAppStudentsList = appStudentsList.map((s: any) => ({ ...s, parentDetails: app.parentDetails }));
+
     return { 
       ...app, 
       status: currentStatus,
-      studentDetails: student,
-      studentsList: appStudentsList,
+      studentDetails: stitchedStudent,
+      studentsList: stitchedAppStudentsList,
       subjects: student?.subjects || [],
       technologies: student?.technologies || [],
       languages: student?.languages || []

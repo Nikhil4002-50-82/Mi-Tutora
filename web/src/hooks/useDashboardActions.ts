@@ -1,5 +1,5 @@
 import { db } from '@/utils/firebase/client';
-import { doc, runTransaction, arrayRemove, collection, getDocs, query, where, writeBatch, increment } from 'firebase/firestore';
+import { doc, runTransaction, arrayRemove, collection, getDocs, query, where, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { syncStudentAvailability } from '@/utils/studentAvailability';
 
 export const executeDeclineOffer = async (appId: string, role: 'student' | 'teacher', data?: any) => {
@@ -19,8 +19,8 @@ export const executeDeclineOffer = async (appId: string, role: 'student' | 'teac
     
     transaction.update(appRef, {
       status: 'declined',
-      declinedAt: Date.now(),
-      updatedAt: Date.now(),
+      declinedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       lastUpdatedBy: role
     });
     
@@ -43,50 +43,21 @@ export const executeDeclineOffer = async (appId: string, role: 'student' | 'teac
 };
 
 export const executeAppointTutor = async (appId: string, data?: any) => {
-  const batch = writeBatch(db);
-  
-  batch.update(doc(db, 'applications', appId), { 
-    status: 'tuition_started', 
-    startDate: Date.now(),
-    feePaid: false
+  const parentDocId = data?.user?.uid;
+  if (!parentDocId) throw new Error("Unauthorized");
+
+  const response = await fetch('/api/transactions/hire', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ applicationId: appId, parentDocId })
   });
-  
-  const app = data?.applications?.find((a: any) => a.id === appId);
-  if (app) {
-    if (app.tutorDocId) batch.update(doc(db, 'tutors', app.tutorDocId), { pendingRequests: arrayRemove(appId) });
-    if (app.studentDocIds) {
-      for (const sid of app.studentDocIds) {
-        batch.update(doc(db, 'students', sid), { pendingRequests: arrayRemove(appId) });
-      }
-    }
-    
-    const qGroupId = app.groupDocId || app.studentDocId;
-    if (qGroupId) {
-      const otherAppsSnap1 = await getDocs(query(collection(db, 'applications'), where('groupDocId', '==', qGroupId)));
-      const otherAppsSnap2 = await getDocs(query(collection(db, 'applications'), where('studentDocId', '==', qGroupId)));
-      
-      const docsToProcess = new Map();
-      otherAppsSnap1.docs.forEach(d => docsToProcess.set(d.id, d));
-      otherAppsSnap2.docs.forEach(d => docsToProcess.set(d.id, d));
-      
-      for (const [docId, docSnap] of Array.from(docsToProcess.entries())) {
-         if (docId !== appId && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
-            batch.update(doc(db, 'applications', docId), {
-               status: 'declined',
-               reason: 'student_hired_another_tutor',
-               declinedAt: Date.now(),
-               updatedAt: Date.now()
-            });
-            const d = docSnap.data();
-            if (d.tutorDocId) {
-               batch.update(doc(db, 'tutors', d.tutorDocId), { pendingRequests: arrayRemove(docId) });
-            }
-         }
-      }
-    }
+
+  const result = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || "Failed to hire teacher");
   }
   
-  await batch.commit();
+  const app = data?.applications?.find((a: any) => a.id === appId);
   
   if (app) {
     try {
@@ -104,7 +75,7 @@ export const executeAppointTutor = async (appId: string, data?: any) => {
           const refDoc = snap.docs[0];
           const referrerId = refDoc.data().referrerId;
           const refBatch = writeBatch(db);
-          refBatch.update(doc(db, 'referrals', refDoc.id), { status: 'qualified', reward: rewardAmount, qualifiedAt: Date.now() });
+          refBatch.update(doc(db, 'referrals', refDoc.id), { status: 'qualified', reward: rewardAmount, qualifiedAt: serverTimestamp() });
           refBatch.update(doc(db, 'users', referrerId), { walletBalance: increment(rewardAmount) });
           await refBatch.commit();
         }

@@ -528,46 +528,25 @@ export default function StudentDashboard() {
         return false;
       }
 
-      const appId = generateCustomId('APP');
-      const appRef = doc(collection(db, 'applications'));
-      
-      await runTransaction(db, async (transaction) => {
-         const parentRef = doc(db, 'parents', data?.user?.uid as string);
-         const parentSnap = await transaction.get(parentRef);
-         const parentData = parentSnap.data() || {};
-         const today = new Date().toISOString().split('T')[0];
-         const currentDailyCount = parentData.dailyUsage?.date === today ? parentData.dailyUsage.count : 0;
-         
-         if (currentDailyCount >= 5) {
-            throw new Error("DAILY_LIMIT_EXCEEDED");
-         }
-
-         transaction.set(appRef, {
-            applicationId: appId,
-            tutorDocId: tutor.id,
-            tutorName: tutor.name,
-            parentDocId: data?.user?.uid,
-            groupDocId: groupToUse.id,
-            studentDocIds: groupToUse.students.map((s: any) => s.id),
-            studentName: groupToUse.name,
-            currentOffer: offerPrice,
-            initialBudget: tutorPrice > 0 ? tutorPrice : offerPrice,
-            absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil(offerPrice * 0.6),
-            absoluteMax: tutorPrice > 0 ? tutorPrice : offerPrice,
-            initiator: 'student',
-            lastUpdatedBy: 'student',
-            status: 'negotiating',
-            source: 'direct',
-            category: tutor.category || groupToUse.category || '',
-            mode: tutor.mode,
-            demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
-            createdAt: Date.now()
-         });
-
-         transaction.update(parentRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
-         });
+      const response = await fetch('/api/transactions/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'student',
+          userId: data?.user?.uid,
+          tutor: { id: tutor.id, name: tutor.name, category: tutor.category, mode: tutor.mode },
+          groupToUse: { id: groupToUse.id, name: groupToUse.name, category: groupToUse.category, students: groupToUse.students },
+          tutorPrice,
+          offerPrice,
+          preferredTimeRange: data?.myRequest?.preferredTimeRange,
+          actionType: 'make_offer'
+        })
       });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to make offer");
+      }
 
       toast.success("Tutor request & offer sent successfully!");
       mutate();
@@ -633,48 +612,23 @@ export default function StudentDashboard() {
 
       const tutorPrice = getTutorBasePrice(tutor);
 
-      const appId = generateCustomId('APP');
-      const appRef = doc(collection(db, 'applications'));
-      
-      await runTransaction(db, async (transaction) => {
-         const parentRef = doc(db, 'parents', data?.user?.uid as string);
-         const parentSnap = await transaction.get(parentRef);
-         const parentData = parentSnap.data() || {};
-         const today = new Date().toISOString().split('T')[0];
-         const currentDailyCount = parentData.dailyUsage?.date === today ? parentData.dailyUsage.count : 0;
-         
-         if (currentDailyCount >= 5) {
-            throw new Error("DAILY_LIMIT_EXCEEDED");
-         }
-
-         transaction.set(appRef, {
-            applicationId: appId,
-            tutorDocId: tutor.id,
-            tutorName: tutor.name,
-            parentDocId: data?.user?.uid,
-            groupDocId: groupToUse.id,
-            studentDocIds: groupToUse.students.map((s: any) => s.id),
-            studentName: groupToUse.name,
-            currentOffer: tutorPrice,
-            finalPrice: tutorPrice,
-            initialBudget: tutorPrice > 0 ? tutorPrice : 500,
-            absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : 300,
-            absoluteMax: tutorPrice > 0 ? tutorPrice : 500,
-            initiator: 'student',
-            lastUpdatedBy: 'student',
-            status: 'demo_requested_by_student',
-            source: 'direct',
-            category: tutor.category || groupToUse.category || '',
-            mode: tutor.mode,
-            demoHours: data?.myRequest?.preferredTimeRange || 'Flexible',
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-         });
-
-         transaction.update(parentRef, {
-            dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
-         });
+      const response = await fetch('/api/transactions/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'student',
+          userId: data?.user?.uid,
+          tutor: { id: tutor.id, name: tutor.name, category: tutor.category, mode: tutor.mode },
+          groupToUse: { id: groupToUse.id, name: groupToUse.name, category: groupToUse.category, students: groupToUse.students },
+          tutorPrice,
+          preferredTimeRange: data?.myRequest?.preferredTimeRange
+        })
       });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to request demo");
+      }
 
       toast.success("Demo requested successfully!");
       mutate();
@@ -749,7 +703,7 @@ export default function StudentDashboard() {
     
     try {
       const { db } = await import('@/utils/firebase/client');
-      const { doc, arrayRemove, runTransaction } = await import('firebase/firestore');
+      const { doc, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       
       await runTransaction(db, async (transaction) => {
         const appRef = doc(db, 'applications', appId);
@@ -791,7 +745,7 @@ export default function StudentDashboard() {
           updateData.currentOffer = newOffer;
           updateData.lastUpdatedBy = 'student';
         }
-        updateData.updatedAt = Date.now();
+        updateData.updatedAt = serverTimestamp();
         
         transaction.update(appRef, updateData);
         
@@ -1913,7 +1867,7 @@ export default function StudentDashboard() {
                                         Counter Offer
                                       </button>
                                       <button 
-                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                         disabled={actionLoadingAppId === neg.id}
                                         className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
@@ -1926,7 +1880,7 @@ export default function StudentDashboard() {
                                         <p className="text-sm font-semibold text-slate-500">Waiting for tutor response...</p>
                                       </div>
                                       <button 
-                                        onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                        onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                         className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                       >
                                         Withdraw Request
@@ -1946,7 +1900,7 @@ export default function StudentDashboard() {
                                       <CheckCircle2 className="w-4 h-4" /> {actionLoadingAppId === neg.id ? 'Processing...' : 'Accept Demo'}
                                     </button>
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Decline
@@ -1959,7 +1913,7 @@ export default function StudentDashboard() {
                                       <p className="text-sm font-semibold text-blue-600">Waiting for Teacher to Accept</p>
                                     </div>
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Withdraw Request
@@ -1972,7 +1926,7 @@ export default function StudentDashboard() {
                                       <p className="text-sm font-semibold text-orange-600">Waiting for Teacher to Pay Fee</p>
                                     </div>
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Withdraw Request
@@ -2019,7 +1973,7 @@ export default function StudentDashboard() {
                                       </div>
                                     )}
                                     <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'decline')}
+                                      onClick={() => setActionConfirmModal({ isOpen: true, type: 'reject', appId: neg.id, teacherName: neg.tutorName || 'the teacher' })}
                                       className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
                                     >
                                       Cancel Demo
@@ -2393,7 +2347,7 @@ export default function StudentDashboard() {
                               <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'accept_demo'); }} disabled={actionLoadingAppId === cls.id} className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white py-3.5 rounded-xl font-bold shadow-md shadow-emerald-500/25 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}>
                                 {actionLoadingAppId === cls.id ? 'Processing...' : 'Accept Demo'}
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'decline'); }} disabled={actionLoadingAppId === cls.id} className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}>
+                              <button onClick={(e) => { e.stopPropagation(); setActionConfirmModal({ isOpen: true, type: 'reject', appId: cls.id, teacherName: cls.tutorName || 'the teacher' }); }} disabled={actionLoadingAppId === cls.id} className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}>
                                 {actionLoadingAppId === cls.id ? 'Processing...' : 'Decline'}
                               </button>
                             </div>
@@ -2973,7 +2927,7 @@ export default function StudentDashboard() {
         title={actionConfirmModal?.type === 'hire' ? 'Confirm Hiring' : 'Confirm Rejection'}
         description={actionConfirmModal?.type === 'hire' 
           ? `Are you sure you want to hire ${actionConfirmModal.teacherName}? Your 1-week trial will begin today.`
-          : `Are you sure you want to reject ${actionConfirmModal?.teacherName}?`}
+          : `Are you sure you want to decline or withdraw your request with ${actionConfirmModal?.teacherName}?`}
         onCancel={() => setActionConfirmModal(null)}
         onConfirm={async () => {
           let success: boolean | void = true;
