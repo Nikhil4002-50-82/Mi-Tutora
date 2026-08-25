@@ -28,8 +28,31 @@ export async function POST(req: NextRequest) {
     
     // Determine the base price based on role and what exists in the document
     let coursePrice = 4000; // Fallback
-    if (appData) {
-        coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+    
+    if (role === 'teacher') {
+        // Teacher is paying the platform demo fee, we MUST calculate it from marketplace pricing securely
+        const pricingSnap = await adminDb.collection('marketplace_pricing').get();
+        const pricingData = pricingSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        
+        let studentsList: any[] = [];
+        const studentDocIds = appData?.studentDocIds || [appData?.studentDocId];
+        
+        if (studentDocIds.length > 0) {
+            for (const sId of studentDocIds) {
+                if (sId) {
+                    const studentSnap = await adminDb.collection('students').doc(sId).get();
+                    if (studentSnap.exists) studentsList.push({ id: studentSnap.id, ...studentSnap.data() });
+                }
+            }
+        }
+        
+        const { calculateTotalDemoFee } = await import('@/utils/pricing');
+        coursePrice = calculateTotalDemoFee(studentsList, pricingData);
+    } else {
+        // Student is paying the full tuition fee
+        if (appData) {
+            coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+        }
     }
 
     // Calculate total including 18% GST

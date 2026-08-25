@@ -94,7 +94,26 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
 
     // 2. Handle Wallet Deductions
     if (useWallet) {
-        const coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+        let coursePrice = 4000;
+        if (role === 'teacher') {
+            const pricingSnap = await adminDb.collection('marketplace_pricing').get();
+            const pricingData = pricingSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+            let studentsList: any[] = [];
+            const studentDocIds = appData?.studentDocIds || [appData?.studentDocId];
+            if (studentDocIds.length > 0) {
+                for (const sId of studentDocIds) {
+                    if (sId) {
+                        const studentSnap = await adminDb.collection('students').doc(sId).get();
+                        if (studentSnap.exists) studentsList.push({ id: studentSnap.id, ...studentSnap.data() });
+                    }
+                }
+            }
+            const { calculateTotalDemoFee } = await import('@/utils/pricing');
+            coursePrice = calculateTotalDemoFee(studentsList, pricingData);
+        } else {
+            coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+        }
+        
         const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
         const userId = role === 'student' ? appData?.parentDocId : appData?.tutorDocId;
         

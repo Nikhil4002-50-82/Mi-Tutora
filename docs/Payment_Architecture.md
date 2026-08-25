@@ -18,14 +18,14 @@ All payment calculations and verifications happen securely on the backend.
 
 ### A. Order Creation (`/api/create-order`)
 *   **Purpose:** Securely calculates the true price and generates a Razorpay Order ID.
-*   **Input:** `applicationId`, `userId`, `role` ('student' or 'teacher').
-*   **Security Check:** The backend queries Firestore directly to find the `finalPrice` or `budget`. It ignores any price sent by the frontend.
+*   **Input:** `applicationId`, `userId`, `role` ('student' or 'teacher'), `useWallet`.
+*   **Security Check:** The backend ignores any price sent by the frontend. If `role` is 'student', it queries the application's `finalPrice`. If `role` is 'teacher', it fetches the `marketplace_pricing` matrix and recalculates the specific platform demo fee natively on the server.
 *   **Output:** `order_id`, `amount`, `currency`.
 
 ### B. Payment Verification (`/api/verify-payment`)
 *   **Purpose:** Verifies the cryptographic signature from Razorpay.
 *   **Input:** `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`, `applicationId`, `role`.
-*   **Security Check:** The backend hashes the data using the Razorpay Secret Key. If the hash matches the signature, the payment is authentic.
+*   **Security Check:** The backend hashes the data using the Razorpay Secret Key. If the hash matches the signature, the payment is authentic. It also independently re-runs the pricing logic (including `marketplace_pricing` for teachers) to securely calculate wallet balance deductions.
 *   **Database Execution:** The backend uses the `firebase-admin` SDK (which bypasses frontend rules) to update the application status and mark it as paid.
 
 ## 4. Frontend Integration Points

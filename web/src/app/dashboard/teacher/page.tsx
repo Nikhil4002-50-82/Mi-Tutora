@@ -31,43 +31,7 @@ import { executeDeclineOffer } from '@/hooks/useDashboardActions';
 import { useTeacherData } from '@/hooks/useDashboardData';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 
-export const getStudentDemoFee = (student: any, pricingData: any[]) => {
-  if (!student || !pricingData) return { price: 100, name: 'General Tuition' };
-  
-  let targetId = 'general';
-  const cat = student.category || '';
-  
-  if (cat === 'school') {
-    const cl = (student.classLevel || '').toLowerCase();
-    if (cl.includes('lkg')) targetId = 'school_lkg';
-    else if (cl.includes('ukg')) targetId = 'school_ukg';
-    else {
-      const match = cl.match(/\d+/);
-      if (match) targetId = `school_class_${match[0]}`;
-    }
-  } else if (cat === 'competitive') {
-    const goal = (student.learningGoal || student.board || '').toLowerCase();
-    if (goal.includes('neet')) targetId = 'competitive_neet';
-    else if (goal.includes('jee')) targetId = 'competitive_jee';
-    else if (goal.includes('ssc')) targetId = 'competitive_ssc';
-    else if (goal.includes('upsc')) targetId = 'competitive_upsc';
-    else if (goal.includes('cat')) targetId = 'competitive_cat';
-    else if (goal.includes('gate')) targetId = 'competitive_gate';
-    else if (goal.includes('bank')) targetId = 'competitive_banking';
-  } else if (cat === 'programming') {
-    targetId = 'programming_intermediate';
-  } else if (cat === 'languages') {
-    targetId = 'languages_general';
-  }
-
-  const found = pricingData.find(p => p.id === targetId);
-  if (found) {
-    let name = found.displayName;
-    name = name.replace(/School Tuition/i, 'demo fee').replace(/Preparation/i, 'demo fee').replace(/Tuition/i, 'demo fee');
-    return { price: found.price, name };
-  }
-  return { price: 100, name: 'General demo fee' };
-};
+import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function TeacherDashboard() {
   const [activeTab, setActiveTabState] = useState('dashboard');
@@ -122,14 +86,50 @@ export default function TeacherDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [postPaymentPopup, setPostPaymentPopup] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionLoadingAppId, setActionLoadingAppId] = useState<string | null>(null);
   const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'accept_demo'|'reject', appId: string, studentName: string, payload?: any} | null>(null);
   const [selectedPaymentHistoryApp, setSelectedPaymentHistoryApp] = useState<any>(null);
+  const [gmeetLinks, setGmeetLinks] = useState<{ [key: string]: string }>({});
+  const [savingGmeetAppId, setSavingGmeetAppId] = useState<string | null>(null);
+  const [hasFetchedLinks, setHasFetchedLinks] = useState(false);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useTeacherData();
 
 
   const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
+
+  useEffect(() => {
+    if (data?.applications && data?.profile && !hasFetchedLinks) {
+      const fetchLinks = async () => {
+        const scheduledOnlineApps = data.applications.filter(
+          (app: any) => app.status === 'demo_scheduled' && app.mode === 'Online'
+        );
+        
+        for (const app of scheduledOnlineApps) {
+          try {
+            const res = await fetch('/api/get-demo-link-teacher', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                applicationId: app.id,
+                tutorDocId: data.profile.id || data.user?.uid
+              })
+            });
+            const resData = await res.json();
+            if (res.ok && resData.link) {
+              setGmeetLinks(prev => ({ ...prev, [app.id]: resData.link }));
+            }
+          } catch (err) {
+            console.error('Failed to fetch link for app:', app.id, err);
+          }
+        }
+        setHasFetchedLinks(true);
+      };
+      
+      fetchLinks();
+    }
+  }, [data?.applications, data?.profile, hasFetchedLinks]);
 
   const initialRedirectDone = useRef(false);
 
@@ -657,6 +657,7 @@ export default function TeacherDashboard() {
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any, date?: string, time?: string) => {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
+    setActionLoadingAppId(appId);
     
     if (action === 'decline') {
       try {
@@ -669,6 +670,7 @@ export default function TeacherDashboard() {
         return false;
       } finally {
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
       }
     }
     if (action === 'counter_price' && newOffer && neg) {
@@ -677,11 +679,13 @@ export default function TeacherDashboard() {
       if (newOffer < minAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
         return false;
       }
       if (newOffer > maxAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
         return false;
       }
     }
@@ -739,13 +743,20 @@ export default function TeacherDashboard() {
         const { syncStudentAvailability } = await import('@/utils/studentAvailability');
         await syncStudentAvailability(db, appDataSync.studentDocIds || [appDataSync.studentDocId]).catch(console.error);
       }
-      toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      let successMessage = "Action completed successfully!";
+      if (action === 'decline') successMessage = "Offer declined.";
+      else if (action === 'request_demo' || action === 'accept_price') successMessage = "Deal accepted successfully!";
+      else if (action === 'counter_price') successMessage = "Counter offer sent successfully!";
+      else if (action === 'propose_demo_date') successMessage = "Demo date proposed successfully!";
+      else if (action === 'accept_demo_date') successMessage = "Demo date accepted successfully!";
+      toast.success(successMessage);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
       return false;
     } finally {
       isSubmittingRef.current = false;
+      setActionLoadingAppId(null);
     }
   };
 
@@ -856,6 +867,43 @@ export default function TeacherDashboard() {
       if (studentGroup.suitabilityScore <= 0 || !studentGroup.strictMatch) return false;
       return true;
   });
+
+  const handleSaveGmeetLink = async (appId: string) => {
+    const link = gmeetLinks[appId];
+    if (!link) {
+      toast.error('Please enter a Google Meet link.');
+      return;
+    }
+    const gmeetRegex = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/;
+    if (!gmeetRegex.test(link)) {
+      toast.error('Invalid link format. Must be https://meet.google.com/...');
+      return;
+    }
+
+    setSavingGmeetAppId(appId);
+    try {
+      const res = await fetch('/api/save-demo-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: appId,
+          tutorDocId: data?.profile?.id || data?.user?.uid,
+          gmeetLink: link
+        })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to save link');
+      
+      toast.success('Google Meet link saved securely!');
+      // Do not clear the input! We want the teacher to see the link they just saved.
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save link');
+    } finally {
+      setSavingGmeetAppId(null);
+    }
+  };
+
+
 
   if (loading && !data) {
     return <LoadingScreen />;
@@ -1127,7 +1175,7 @@ export default function TeacherDashboard() {
                               const isLocked = !!offerApp;
                               const isRed = false; 
                               const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
-                              const labelText = isDemoPhase ? 'Demo Phase' : (offerApp?.lastUpdatedBy === 'tutor' ? 'Offer Sent' : 'Offer Received');
+                              const labelText = isDemoPhase ? 'Demo Phase' : (['tutor', 'teacher'].includes(offerApp?.lastUpdatedBy) ? 'Offer Sent' : 'Offer Received');
 
                               return (
                                 <div key={student.id} className="flex items-center gap-4 relative group">
@@ -1315,7 +1363,7 @@ export default function TeacherDashboard() {
                             labelText = 'Recently Withdrawn / Cooldown';
                           } else if (isDemoPhase) {
                             labelText = 'Demo in Progress';
-                          } else if (offerApp?.lastUpdatedBy === 'tutor') {
+                          } else if (['tutor', 'teacher'].includes(offerApp?.lastUpdatedBy)) {
                             labelText = 'Offer Sent';
                           } else if (offerApp) {
                             labelText = 'Offer Received';
@@ -1653,9 +1701,10 @@ export default function TeacherDashboard() {
                                     <>
                                        <button 
                                          onClick={() => handleNegotiationAction(neg.id, 'request_demo', neg.currentOffer)}
-                                         className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                         disabled={actionLoadingAppId === neg.id}
+                                         className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                        >
-                                         Accept & Request Demo
+                                         {actionLoadingAppId === neg.id ? 'Processing...' : 'Accept & Request Demo'}
                                        </button>
                                       <button 
                                         onClick={() => {
@@ -1680,9 +1729,10 @@ export default function TeacherDashboard() {
                                       </button>
                                       <button 
                                         onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                        disabled={actionLoadingAppId === neg.id}
+                                        className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
-                                        Decline
+                                        {actionLoadingAppId === neg.id ? 'Processing...' : 'Decline'}
                                       </button>
                                     </>
                                   ) : (
@@ -1692,9 +1742,10 @@ export default function TeacherDashboard() {
                                       </div>
                                       <button 
                                         onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                        disabled={actionLoadingAppId === neg.id}
+                                        className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
-                                        Withdraw Offer
+                                        {actionLoadingAppId === neg.id ? 'Processing...' : 'Withdraw Offer'}
                                       </button>
                                     </>
                                   )
@@ -1800,9 +1851,28 @@ export default function TeacherDashboard() {
                                 )}
                                 {neg.status === 'demo_scheduled' && (
                                   <>
-                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center">
+                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center mb-3">
                                       <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Prepare for the class.</p>
                                     </div>
+                                    {neg.mode === 'Online' && (
+                                      <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
+                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
+                                        <input 
+                                          type="text" 
+                                          placeholder="https://meet.google.com/..." 
+                                          value={gmeetLinks[neg.id] || ''}
+                                          onChange={(e) => setGmeetLinks(prev => ({...prev, [neg.id]: e.target.value}))}
+                                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00a992]"
+                                        />
+                                        <button 
+                                          onClick={() => handleSaveGmeetLink(neg.id)}
+                                          disabled={savingGmeetAppId === neg.id}
+                                          className={`w-full mt-1 bg-[#00a992] text-white py-2 rounded-lg text-sm font-bold transition-all ${savingGmeetAppId === neg.id ? 'opacity-50 cursor-wait' : 'hover:bg-[#008f7b]'}`}
+                                        >
+                                          {savingGmeetAppId === neg.id ? 'Saving...' : gmeetLinks[neg.id] ? 'Update Link Securely' : 'Save Link Securely'}
+                                        </button>
+                                      </div>
+                                    )}
                                   </>
                                 )}
                                 {neg.status === 'waiting_for_parent_decision' && (
@@ -1868,14 +1938,14 @@ export default function TeacherDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent my-1" />
 
                           <div className="grid grid-cols-1 gap-y-4 text-sm flex-grow">
-                            {cls.demoDate && cls.demoTime && (
+                            {cls.app?.demoDate && cls.app?.demoTime && (
                               <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
                                   <Calendar className="w-4 h-4" />
                                 </div>
                                 <div>
                                   <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Demo Schedule</p>
-                                  <p className="font-bold text-slate-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
+                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {cls.app.demoTime}</p>
                                 </div>
                               </div>
                             )}
@@ -1926,6 +1996,27 @@ export default function TeacherDashboard() {
                             </div>
                           </div>
                           
+                          {cls.status === 'demo_scheduled' && cls.app?.mode === 'Online' && (
+                            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2 mt-3">
+                              <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
+                              <input 
+                                type="text" 
+                                placeholder="https://meet.google.com/..." 
+                                value={gmeetLinks[cls.id] || ''}
+                                onChange={(e) => setGmeetLinks(prev => ({...prev, [cls.id]: e.target.value}))}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00a992]"
+                              />
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleSaveGmeetLink(cls.id); }}
+                                disabled={savingGmeetAppId === cls.id}
+                                className={`w-full mt-1 bg-[#00a992] text-white py-1.5 rounded-lg text-xs font-bold transition-all ${savingGmeetAppId === cls.id ? 'opacity-50 cursor-wait' : 'hover:bg-[#008f7b]'}`}
+                              >
+                                {savingGmeetAppId === cls.id ? 'Saving...' : gmeetLinks[cls.id] ? 'Update Link Securely' : 'Save Link Securely'}
+                              </button>
+                            </div>
+                          )}
+
                           <div className="mt-4 flex gap-2">
                             <button
                                 onClick={(e) => {

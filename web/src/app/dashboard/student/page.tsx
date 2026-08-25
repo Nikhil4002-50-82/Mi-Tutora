@@ -34,43 +34,7 @@ import { useStudentData } from '@/hooks/useDashboardData';
 import { executeDeclineOffer, executeAppointTutor } from '@/hooks/useDashboardActions';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 
-export const getStudentDemoFee = (student: any, pricingData: any[]) => {
-  if (!student || !pricingData) return { price: 100, name: 'General Tuition' };
-  
-  let targetId = 'general';
-  const cat = student.category || '';
-  
-  if (cat === 'school') {
-    const cl = (student.classLevel || '').toLowerCase();
-    if (cl.includes('lkg')) targetId = 'school_lkg';
-    else if (cl.includes('ukg')) targetId = 'school_ukg';
-    else {
-      const match = cl.match(/\d+/);
-      if (match) targetId = `school_class_${match[0]}`;
-    }
-  } else if (cat === 'competitive') {
-    const goal = (student.learningGoal || student.board || '').toLowerCase();
-    if (goal.includes('neet')) targetId = 'competitive_neet';
-    else if (goal.includes('jee')) targetId = 'competitive_jee';
-    else if (goal.includes('ssc')) targetId = 'competitive_ssc';
-    else if (goal.includes('upsc')) targetId = 'competitive_upsc';
-    else if (goal.includes('cat')) targetId = 'competitive_cat';
-    else if (goal.includes('gate')) targetId = 'competitive_gate';
-    else if (goal.includes('bank')) targetId = 'competitive_banking';
-  } else if (cat === 'programming') {
-    targetId = 'programming_intermediate';
-  } else if (cat === 'languages') {
-    targetId = 'languages_general';
-  }
-
-  const found = pricingData.find(p => p.id === targetId);
-  if (found) {
-    let name = found.displayName;
-    name = name.replace(/School Tuition/i, 'demo fee').replace(/Preparation/i, 'demo fee').replace(/Tuition/i, 'demo fee');
-    return { price: found.price, name };
-  }
-  return { price: 100, name: 'General demo fee' };
-};
+import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTabState] = useState('dashboard');
@@ -143,7 +107,15 @@ export default function StudentDashboard() {
   const [groupSettingsModalOpen, setGroupSettingsModalOpen] = useState(false);
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<any>(null);
   const [newlyCreatedGroupId, setNewlyCreatedGroupId] = useState<string | null>(null);
+  const [actionLoadingAppId, setActionLoadingAppId] = useState<string | null>(null);
   const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'hire'|'reject', appId: string, teacherName: string} | null>(null);
+  const [retrievingGmeetAppId, setRetrievingGmeetAppId] = useState<string | null>(null);
+  const [nowTime, setNowTime] = useState(Date.now());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useStudentData();
@@ -512,24 +484,32 @@ export default function StudentDashboard() {
     
     if (activeAppForGroup) {
       toast.error("This group already has an active demo request in progress. Please wait for a response or decline the current request before requesting another tutor.");
+      isSubmittingRef.current = false;
       return;
     }
     const offerPrice = parseInt(negotiationOffer[tutor.id]);
-    if (!offerPrice || offerPrice <= 0) return toast.error("Please enter a valid budget offer.");
+    if (!offerPrice || offerPrice <= 0) {
+      toast.error("Please enter a valid budget offer.");
+      isSubmittingRef.current = false;
+      return;
+    }
     
     const tutorPrice = getTutorBasePrice(tutor);
     if (tutorPrice > 0 && offerPrice > tutorPrice) {
       setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The maximum you can offer is Rs. ${tutorPrice} (100% of the teacher's base fee). Please adjust your offer.` });
+      isSubmittingRef.current = false;
       return;
     }
     if (tutorPrice > 0 && offerPrice < tutorPrice * 0.6) {
       setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The minimum you can offer is Rs. ${Math.ceil(tutorPrice * 0.6)} (60% of the teacher's base fee). Please adjust your offer.` });
+      isSubmittingRef.current = false;
       return;
     }
     
     if (!hasProfile) {
-      toast.error("Please complete your profile to request a tutor.");
+      toast.error("Please complete your profile first.");
       setActiveTab('profile');
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -716,6 +696,7 @@ export default function StudentDashboard() {
   const handleNegotiationAction = async (appId: string, action: string, newOffer?: number, neg?: any) => {
     if (isSubmittingRef.current) return false;
     isSubmittingRef.current = true;
+    setActionLoadingAppId(appId);
     if (['request_demo', 'accept_demo'].includes(action)) {
       const currentApp = data?.applications?.find((a: any) => a.id === appId);
       const targetGroupId = currentApp?.groupDocId || activeGroup?.id;
@@ -729,6 +710,7 @@ export default function StudentDashboard() {
       if (recentDemosCount >= 2) {
         toast.error("You can only have up to 2 active demos in a 7-day period. Please complete or cancel your current demos first.");
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
         return false;
       }
     }
@@ -744,6 +726,7 @@ export default function StudentDashboard() {
         return false;
       } finally {
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
       }
     }
 
@@ -753,11 +736,13 @@ export default function StudentDashboard() {
       if (newOffer > maxAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute maximum you can offer is Rs. ${maxAllowed}. Please adjust your offer.` });
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
         return false;
       }
       if (newOffer < minAllowed) {
         setMessageModalConfig({ isOpen: true, title: 'Invalid Offer', message: `The absolute minimum you can offer is Rs. ${minAllowed}. Please adjust your offer.` });
         isSubmittingRef.current = false;
+        setActionLoadingAppId(null);
         return false;
       }
     }
@@ -817,13 +802,21 @@ export default function StudentDashboard() {
         const { syncStudentAvailability } = await import('@/utils/studentAvailability');
         await syncStudentAvailability(db, appDataSync.studentDocIds || [appDataSync.studentDocId]).catch(console.error);
       }
-      toast.success(action === 'decline' ? 'Offer declined.' : `Successfully ${action === 'accept_price' ? 'accepted deal' : 'sent counter offer'}!`);
+      let successMessage = "Action completed successfully!";
+      if (action === 'decline') successMessage = "Offer declined.";
+      else if (action === 'request_demo' || action === 'accept_price') successMessage = "Demo requested successfully!";
+      else if (action === 'accept_demo') successMessage = "Demo accepted successfully!";
+      else if (action === 'counter_price') successMessage = "Counter offer sent successfully!";
+      else if (action === 'propose_demo_date') successMessage = "Demo date proposed successfully!";
+      else if (action === 'accept_demo_date') successMessage = "Demo date accepted successfully!";
+      toast.success(successMessage);
       mutate();
     } catch (e: any) {
       toast.error("Error: " + e.message);
       return false;
     } finally {
       isSubmittingRef.current = false;
+      setActionLoadingAppId(null);
     }
   };
 
@@ -857,6 +850,33 @@ export default function StudentDashboard() {
       }
     } catch (err: any) {
       toast.error('Failed to clear notifications');
+    }
+  };
+
+  const handleJoinDemoRoom = async (appId: string) => {
+    if (retrievingGmeetAppId) return;
+    setRetrievingGmeetAppId(appId);
+    try {
+      const res = await fetch('/api/get-demo-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: appId,
+          parentDocId: data?.profile?.id || data?.user?.uid
+        })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to retrieve link');
+      
+      if (resData.link) {
+        window.open(resData.link, '_blank');
+      } else {
+        toast.error('The tutor has not added a link yet.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to retrieve link');
+    } finally {
+      setRetrievingGmeetAppId(null);
     }
   };
 
@@ -1300,9 +1320,9 @@ export default function StudentDashboard() {
                               
                               let labelText = '';
                               if (hiredAppForGroup) labelText = 'Teacher Assigned';
-                              else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
+                              else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (['tutor', 'teacher'].includes(offerApp.lastUpdatedBy) ? 'Offer Received' : 'Offer Sent');
                               else if (activeAppForGroup) labelText = 'Busy with Another Demo';
-
+                              
                               return (
                                 <div key={tutor.id} className="flex items-center gap-4 relative group">
                                   {isLocked && (
@@ -1455,13 +1475,13 @@ export default function StudentDashboard() {
                       let labelText = '';
                       if (lockedApp) labelText = 'Locked';
                       else if (hiredAppForGroup) labelText = 'Teacher Assigned';
-                      else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (offerApp.lastUpdatedBy === 'tutor' ? 'Offer Received' : 'Offer Sent');
+                      else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (['tutor', 'teacher'].includes(offerApp.lastUpdatedBy) ? 'Offer Received' : 'Offer Sent');
                       else if (activeAppForGroup) labelText = 'Busy with Another Demo';
                       
                       let subText = '';
                       if (lockedApp) subText = lockedApp.declinedAt ? `Available in ${Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000))} days` : 'Currently unavailable';
                       else if (hiredAppForGroup) subText = 'This group already has a teacher';
-                      else if (offerApp) subText = isDemoPhase ? 'Demo in progress...' : (offerApp.lastUpdatedBy === 'tutor' ? 'Waiting to analyze...' : 'Waiting for response...');
+                      else if (offerApp) subText = isDemoPhase ? 'Demo in progress...' : (['tutor', 'teacher'].includes(offerApp.lastUpdatedBy) ? 'Waiting to analyze...' : 'Waiting for response...');
                       else if (activeAppForGroup) subText = 'Active demo with another tutor';
                       
                       return (
@@ -1871,15 +1891,16 @@ export default function StudentDashboard() {
                                       <p className="text-sm font-black text-emerald-600 uppercase tracking-widest">Fees Paid</p>
                                     </div>
                                 ) : neg.status === 'negotiating' && (
-                                  neg.lastUpdatedBy === 'tutor' ? (
+                                  ['tutor', 'teacher'].includes(neg.lastUpdatedBy) ? (
                                     <>
                                       <button 
                                         onClick={() => {
                                           handleNegotiationAction(neg.id, 'request_demo', neg.currentOffer);
                                         }}
-                                        className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                        disabled={actionLoadingAppId === neg.id}
+                                        className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
-                                        Accept & Request Demo
+                                        {actionLoadingAppId === neg.id ? 'Processing...' : 'Accept & Request Demo'}
                                       </button>
                                       <button 
                                         onClick={() => {
@@ -1904,9 +1925,10 @@ export default function StudentDashboard() {
                                       </button>
                                       <button 
                                         onClick={() => handleNegotiationAction(neg.id, 'decline')}
-                                        className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all"
+                                        disabled={actionLoadingAppId === neg.id}
+                                        className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                       >
-                                        Decline
+                                        {actionLoadingAppId === neg.id ? 'Processing...' : 'Decline'}
                                       </button>
                                     </>
                                   ) : (
@@ -1929,9 +1951,10 @@ export default function StudentDashboard() {
                                   <>
                                     <button 
                                       onClick={() => handleNegotiationAction(neg.id, 'accept_demo')}
-                                      className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                                      disabled={actionLoadingAppId === neg.id}
+                                      className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-black text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest flex items-center justify-center gap-2 ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                     >
-                                      <CheckCircle2 className="w-4 h-4" /> Accept Demo
+                                      <CheckCircle2 className="w-4 h-4" /> {actionLoadingAppId === neg.id ? 'Processing...' : 'Accept Demo'}
                                     </button>
                                     <button 
                                       onClick={() => handleNegotiationAction(neg.id, 'decline')}
@@ -1969,13 +1992,14 @@ export default function StudentDashboard() {
                                 )}
                                 {neg.status === 'demo_booking_phase' && (
                                   <>
-                                    {neg.proposedDate && neg.lastUpdatedBy === 'teacher' ? (
+                                    {neg.proposedDate && ['tutor', 'teacher'].includes(neg.lastUpdatedBy) ? (
                                       <>
                                         <button 
                                           onClick={() => handleNegotiationAction(neg.id, 'accept_demo_date')}
-                                          className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                          disabled={actionLoadingAppId === neg.id}
+                                          className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white px-5 py-3.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transform hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
                                         >
-                                          <CheckCircle2 className="w-4 h-4" /> Accept Proposed Date
+                                          <CheckCircle2 className="w-4 h-4" /> {actionLoadingAppId === neg.id ? 'Processing...' : 'Accept Proposed Date'}
                                         </button>
                                         <button 
                                           onClick={() => {
@@ -2014,9 +2038,53 @@ export default function StudentDashboard() {
                                   </>
                                 )}
                                 {neg.status === 'demo_scheduled' && (
-                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center">
+                                  <>
+                                    <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center mb-3">
                                       <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Wait for it to complete.</p>
                                     </div>
+                                    {neg.mode === 'Online' && neg.demoDate && neg.demoTime && (() => {
+                                      const demoDateTime = new Date(`${neg.demoDate}T${neg.demoTime}:00`).getTime();
+                                      const timeDiff = demoDateTime - nowTime;
+                                      const isLocked = timeDiff > 5 * 60 * 1000;
+                                      
+                                      const formatTimeDiff = (ms: number) => {
+                                        if (ms <= 0) return 'Ready to Join';
+                                        const hours = Math.floor(ms / (1000 * 60 * 60));
+                                        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+                                        const secs = Math.floor((ms % (1000 * 60)) / 1000);
+                                        return `${hours > 0 ? `${hours}h ` : ''}${mins}m ${secs}s`;
+                                      };
+
+                                      return (
+                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-2 relative overflow-hidden">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Demo Room</p>
+                                            {isLocked && <span className="text-xs font-mono font-bold text-[#00a992] bg-emerald-50 px-2 py-0.5 rounded">{formatTimeDiff(timeDiff - 5 * 60 * 1000)}</span>}
+                                          </div>
+                                          
+                                          <button 
+                                            onClick={() => handleJoinDemoRoom(neg.id)}
+                                            disabled={isLocked || retrievingGmeetAppId === neg.id}
+                                            className={`w-full py-3 rounded-lg text-sm font-black transition-all flex items-center justify-center gap-2 ${
+                                              isLocked 
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed blur-[1px]' 
+                                                : retrievingGmeetAppId === neg.id
+                                                  ? 'bg-[#00a992]/50 text-white cursor-wait'
+                                                  : 'bg-[#00a992] text-white hover:bg-[#008f7b] shadow-md hover:shadow-lg hover:-translate-y-0.5'
+                                            }`}
+                                          >
+                                            {isLocked ? (
+                                              <><Lock className="w-4 h-4" /> Locked until 5 mins before</>
+                                            ) : retrievingGmeetAppId === neg.id ? (
+                                              'Retrieving Link...'
+                                            ) : (
+                                              <><Video className="w-4 h-4" /> Join Google Meet</>
+                                            )}
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
+                                  </>
                                 )}
                                 {neg.status === 'waiting_for_parent_decision' && (
                                   <>
@@ -2093,14 +2161,14 @@ export default function StudentDashboard() {
                           <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-100 to-transparent my-1" />
 
                           <div className="grid grid-cols-1 gap-y-4 text-sm flex-grow">
-                            {cls.demoDate && cls.demoTime && (
+                            {cls.app?.demoDate && cls.app?.demoTime && (
                               <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
                                   <Calendar className="w-4 h-4" />
                                 </div>
                                 <div>
                                   <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Demo Schedule</p>
-                                  <p className="font-bold text-slate-800">{new Date(cls.demoDate).toLocaleDateString()} at {cls.demoTime}</p>
+                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {cls.app.demoTime}</p>
                                 </div>
                               </div>
                             )}
@@ -2126,6 +2194,49 @@ export default function StudentDashboard() {
                             </div>
                           </div>
                           
+                          {cls.status === 'demo_scheduled' && cls.app?.mode === 'Online' && cls.app?.demoDate && cls.app?.demoTime && (() => {
+                            const demoDateTime = new Date(`${cls.app.demoDate}T${cls.app.demoTime}:00`).getTime();
+                            const timeDiff = demoDateTime - nowTime;
+                            const isLocked = timeDiff > 5 * 60 * 1000;
+                            
+                            const formatTimeDiff = (ms: number) => {
+                              if (ms <= 0) return 'Ready to Join';
+                              const hours = Math.floor(ms / (1000 * 60 * 60));
+                              const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+                              const secs = Math.floor((ms % (1000 * 60)) / 1000);
+                              return `${hours > 0 ? `${hours}h ` : ''}${mins}m ${secs}s`;
+                            };
+
+                            return (
+                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2 mt-3 relative overflow-hidden">
+                                <div className="flex justify-between items-center mb-0.5">
+                                  <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Demo Room</p>
+                                  {isLocked && <span className="text-[10px] font-mono font-bold text-[#00a992] bg-emerald-50 px-1.5 py-0.5 rounded">{formatTimeDiff(timeDiff - 5 * 60 * 1000)}</span>}
+                                </div>
+                                
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleJoinDemoRoom(cls.id); }}
+                                  disabled={isLocked || retrievingGmeetAppId === cls.id}
+                                  className={`w-full py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                                    isLocked 
+                                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed blur-[1px]' 
+                                      : retrievingGmeetAppId === cls.id
+                                        ? 'bg-[#00a992]/50 text-white cursor-wait'
+                                        : 'bg-[#00a992] text-white hover:bg-[#008f7b] shadow-md hover:shadow-lg hover:-translate-y-0.5'
+                                  }`}
+                                >
+                                  {isLocked ? (
+                                    <><Lock className="w-3.5 h-3.5" /> Locked</>
+                                  ) : retrievingGmeetAppId === cls.id ? (
+                                    'Retrieving...'
+                                  ) : (
+                                    <><Video className="w-3.5 h-3.5" /> Join Meet</>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })()}
+
                           <div className="mt-4 flex gap-2">
                             <button
                                 onClick={(e) => {
@@ -2290,11 +2401,11 @@ export default function StudentDashboard() {
                           {/* Action Button */}
                           {cls.status === 'demo_requested_by_teacher' && (
                             <div className="mt-2 flex flex-col gap-2">
-                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'accept_demo'); }} className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white py-3.5 rounded-xl font-bold shadow-md shadow-emerald-500/25 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
-                                Accept Demo
+                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'accept_demo'); }} disabled={actionLoadingAppId === cls.id} className={`w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white py-3.5 rounded-xl font-bold shadow-md shadow-emerald-500/25 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}>
+                                {actionLoadingAppId === cls.id ? 'Processing...' : 'Accept Demo'}
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'decline'); }} className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                                Decline
+                              <button onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'decline'); }} disabled={actionLoadingAppId === cls.id} className={`w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}>
+                                {actionLoadingAppId === cls.id ? 'Processing...' : 'Decline'}
                               </button>
                             </div>
                           )}
