@@ -1346,11 +1346,11 @@ export default function TeacherDashboard() {
                           const isPending = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(app.status));
                           const isHired = data?.applications?.some((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['tuition_started'].includes(app.status));
                           
-                          const isLocked = false;
                           const lockInfo = data?.globalLocks?.[group.id];
                           const isGloballyLocked = lockInfo && lockInfo.unlockDate > Date.now() && lockInfo.tutorDocId !== data?.user?.uid;
-                          
                           const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
+                          
+                          const isLocked = !!lockedApp || isGloballyLocked;
                           
                           let labelText = '';
                           let isRed = false;
@@ -1360,7 +1360,7 @@ export default function TeacherDashboard() {
                             labelText = 'Busy with another demo';
                           } else if (lockedApp) {
                             isRed = true;
-                            labelText = 'Recently Withdrawn / Cooldown';
+                            labelText = lockedApp.declinedAt ? `LOCKED (${Math.max(1, Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)))} DAYS)` : 'LOCKED';
                           } else if (isDemoPhase) {
                             labelText = 'Demo in Progress';
                           } else if (['tutor', 'teacher'].includes(offerApp?.lastUpdatedBy)) {
@@ -1471,10 +1471,10 @@ export default function TeacherDashboard() {
                                                 }
                                                 handleSendOffer(group);
                                               }}
-                                              disabled={offerLoading && !offerApp}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              disabled={(offerLoading && !offerApp) || isLocked}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                             >
-                                              {offerLoading && !offerApp ? 'Sending...' : 'Make Offer'} <ArrowRight className="w-4 h-4" />
+                                              {isLocked ? 'Locked' : (offerLoading && !offerApp ? 'Sending...' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
                                             </button>
                                           ) : (
                                             <button
@@ -1490,10 +1490,10 @@ export default function TeacherDashboard() {
                                                 }
                                                 handleDirectRequestDemo(group);
                                               }}
-                                              disabled={!!offerApp}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp ? 'bg-gray-200 text-gray-500 shadow-none' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              disabled={!!offerApp || isLocked}
+                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                             >
-                                              Request Demo <ArrowRight className="w-4 h-4" />
+                                              {isLocked ? 'Locked' : 'Request Demo'} <ArrowRight className="w-4 h-4" />
                                             </button>
                                           )}
                                         </div>

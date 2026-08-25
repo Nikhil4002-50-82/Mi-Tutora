@@ -1473,7 +1473,7 @@ export default function StudentDashboard() {
                       const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                       
                       let labelText = '';
-                      if (lockedApp) labelText = 'Locked';
+                      if (lockedApp) labelText = lockedApp.declinedAt ? `LOCKED (${Math.max(1, Math.ceil((lockedApp.declinedAt + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)))} DAYS)` : 'LOCKED';
                       else if (hiredAppForGroup) labelText = 'Teacher Assigned';
                       else if (offerApp) labelText = isDemoPhase ? 'Demo Phase' : (['tutor', 'teacher'].includes(offerApp.lastUpdatedBy) ? 'Offer Received' : 'Offer Sent');
                       else if (activeAppForGroup) labelText = 'Busy with Another Demo';
@@ -1486,17 +1486,6 @@ export default function StudentDashboard() {
                       
                       return (
                         <div key={teacher.id} className="bg-white rounded-3xl shadow-md border border-gray-100 hover:shadow-lg transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
-                          {isLocked && (
-                            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm ${isRed ? 'bg-red-50' : 'bg-emerald-50'}`}>
-                                <Lock className={`w-6 h-6 ${isRed ? 'text-red-500' : 'text-emerald-500'}`} />
-                              </div>
-                              <h4 className="font-bold text-gray-900 mb-1">{labelText}</h4>
-                              <p className="text-sm text-gray-600 font-medium">
-                                {subText}
-                              </p>
-                            </div>
-                          )}
                           
                           {/* Header */}
                           <div className="bg-[#00a992] p-4 flex items-center justify-between">
@@ -1508,7 +1497,7 @@ export default function StudentDashboard() {
                               )}
                               <h3 className="text-lg font-bold text-white tracking-tight truncate">{teacher.name}</h3>
                             </div>
-                            {!isLocked && labelText ? (
+                            {labelText ? (
                               <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>
                                 {labelText}
                               </span>
@@ -1612,7 +1601,7 @@ export default function StudentDashboard() {
                                       </button>
                                       {negotiationOffer[teacher.id] ? (
                                         <button
-                                          disabled={requestLoading || !!offerApp || (dailyRequestsCount >= 5) || hasPendingDues}
+                                          disabled={requestLoading || !!offerApp || (dailyRequestsCount >= 5) || hasPendingDues || isLocked}
                                           onClick={() => { 
                                             if (hasPendingDues) { toast.error("Please clear your pending dues first."); return; }
                                             if (!!offerApp) {
@@ -1621,13 +1610,13 @@ export default function StudentDashboard() {
                                             }
                                             handleRequestTutor(teacher);
                                           }}
-                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
+                                          {isLocked ? 'Locked' : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer'))} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       ) : (
                                         <button
-                                          disabled={(requestLoading && !offerApp) || hasPendingDues}
+                                          disabled={(requestLoading && !offerApp) || hasPendingDues || isLocked}
                                           onClick={() => { 
                                             if (hasPendingDues) { toast.error("Please clear your pending dues first."); return; }
                                             if (!!offerApp) {
@@ -1636,9 +1625,9 @@ export default function StudentDashboard() {
                                             }
                                             handleDirectRequestDemo(teacher); 
                                           }}
-                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                          className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo')} <ArrowRight className="w-4 h-4" />
+                                          {isLocked ? 'Locked' : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo'))} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       )}
                                     </div>
