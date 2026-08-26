@@ -2595,10 +2595,10 @@ export default function StudentDashboard() {
                           return null;
                         }
                       })()}
-                      onSuccess={() => {
+                      onSuccess={async () => {
                         if(activeStudentId === 'new') setActiveStudentId('');
                         if(editingStudentId) setEditingStudentId('');
-                        mutate();
+                        await mutate();
                       }} 
                       onCancel={() => {
                         if(activeStudentId === 'new') setActiveStudentId('');

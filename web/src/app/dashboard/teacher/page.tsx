@@ -2478,7 +2478,7 @@ export default function TeacherDashboard() {
                     hasProfile={hasProfile} 
                     category={selectedCategory} 
                     initialData={data?.profile || { name: data?.user?.displayName || '', email: data?.user?.email || '' }} 
-                    onSuccess={() => mutate()} 
+                    onSuccess={async () => await mutate()} 
                   />
                 </div>
                 {data?.userData?.roles?.includes('student') && (
