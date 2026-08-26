@@ -10,7 +10,7 @@ export class ApplicationService {
    * Teachers use this to send an offer to a student/group.
    */
   static async sendOffer(teacherUid: string, teacherName: string, student: Student, offerPrice: number): Promise<void> {
-    const appId = generateCustomId('MTA');
+    const appId = generateCustomId('APP');
     const appRef = doc(collection(db, 'applications'));
     
     await runTransaction(db, async (transaction) => {
@@ -86,7 +86,7 @@ export class ApplicationService {
    * Students use this to request a tutor (send an initial offer).
    */
   static async requestTutor(studentUid: string, group: Group, tutor: Tutor, offerPrice: number, tutorPrice: number, demoHours: string): Promise<void> {
-    const appId = generateCustomId('MTA');
+    const appId = generateCustomId('APP');
     const appRef = doc(collection(db, 'applications'));
     
     await runTransaction(db, async (transaction) => {

@@ -465,14 +465,13 @@ export default function DemoForm({
       const pQuery = query(collection(db, 'parents'), where('authUid', '==', user.uid));
       const pSnap = await getDocs(pQuery);
       if (!pSnap.empty) {
-        customParentId = pSnap.docs[0].data().parentId || generateCustomId('MTP');
+        customParentId = pSnap.docs[0].id;
       } else {
         customParentId = generateCustomId('MTP');
       }
 
       const parentDocRef = doc(db, 'parents', user.uid);
       await setDoc(parentDocRef, { 
-        parentId: customParentId,
         parentDocId: user.uid, 
         authUid: user.uid,
         name: formData.parentName,
@@ -485,7 +484,7 @@ export default function DemoForm({
         setSuccessMsg('Parent profile updated successfully!');
         toast.success("Profile saved successfully!", { description: "Your parent profile has been updated." });
         sessionStorage.removeItem('demoFormData');
-        if (onSuccess) await onSuccess();
+        if (onSuccess) onSuccess();
         return;
       }
 
@@ -611,7 +610,6 @@ export default function DemoForm({
            studentDocs.push({
              ref: newStudentRef,
              data: {
-               studentId: newStudentId,
                id: newStudentRef.id,
                guardianName: formData.parentName,
                dob: '',
@@ -673,7 +671,6 @@ export default function DemoForm({
            }
 
            await setDoc(groupRef, {
-              groupId: generateCustomId('MTG'),
               groupDocId: groupDocId,
               parentDocId: user.uid,
               studentDocIds: studentIds,
@@ -737,7 +734,7 @@ export default function DemoForm({
 
       sessionStorage.removeItem('demoFormData');
       if (isDashboard) {
-        if (onSuccess) await onSuccess();
+        if (onSuccess) onSuccess();
       } else {
         setTimeout(() => router.push('/dashboard/student'), 2000);
       }

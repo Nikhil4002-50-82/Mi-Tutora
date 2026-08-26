@@ -289,13 +289,12 @@ export default function TeacherForm({
       sessionStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
       toast.success("Profile saved successfully!", { description: "Your teacher profile has been updated." });
-      if (isDashboard) {
-        if (onSuccess) await onSuccess();
-      } else {
+      setIsEditing(false);
+      if (onSuccess) onSuccess();
+      
+      if (!isDashboard) {
         setTimeout(() => router.push('/dashboard/teacher'), 1500);
       }
-      setIsEditing(false);
-      
     } catch (error: any) {
       toast.error('Failed to update profile', { description: error.message });
       alert(error.message || 'Failed to update profile');

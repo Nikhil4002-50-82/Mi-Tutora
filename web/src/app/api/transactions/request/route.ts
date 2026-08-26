@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/utils/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { generateCustomId } from '@/utils/idGenerator';
+
 export async function POST(req: NextRequest) {
   try {
     const adminDb = getAdminDb();
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         }
 
         batch.set(appRef, {
-            applicationId: generateCustomId('MTA'),
+            applicationId: appRef.id,
             tutorDocId: tutor.id,
             tutorName: tutor.name,
             parentDocId: userId,
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         const studentDocIds = studentData.students ? studentData.students.map((s:any)=>s.id) : [studentData.id];
 
         batch.set(appRef, {
-            applicationId: generateCustomId('MTA'),
+            applicationId: appRef.id,
             tutorDocId: userId,
             tutorName: teacherName,
             requestDocId: '',

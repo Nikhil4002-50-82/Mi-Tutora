@@ -91,6 +91,14 @@ function SignupContent() {
         };
         if (finalReferrerName) userPayload.referrerName = finalReferrerName;
         await setDoc(doc(db, 'users', user.uid), userPayload);
+
+        if (role === 'parent') {
+          const parentId = generateCustomId('MTP');
+          await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: name });
+        } else if (role === 'teacher') {
+          const tutorId = generateCustomId('MTT');
+          await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: name, email: user.email });
+        }
         
         await auth.signOut();
         localStorage.removeItem('mitutora_ref');
@@ -144,6 +152,15 @@ function SignupContent() {
           const payload = data.roles ? { roles: arrayUnion(role) } : { roles: [...roles, role] };
           await updateDoc(doc(db, 'users', user.uid), payload);
           roles.push(role);
+          
+          const { setDoc } = await import('firebase/firestore');
+          if (accountType === 'parent') {
+            const parentId = generateCustomId('MTP');
+            await setDoc(doc(db, 'parents', user.uid), { parentId: parentId, authUid: user.uid, name: user.displayName || '' });
+          } else if (accountType === 'teacher') {
+            const tutorId = generateCustomId('MTT');
+            await setDoc(doc(db, 'tutors', user.uid), { tutorId: tutorId, authUid: user.uid, name: user.displayName || '', email: user.email });
+          }
         }
         
         localStorage.setItem('user', JSON.stringify({ id: user.uid, email: user.email, role: userRole, roles: roles }));
@@ -235,7 +252,6 @@ function SignupContent() {
     } catch (err: any) {
       setError(getFriendlyAuthError(err));
       setIsGoogleLoading(false);
-      setShowGoogleRefModal(false);
     }
   };
 
@@ -561,20 +577,20 @@ function SignupContent() {
                 <div className="space-y-3">
                   <button
                     onClick={() => {
+                      setShowGoogleRefModal(false);
                       if (pendingGoogleUser) completeGoogleSignup(pendingGoogleUser);
                     }}
-                    disabled={isGoogleLoading}
-                    className="w-full bg-[#00a992] hover:bg-emerald-600 disabled:opacity-70 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center"
+                    className="w-full bg-[#00a992] hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all"
                   >
-                    {isGoogleLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Submit & Continue"}
+                    Submit & Continue
                   </button>
                   <button
                     onClick={() => {
                       setReferralCode('');
+                      setShowGoogleRefModal(false);
                       if (pendingGoogleUser) completeGoogleSignup(pendingGoogleUser);
                     }}
-                    disabled={isGoogleLoading}
-                    className="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-70 disabled:cursor-not-allowed text-gray-700 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center"
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold text-sm transition-all"
                   >
                     Skip, I don't have one
                   </button>
