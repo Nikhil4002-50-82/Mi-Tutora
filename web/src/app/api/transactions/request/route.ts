@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
         const studentDocIds = studentData.students ? studentData.students.map((s:any)=>s.id) : [studentData.id];
 
         batch.set(appRef, {
+            applicationDocId: appRef.id,
             applicationId: generateCustomId('MTA'),
             tutorDocId: userId,
             tutorName: teacherName,

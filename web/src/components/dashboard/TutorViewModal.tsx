@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, X, CheckCircle2, TrendingUp, CalendarDays } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star } from 'lucide-react';
 
 interface TutorViewModalProps {
   selectedViewUser: any;
@@ -32,6 +32,22 @@ export function TutorViewModal({
   setActionConfirmModal,
   offerLoading
 }: TutorViewModalProps) {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    if (selectedViewUser?.id) {
+      setReviewsLoading(true);
+      fetch(`/api/reviews?tutorDocId=${selectedViewUser.id}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success) setReviews(resData.reviews || []);
+        })
+        .catch(err => console.error('Error fetching reviews:', err))
+        .finally(() => setReviewsLoading(false));
+    }
+  }, [selectedViewUser?.id]);
+
   if (!selectedViewUser) return null;
 
   const getTutorBasePrice = (tutor: any) => {
@@ -219,13 +235,39 @@ export function TutorViewModal({
             )}
             
             {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
-              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mt-8">
                 <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                   Residential Address
                 </h4>
                 <p className="font-bold text-gray-800">{selectedViewUser.address}</p>
               </div>
             )}
+
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mt-8">
+              <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                <Star className="w-5 h-5 text-emerald-600" /> Parent Reviews
+              </h4>
+              <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                {reviewsLoading ? (
+                  <p className="text-sm text-gray-500 font-medium">Loading reviews...</p>
+                ) : reviews.length > 0 ? (
+                  reviews.map((review) => (
+                    <div key={review.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center gap-1 mb-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-200 fill-slate-50'}`} />
+                        ))}
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 italic">"{review.comment}"</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-white rounded-xl border border-dashed border-gray-200 text-center">
+                    <p className="text-sm font-medium text-gray-500">No reviews have been written for this tutor yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
         {/* Actions */}

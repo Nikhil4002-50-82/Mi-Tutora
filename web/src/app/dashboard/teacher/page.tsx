@@ -131,6 +131,23 @@ export default function TeacherDashboard() {
     }
   }, [data?.applications, data?.profile, hasFetchedLinks]);
 
+  const [myReviews, setMyReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    const docId = data?.tutorDocId || data?.profile?.id || data?.user?.uid;
+    if (activeTab === 'my_reviews' && docId) {
+      setReviewsLoading(true);
+      fetch(`/api/reviews?tutorDocId=${docId}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success) setMyReviews(resData.reviews || []);
+        })
+        .catch(err => console.error('Error fetching reviews:', err))
+        .finally(() => setReviewsLoading(false));
+    }
+  }, [activeTab, data?.tutorDocId, data?.profile?.id, data?.user?.uid]);
+
   const initialRedirectDone = useRef(false);
 
   useEffect(() => {
@@ -2104,6 +2121,57 @@ export default function TeacherDashboard() {
                     )}
                   </ul>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: MY REVIEWS */}
+            {activeTab === 'my_reviews' && (
+              <div className="space-y-6 pb-10">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">My Reviews</h1>
+                  <p className="text-slate-500 font-medium mt-1">See what parents and students are saying about you.</p>
+                </div>
+
+                {reviewsLoading ? (
+                  <div className="flex justify-center p-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                  </div>
+                ) : myReviews.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {myReviews.map((review: any) => (
+                      <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                        <div className="flex justify-between items-start mb-1">
+                          <div>
+                            <h4 className="font-bold text-gray-900">{review.parentName || 'Parent'}</h4>
+                            <div className="flex flex-col gap-0.5 mt-1">
+                              {review.groupId && <span className="text-xs font-mono bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md inline-block w-fit">Group: {review.groupId}</span>}
+                              {review.studentsList && review.studentsList.length > 0 && (
+                                <span className="text-xs text-slate-500 font-medium">Students: {review.studentsList.join(', ')}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300 fill-slate-100'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-slate-700 italic border-l-2 border-emerald-200 pl-3">"{review.comment}"</p>
+                        <p className="text-xs text-slate-400 font-medium mt-auto pt-4 text-right">
+                          {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Recent'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-12 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                      <Star className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">No reviews yet</h3>
+                    <p className="text-slate-500 max-w-sm">When parents hire you and leave feedback, their reviews will appear here.</p>
+                  </div>
+                )}
               </div>
             )}
 

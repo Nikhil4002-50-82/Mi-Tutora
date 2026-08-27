@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       
       await adminDb.collection('payments').add({
         razorpayOrderId: mockOrderId,
-        applicationId,
+        applicationDocId: applicationId,
         userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
         amount: totalToPay,
         currency: 'INR',
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     // Create an initial entry in the payments collection
     await adminDb.collection('payments').add({
       razorpayOrderId: order.id,
-      applicationId,
+      applicationDocId: applicationId,
       userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
       amount: totalToPay,
       currency: 'INR',

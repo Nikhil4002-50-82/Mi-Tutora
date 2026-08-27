@@ -39,9 +39,10 @@ export async function POST(req: NextRequest) {
     const tutorDocId = appData.tutorDocId;
 
     // 3. Prevent duplicate reviews for the same application
-    const existingReviewQuery = await adminDb.collection('reviews').where('applicationId', '==', applicationId).get();
+    const existingReviewQuery = await adminDb.collection('reviews').where('applicationDocId', '==', applicationId).get();
+    
     if (!existingReviewQuery.empty) {
-      return NextResponse.json({ success: false, error: 'You have already submitted a review for this specific hiring.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Review already submitted for this application' }, { status: 400 });
     }
 
     // 4. Fetch the Tutor to calculate the new average rating
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     batch.set(newReviewRef, {
       tutorDocId,
       parentDocId,
-      applicationId,
+      applicationDocId: applicationId,
       rating,
       comment: comment || '',
       createdAt: Date.now()

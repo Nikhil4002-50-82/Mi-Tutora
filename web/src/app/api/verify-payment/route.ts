@@ -146,6 +146,42 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                 feePaid: true,
                 updatedAt: Date.now()
             });
+
+            // Process Referrals on full payment
+            try {
+                const rewardBase = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+                const rewardAmount = Math.round(rewardBase * 0.25);
+                const studentUid = appData.parentDocId;
+                const teacherUid = appData.tutorDocId;
+
+                const processReferral = async (referredUid: string) => {
+                    if (!referredUid) return;
+                    const refSnap = await adminDb.collection('referrals')
+                        .where('referredUserId', '==', referredUid)
+                        .where('status', '==', 'pending')
+                        .get();
+                    
+                    if (!refSnap.empty) {
+                        const refDoc = refSnap.docs[0];
+                        const referrerId = refDoc.data().referrerId;
+                        batch.update(adminDb.collection('referrals').doc(refDoc.id), {
+                            status: 'qualified',
+                            reward: rewardAmount,
+                            qualifiedAt: FieldValue.serverTimestamp()
+                        });
+                        batch.update(adminDb.collection('users').doc(referrerId), {
+                            walletBalance: FieldValue.increment(rewardAmount)
+                        });
+                    }
+                };
+
+                await Promise.all([
+                    processReferral(studentUid),
+                    processReferral(teacherUid)
+                ]);
+            } catch (rewardErr) {
+                console.error('Failed to process referral rewards in payment verification:', rewardErr);
+            }
             
             // Auto-decline competing apps logic for this specific group/student
             const qGroupId = appData.groupDocId || appData.studentDocId;

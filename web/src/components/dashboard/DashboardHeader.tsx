@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, User, BookOpen, CreditCard, LogOut, X } from 'lucide-react';
+import { Bell, User, BookOpen, CreditCard, LogOut, X, Star } from 'lucide-react';
 
 interface DashboardHeaderProps {
   role: 'student' | 'teacher';
@@ -136,8 +136,8 @@ export function DashboardHeader({
                )}
                {role === 'teacher' && (
                  <>
-                   <button onClick={() => { setActiveTab('my_students'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
-                     <BookOpen className="w-4 h-4" /> My Students
+                   <button onClick={() => { setActiveTab('my_reviews'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
+                     <Star className="w-4 h-4" /> My Reviews
                    </button>
                    <button onClick={() => { setActiveTab('subscriptions'); setIsProfileDropdownOpen(false); }} className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors">
                      <CreditCard className="w-4 h-4" /> Subscriptions

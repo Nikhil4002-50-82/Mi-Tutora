@@ -122,6 +122,7 @@ export class ApplicationService {
        if (verifiedCount >= teacherLimit) throw new Error("TEACHER_QUEUE_FULL");
        
        transaction.set(appRef, {
+          applicationDocId: appRef.id,
           applicationId: appId,
           tutorDocId: tutor.id,
           tutorName: tutor.name,

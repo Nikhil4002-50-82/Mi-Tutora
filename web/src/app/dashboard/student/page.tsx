@@ -243,6 +243,32 @@ export default function StudentDashboard() {
     }
   };
 
+  // Auto-trigger payment modal if 7-day trial expired and unpaid
+  useEffect(() => {
+    if (data?.upcomingClasses && !payingClass) {
+      const pendingClass = data.upcomingClasses.find((cls: any) => {
+        if (cls.status !== 'tuition_started') return false;
+        if (cls.feePaid === true) return false;
+        const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+        return daysElapsed >= 7;
+      });
+
+      if (pendingClass) {
+        const displayNames = pendingClass.studentName || (pendingClass.studentDocIds?.length > 1 ? 'Group' : 'Student');
+        const monthlyFee = pendingClass.finalPrice || pendingClass.currentOffer || 0;
+        setPayingClass({ 
+          id: pendingClass.id, 
+          studentName: displayNames, 
+          finalPrice: monthlyFee, 
+          isProrated: false, 
+          isRemoval: false, 
+          studentsList: pendingClass.studentsList || (pendingClass.studentDetails ? [pendingClass.studentDetails] : []), 
+          tutorName: pendingClass.tutorName || pendingClass.teacher 
+        });
+      }
+    }
+  }, [data?.upcomingClasses, payingClass]);
+
   useEffect(() => {
     if (newlyCreatedGroupId && studentGroups && studentGroups.length > 0) {
       const newGroup = studentGroups.find((g: any) => g.id === newlyCreatedGroupId);

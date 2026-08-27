@@ -174,7 +174,7 @@ export function StudentViewModal({
             <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
-                  {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? 'Amount Received' : 'Amount to be Received') : 'Total Budget'}
+                  {selectedViewApp ? (selectedViewApp.status === 'tuition_started' ? (selectedViewApp.feePaid ? 'Amount Received' : 'Pending 7-Day Trial') : 'Amount to be Received') : 'Total Budget'}
                 </p>
                 <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.budget || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
               </div>
