@@ -62,6 +62,7 @@ export const fetchStudentDashboardData = async () => {
     if (!val) return 0;
     if (typeof val === 'number') return val;
     if (val.toMillis) return val.toMillis();
+    if (val.seconds) return val.seconds * 1000;
     if (val._seconds) return val._seconds * 1000;
     return 0;
   };
@@ -295,6 +296,7 @@ export const fetchTeacherDashboardData = async () => {
     if (!val) return 0;
     if (typeof val === 'number') return val;
     if (val.toMillis) return val.toMillis();
+    if (val.seconds) return val.seconds * 1000;
     if (val._seconds) return val._seconds * 1000;
     return 0;
   };

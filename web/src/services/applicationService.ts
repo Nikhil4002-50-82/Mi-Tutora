@@ -1,5 +1,5 @@
 import { db, auth } from '@/utils/firebase/client';
-import { collection, doc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { generateCustomId } from '@/utils/idGenerator';
 import { APP_STATUS_ACTIVE } from '@/utils/constants';
 import { syncStudentAvailability } from '@/utils/studentAvailability';
@@ -60,11 +60,11 @@ export class ApplicationService {
           source: 'direct',
           category: student.category || 'general',
           demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
        });
 
        transaction.update(tutorRef, {
-          dailyUsage: { date: today, count: currentDailyCount + 1 }
+          dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
        });
        
        if (orphanedIds.length > 0) {
@@ -139,11 +139,11 @@ export class ApplicationService {
           category: tutor.category || group.category || '',
           mode: tutor.mode,
           demoHours: demoHours,
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
        });
 
        transaction.update(parentRef, {
-          dailyUsage: { date: today, count: currentDailyCount + 1 }
+          dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: serverTimestamp() }
        });
        
        if (orphanedIds.length > 0) {

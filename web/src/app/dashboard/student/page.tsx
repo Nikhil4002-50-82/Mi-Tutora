@@ -267,7 +267,7 @@ export default function StudentDashboard() {
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {
       if (tutor.id === data?.userData?.id || (tutor.email && tutor.email === data?.userData?.email)) return false; // Prevent self-hiring
       const matchGroup = (app: any) => {
-          return app.groupDocId === activeGroup?.id;
+        return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
       };
       const app = data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app));
       if (app && app.status === 'tuition_started') return false;
@@ -286,7 +286,7 @@ export default function StudentDashboard() {
   }).sort((a: any, b: any) => {
       const getStatus = (tutorId: string) => {
           const matchGroup = (app: any) => {
-              return app.groupDocId === activeGroup?.id;
+            return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
           };
           const app = data?.applications?.find((app: any) => app.tutorDocId === tutorId && matchGroup(app));
           if (!app) return '';
@@ -466,7 +466,7 @@ export default function StudentDashboard() {
 
   const handleRequestTutor = async (tutor: any) => {
     const matchGroup = (app: any) => {
-      return app.groupDocId === activeGroup?.id;
+      return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
     };
 
     const pendingStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked'];
@@ -566,7 +566,7 @@ export default function StudentDashboard() {
 
   const handleDirectRequestDemo = async (tutor: any) => {
     const matchGroup = (app: any) => {
-      return app.groupDocId === activeGroup?.id;
+      return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
     };
 
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
@@ -1256,13 +1256,13 @@ export default function StudentDashboard() {
                           <div className="space-y-6">
                             {computedRecommendedTutors.filter((tutor: any) => {
                                const matchGroup = (app: any) => {
-                                 return app.groupDocId === activeGroup?.id;
+                                 return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
                                };
                                const isLocked = !!data?.applications?.find((app: any) => app.tutorDocId === tutor.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                                return !isLocked;
                             }).slice(0, 4).map((tutor: any, index: number) => {
                               const matchGroup = (app: any) => {
-                                return app.groupDocId === activeGroup?.id;
+                                return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
                               };
                               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
@@ -1412,7 +1412,7 @@ export default function StudentDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {(tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
                       const matchGroup = (app: any) => {
-                        return app.groupDocId === activeGroup?.id;
+                        return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
                       };
                       const lockedApp = data?.applications?.find((app: any) => app.tutorDocId === teacher.id && matchGroup(app) && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                       const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
@@ -1441,6 +1441,17 @@ export default function StudentDashboard() {
                       return (
                         <div key={teacher.id} className="bg-white rounded-3xl shadow-md border border-gray-100 hover:shadow-lg transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
                           
+
+                          {/* Locked overlay — mirrors teacher portal pattern. Shows when a declined
+                              application puts this tutor in a 7-day lock for the current group. */}
+                          {isLocked && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-10 flex items-center justify-end pr-4 rounded-3xl pointer-events-none">
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm bg-red-50 text-red-600 border-red-100">
+                                {labelText || 'LOCKED'}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Header */}
                           <div className="bg-[#00a992] p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">

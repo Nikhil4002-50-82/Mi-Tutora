@@ -5,6 +5,17 @@ import { fetchStudentDashboardData, fetchTeacherDashboardData, deriveStudentDash
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/utils/firebase/client';
 
+// Shared helper — converts any Firestore Timestamp variant or raw number to a plain ms number.
+// Defined at module level so both useStudentData and useTeacherData use the same logic.
+const parseTimestamp = (val: any): number => {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  if (val.toMillis) return val.toMillis();
+  if (val.seconds) return val.seconds * 1000;
+  if (val._seconds) return val._seconds * 1000;
+  return 0;
+};
+
 export function useStudentData() {
   const router = useRouter();
 
@@ -34,6 +45,7 @@ export function useStudentData() {
     let unsubscribeTutors: any;
     let unsubscribeReferrals: any;
     
+
     const setupRealtime = async () => {
       if (isCancelled) return;
       
@@ -51,7 +63,15 @@ export function useStudentData() {
           let updated = false;
 
           changedDocs.forEach((change: any) => {
-            const docData = { id: change.doc.id, ...change.doc.data() };
+            const rawData = change.doc.data();
+            const docData = { 
+              id: change.doc.id, 
+              ...rawData,
+              createdAt: parseTimestamp(rawData.createdAt),
+              updatedAt: parseTimestamp(rawData.updatedAt),
+              declinedAt: parseTimestamp(rawData.declinedAt),
+              startDate: parseTimestamp(rawData.startDate)
+            };
             if (change.type === 'added' || change.type === 'modified') {
               const index = apps.findIndex((a: any) => a.id === docData.id);
               if (index !== -1) {
@@ -183,7 +203,15 @@ export function useTeacherData() {
           let updated = false;
 
           changedDocs.forEach((change: any) => {
-            const docData = { id: change.doc.id, ...change.doc.data() };
+            const rawData = change.doc.data();
+            const docData = {
+              id: change.doc.id,
+              ...rawData,
+              createdAt: parseTimestamp(rawData.createdAt),
+              updatedAt: parseTimestamp(rawData.updatedAt),
+              declinedAt: parseTimestamp(rawData.declinedAt),
+              startDate: parseTimestamp(rawData.startDate),
+            };
             if (change.type === 'added' || change.type === 'modified') {
               const index = apps.findIndex((a: any) => a.id === docData.id);
               if (index !== -1) {

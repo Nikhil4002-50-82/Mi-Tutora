@@ -71,7 +71,11 @@ service cloud.firestore {
           !(resource.data.status in ['accepted', 'tuition_started', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_pending_payment'])
         );
 
-      // Creating an application requires updating the initiator's quota tracker in the exact same batch/transaction
+      // Creating an application requires updating the initiator's quota tracker in the exact same batch/transaction.
+      // NOTE: The active production path (/api/transactions/request) uses firebase-admin SDK which bypasses
+      // these rules entirely. This getAfter validation acts as defense-in-depth for any direct Firestore
+      // client access. applicationService.ts writes lastUpdated: serverTimestamp() so this rule is satisfied
+      // on both code paths.
       allow create: if true 
         && (
             (request.resource.data.initiator == 'student' 

@@ -634,7 +634,10 @@ export default function TeacherDashboard() {
         if (action === 'accept_price' || action === 'request_demo') {
           updateData.status = 'demo_requested_by_teacher';
           if (newOffer) updateData.finalPrice = newOffer;
-          updateData.lastUpdatedBy = 'tutor';
+          updateData.lastUpdatedBy = 'teacher';
+        } else if (action === 'accept_demo') {
+          updateData.status = 'demo_pending_payment';
+          updateData.lastUpdatedBy = 'teacher';
         } else if (action === 'propose_demo_date') {
           updateData.proposedDate = neg?.proposedDate;
           updateData.proposedTime = neg?.proposedTime;
@@ -646,7 +649,7 @@ export default function TeacherDashboard() {
           updateData.lastUpdatedBy = 'teacher';
         } else if (action === 'counter_price') {
           updateData.currentOffer = newOffer;
-          updateData.lastUpdatedBy = 'tutor';
+          updateData.lastUpdatedBy = 'teacher';
         }
         updateData.updatedAt = serverTimestamp();
         
@@ -663,6 +666,7 @@ export default function TeacherDashboard() {
       let successMessage = "Action completed successfully!";
       if (action === 'decline') successMessage = "Offer declined.";
       else if (action === 'request_demo' || action === 'accept_price') successMessage = "Deal accepted successfully!";
+      else if (action === 'accept_demo') successMessage = "Demo accepted successfully!";
       else if (action === 'counter_price') successMessage = "Counter offer sent successfully!";
       else if (action === 'propose_demo_date') successMessage = "Demo date proposed successfully!";
       else if (action === 'accept_demo_date') successMessage = "Demo date accepted successfully!";
