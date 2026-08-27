@@ -152,6 +152,7 @@ export async function POST(req: NextRequest) {
             status: actionType === 'make_offer' ? 'negotiating' : 'demo_requested_by_teacher',
             source: 'direct',
             category: studentData.category || 'general',
+            mode: studentData.mode || tutorData.mode || 'Online',
             demoHours: (studentData.students ? studentData.students[0]?.hoursPerDay : (studentData.hoursPerDay || studentData.preferredTimeRange)) || 'Flexible',
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp()

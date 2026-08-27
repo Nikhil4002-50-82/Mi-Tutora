@@ -1777,19 +1777,7 @@ export default function StudentDashboard() {
                                       <Calendar className="w-4 h-4 text-emerald-600" />
                                       <span className="text-sm font-bold text-slate-800">{new Date(neg.proposedDate).toLocaleDateString()} at {neg.proposedTime?.split('||')[0] || neg.proposedTime}</span>
                                     </div>
-                                    {neg.mode === 'online' && neg.proposedTime?.includes('||') && (
-                                      <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-200/50">
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-slate-500">Platform:</span>
-                                          <span className="text-slate-800 font-medium">{neg.proposedTime.split('||')[1]}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-slate-500">Link:</span>
-                                          <a href={neg.proposedTime.split('||')[2]} target="_blank" rel="noreferrer" className="text-blue-600 font-medium hover:underline truncate max-w-full">{neg.proposedTime.split('||')[2]}</a>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </div>
                                 ) : (
                                   <div className="text-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-auto">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
@@ -1966,7 +1954,7 @@ export default function StudentDashboard() {
                                               initialValue: '',
                                               initialDate: neg.proposedDate || '',
                                               initialTime: neg.proposedTime?.split('||')[0] || '',
-                                              isOnline: neg.mode === 'online',
+                                              isOnline: (neg.mode || 'Online').toLowerCase() === 'online',
                                               onSubmit: (val: string, date?: string, time?: string) => {
                                                 setModalConfig(prev => ({ ...prev, isOpen: false }));
                                                 handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
@@ -1996,7 +1984,7 @@ export default function StudentDashboard() {
                                     <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center mb-3">
                                       <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Wait for it to complete.</p>
                                     </div>
-                                    {neg.mode === 'Online' && neg.demoDate && neg.demoTime && (() => {
+                                    {(neg.mode || 'Online').toLowerCase() === 'online' && neg.demoDate && neg.demoTime && (() => {
                                       const demoDateTime = new Date(`${neg.demoDate}T${neg.demoTime}:00`).getTime();
                                       const timeDiff = demoDateTime - nowTime;
                                       const isLocked = timeDiff > 5 * 60 * 1000;
@@ -2148,7 +2136,7 @@ export default function StudentDashboard() {
                             </div>
                           </div>
                           
-                          {cls.status === 'demo_scheduled' && cls.app?.mode === 'Online' && cls.app?.demoDate && cls.app?.demoTime && (() => {
+                          {cls.status === 'demo_scheduled' && (cls.app?.mode || 'Online').toLowerCase() === 'online' && cls.app?.demoDate && cls.app?.demoTime && (() => {
                             const demoDateTime = new Date(`${cls.app.demoDate}T${cls.app.demoTime}:00`).getTime();
                             const timeDiff = demoDateTime - nowTime;
                             const isLocked = timeDiff > 5 * 60 * 1000;

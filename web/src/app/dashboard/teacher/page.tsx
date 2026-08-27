@@ -103,7 +103,7 @@ export default function TeacherDashboard() {
     if (data?.applications && data?.profile && !hasFetchedLinks) {
       const fetchLinks = async () => {
         const scheduledOnlineApps = data.applications.filter(
-          (app: any) => app.status === 'demo_scheduled' && app.mode === 'Online'
+          (app: any) => app.status === 'demo_scheduled' && (app.mode || 'Online').toLowerCase() === 'online'
         );
         
         for (const app of scheduledOnlineApps) {
@@ -1551,19 +1551,7 @@ export default function TeacherDashboard() {
                                       <Calendar className="w-4 h-4 text-emerald-600" />
                                       <span className="text-sm font-bold text-slate-800">{new Date(neg.demoDate || neg.proposedDate).toLocaleDateString()} at {(neg.demoTime || neg.proposedTime)?.split('||')[0] || (neg.demoTime || neg.proposedTime)}</span>
                                     </div>
-                                    {neg.mode === 'online' && (neg.demoTime || neg.proposedTime)?.includes('||') && (
-                                      <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-slate-200/50">
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-slate-500">Platform:</span>
-                                          <span className="text-slate-800 font-medium">{(neg.demoTime || neg.proposedTime).split('||')[1]}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                          <span className="font-bold text-slate-500">Link:</span>
-                                          <a href={(neg.demoTime || neg.proposedTime).split('||')[2]} target="_blank" rel="noreferrer" className="text-blue-600 font-medium hover:underline truncate max-w-full">{(neg.demoTime || neg.proposedTime).split('||')[2]}</a>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </div>
                                 ) : (
                                   <div className="text-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-auto">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
@@ -1754,7 +1742,7 @@ export default function TeacherDashboard() {
                                               initialValue: '',
                                               initialDate: neg.proposedDate || '',
                                               initialTime: neg.proposedTime?.split('||')[0] || '',
-                                              isOnline: neg.mode === 'online',
+                                              isOnline: (neg.mode || 'Online').toLowerCase() === 'online',
                                               onSubmit: (val: string, date?: string, time?: string) => {
                                                 setModalConfig(prev => ({ ...prev, isOpen: false }));
                                                 handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });
@@ -1787,7 +1775,7 @@ export default function TeacherDashboard() {
                                     <div className="w-full bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100 text-center mb-3">
                                       <p className="text-sm font-semibold text-blue-600">Demo Scheduled! Prepare for the class.</p>
                                     </div>
-                                    {neg.mode === 'Online' && (
+                                    {(neg.mode || 'Online').toLowerCase() === 'online' && (
                                       <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
                                         <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
                                         <input 
@@ -1929,7 +1917,7 @@ export default function TeacherDashboard() {
                             </div>
                           </div>
                           
-                          {cls.status === 'demo_scheduled' && cls.app?.mode === 'Online' && (
+                          {cls.status === 'demo_scheduled' && (cls.app?.mode || 'Online').toLowerCase() === 'online' && (
                             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2 mt-3">
                               <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
                               <input 
@@ -2898,7 +2886,7 @@ export default function TeacherDashboard() {
                       description: 'Suggest a date and time for the demo class.',
                       placeholder: '',
                       initialValue: '',
-                      isOnline: neg.mode === 'online',
+                      isOnline: (neg.mode || 'Online').toLowerCase() === 'online',
                       onSubmit: (val: string, date?: string, time?: string) => {
                         setModalConfig(prev => ({ ...prev, isOpen: false }));
                         handleNegotiationAction(neg.id, 'propose_demo_date', 0, { ...neg, proposedDate: date, proposedTime: time });

@@ -1,6 +1,6 @@
 # Firestore Data Dump
 
-Generated on: 2026-08-26T12:11:47.744Z
+Generated on: 2026-08-27T12:17:42.959Z
 
 This file contains the raw data from all documents in the database to help trace foreign keys and logic.
 
@@ -112,10 +112,10 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `applications`
 
-### Document: `8KTQRWuKJitdjHnn4FrH`
+### Document: `Vq0CndlZEriYubNnjlNd`
 ```json
 {
-  "applicationId": "MTAT5X8FE",
+  "applicationId": "MTA1GV8D8",
   "tutorDocId": "sWlHosCiP8Xyopk6Bqf7O6BjG252",
   "tutorName": "KK",
   "parentDocId": "VTEVCwSGvkVmOrTPoZNmDjjZ2Sb2",
@@ -124,7 +124,6 @@ This file contains the raw data from all documents in the database to help trace
     "ljPHXhnLM14KFf20y2ZY"
   ],
   "studentName": "Nikhil R Nambiar",
-  "finalPrice": 4000,
   "initialBudget": 5000,
   "absoluteMin": 3000,
   "absoluteMax": 5000,
@@ -134,19 +133,20 @@ This file contains the raw data from all documents in the database to help trace
   "mode": "Online",
   "demoHours": "1 Hour/Day",
   "createdAt": {
-    "_seconds": 1787745768,
-    "_nanoseconds": 655000000
+    "_seconds": 1787832066,
+    "_nanoseconds": 604000000
   },
   "currentOffer": 4500,
-  "lastUpdatedBy": "student",
+  "finalPrice": 4500,
+  "lastUpdatedBy": "teacher",
   "declinedAt": {
-    "_seconds": 1787745818,
-    "_nanoseconds": 978000000
+    "_seconds": 1787832138,
+    "_nanoseconds": 512000000
   },
   "status": "declined",
   "updatedAt": {
-    "_seconds": 1787745818,
-    "_nanoseconds": 978000000
+    "_seconds": 1787832138,
+    "_nanoseconds": 512000000
   }
 }
 ```
@@ -549,12 +549,37 @@ This file contains the raw data from all documents in the database to help trace
   "email": "nikhil.4002.50.82@gmail.com",
   "parentId": "MTPUH23NM",
   "dailyUsage": {
-    "date": "2026-08-26",
+    "date": "2026-08-27",
     "count": 2,
     "lastUpdated": {
-      "_seconds": 1787745768,
-      "_nanoseconds": 655000000
+      "_seconds": 1787832066,
+      "_nanoseconds": 604000000
     }
+  }
+}
+```
+
+---
+
+## Collection: `payments`
+
+### Document: `BBytTsfAgPWeuxKpARDd`
+```json
+{
+  "razorpayOrderId": "mock_order_1787831726653",
+  "applicationId": "QSeON5DsJC3YnBiTzW7B",
+  "userId": "sWlHosCiP8Xyopk6Bqf7O6BjG252",
+  "amount": 236,
+  "currency": "INR",
+  "createdAt": {
+    "_seconds": 1787831726,
+    "_nanoseconds": 654000000
+  },
+  "razorpayPaymentId": "mock_payment_id",
+  "status": "paid",
+  "updatedAt": {
+    "_seconds": 1787831727,
+    "_nanoseconds": 571000000
   }
 }
 ```
@@ -605,10 +630,10 @@ This file contains the raw data from all documents in the database to help trace
   "budget": 3000,
   "technologies": [],
   "languages": [],
-  "isAvailable": true,
   "createdAt": 1787745534112,
   "groupDocId": "MEuYCpjQfV4UClxjQTj5",
-  "pendingRequests": []
+  "pendingRequests": [],
+  "isAvailable": true
 }
 ```
 
@@ -712,7 +737,15 @@ This file contains the raw data from all documents in the database to help trace
   "preferredLocations": "",
   "category": "school",
   "authUid": "sWlHosCiP8Xyopk6Bqf7O6BjG252",
-  "pendingRequests": []
+  "pendingRequests": [],
+  "weeklyQuota": {
+    "weekStartDate": "2026-08-23",
+    "tokensUsed": 1,
+    "lastUpdated": {
+      "_seconds": 1787831701,
+      "_nanoseconds": 497000000
+    }
+  }
 }
 ```
 

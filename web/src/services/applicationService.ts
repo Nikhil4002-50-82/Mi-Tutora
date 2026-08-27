@@ -59,6 +59,7 @@ export class ApplicationService {
           status: 'negotiating',
           source: 'direct',
           category: student.category || 'general',
+          mode: (student as any).mode || tutorData.mode || 'Online',
           demoHours: (student.students ? student.students[0]?.hoursPerDay : (student.hoursPerDay || student.preferredTimeRange)) || 'Flexible',
           createdAt: serverTimestamp()
        });
