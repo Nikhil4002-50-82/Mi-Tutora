@@ -10,7 +10,7 @@ The system operates dynamically based on environment variables.
 ## 2. Database Architecture (The `payments` Ledger)
 To ensure absolute financial integrity and auditing, we do not store payment transaction histories inside the `applications` document. Instead, we use a dedicated `payments` collection.
 
-*   **The Ledger (`payments` collection):** Every time a user clicks "Pay", a permanent record is created here containing the `razorpayOrderId`, `amount`, `userId`, and `status`. If a payment fails and they retry, a new ledger entry is created. 
+*   **The Ledger (`payments` collection):** Every time a user clicks "Pay", a permanent record is created here containing the `razorpayOrderId`, `amount`, `userId`, `status`, and strictly the `applicationDocId` (the raw Firestore Document reference, maintaining database normalization without UI strings). If a payment fails and they retry, a new ledger entry is created. 
 *   **The Application (`applications` collection):** Once a payment is securely verified, the backend simply flips `feePaid: true` or `demoPaymentPaid: true` on the application so the frontend UI can update instantly.
 
 ## 3. Server-Side Routes (Next.js API)
@@ -18,15 +18,19 @@ All payment calculations and verifications happen securely on the backend.
 
 ### A. Order Creation (`/api/create-order`)
 *   **Purpose:** Securely calculates the true price and generates a Razorpay Order ID.
-*   **Input:** `applicationId`, `userId`, `role` ('student' or 'teacher'), `useWallet`.
+*   **Input:** `applicationDocId`, `userId`, `role` ('student' or 'teacher'), `useWallet`.
 *   **Security Check:** The backend ignores any price sent by the frontend. If `role` is 'student', it queries the application's `finalPrice`. If `role` is 'teacher', it fetches the `marketplace_pricing` matrix and recalculates the specific platform demo fee natively on the server.
 *   **Output:** `order_id`, `amount`, `currency`.
 
 ### B. Payment Verification (`/api/verify-payment`)
 *   **Purpose:** Verifies the cryptographic signature from Razorpay.
-*   **Input:** `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`, `applicationId`, `role`.
+*   **Input:** `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`, `applicationDocId`, `role`.
 *   **Security Check:** The backend hashes the data using the Razorpay Secret Key. If the hash matches the signature, the payment is authentic. It also independently re-runs the pricing logic (including `marketplace_pricing` for teachers) to securely calculate wallet balance deductions.
 *   **Database Execution:** The backend uses the `firebase-admin` SDK (which bypasses frontend rules) to update the application status and mark it as paid.
+
+### C. Referral Reward Distribution (Backend Embedded)
+*   **Purpose:** Ensures referrers are only rewarded upon a fully completed and verified transaction.
+*   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It checks if the student was referred, and if so, securely calculates the 25% reward from the `finalPrice` and updates the referrer's `walletBalance`. By embedding this in the backend verification block rather than the frontend UI, the platform is protected from 7-day cancellation refund leakage.
 
 ## 4. Frontend Integration Points
 

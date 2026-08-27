@@ -123,6 +123,15 @@ export default function StudentDashboard() {
 
   const allStudents = data?.students || (data?.myStudent ? [data.myStudent] : []);
   
+  const initialTuitionTabSet = useRef(false);
+  useEffect(() => {
+    if (data && !loading && !initialTuitionTabSet.current) {
+      const hasStudents = data.students && data.students.length > 0;
+      setTuitionSubTab(hasStudents ? 'recommendation' : 'all');
+      initialTuitionTabSet.current = true;
+    }
+  }, [data, loading]);
+
   const hasPendingDues = useMemo(() => {
     if (!data?.upcomingClasses) return false;
     return data.upcomingClasses.some((cls: any) => {

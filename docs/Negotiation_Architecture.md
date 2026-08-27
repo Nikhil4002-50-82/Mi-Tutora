@@ -89,8 +89,9 @@ stateDiagram-v2
     }
     
     DemoReq --> demo_pending_payment : accept_demo (Student)
-    DemoReq --> SchedulingPhase : propose_demo_date
-    demo_pending_payment --> SchedulingPhase : Payment Success
+    DemoReq --> demo_booking_phase : Teacher Platform Fee Success
+    demo_pending_payment --> demo_booking_phase : Student Platform Fee Success
+    demo_booking_phase --> SchedulingPhase : Trigger
     
     state "Scheduling Phase" as SchedulingPhase {
         direction LR

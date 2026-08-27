@@ -99,6 +99,15 @@ export default function TeacherDashboard() {
 
   const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
 
+  const initialTuitionTabSet = useRef(false);
+  useEffect(() => {
+    if (data && !loading && !initialTuitionTabSet.current) {
+      const profileCompleted = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
+      setTuitionSubTab(profileCompleted ? 'recommendation' : 'all');
+      initialTuitionTabSet.current = true;
+    }
+  }, [data, loading]);
+
   useEffect(() => {
     if (data?.applications && data?.profile && !hasFetchedLinks) {
       const fetchLinks = async () => {

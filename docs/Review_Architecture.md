@@ -14,7 +14,7 @@ We use a separate `reviews` collection to store each review independently. This 
 {
   tutorDocId: string;       // ID of the teacher being reviewed
   parentDocId: string;      // ID of the parent writing the review
-  applicationId: string;    // ID of the specific hiring instance (Group-Teacher pairing)
+  applicationDocId: string; // The raw Firestore Document ID of the application instance
   rating: number;           // Integer 1 to 5
   comment: string;          // Optional text feedback
   createdAt: number;        // Timestamp
@@ -44,12 +44,14 @@ match /reviews/{reviewId} {
 }
 ```
 
-### The API Route: `/api/submit-review`
-1. **Validation:** Checks if a review with the given `applicationId` already exists.
-2. **Authorization:** Verifies the `applicationId` exists and its `status` is `tuition_started` (active hiring).
-3. **Database Write:** Uses `firebase-admin` (which bypasses Firestore Rules) in a secure Batch Write to:
-   - Create the new document in the `reviews` collection.
-   - Increment `tutor.reviewCount` and mathematically update `tutor.rating`.
+### The API Routes
+#### 1. Creation (`/api/submit-review`)
+1. **Validation:** Checks if a review with the given `applicationDocId` already exists.
+2. **Authorization:** Verifies the `applicationDocId` exists and its `status` is `tuition_started` (active hiring).
+3. **Database Write:** Uses `firebase-admin` (which bypasses Firestore Rules) in a secure Batch Write to create the review and mathematically update the teacher's average.
+
+#### 2. Retrieval (`/api/reviews`)
+When fetching reviews for a teacher, the backend dynamically performs secure database joins before responding. It uses the stored `applicationDocId` and `parentDocId` to fetch the beautiful human-readable `parentName`, the `groupId` (e.g. MTGXXXXX), and the specific `studentsList`. This ensures the UI has complete context without ever duplicating data into the `reviews` collection.
 
 ## 3. Frontend UI
 
@@ -57,7 +59,15 @@ match /reviews/{reviewId} {
 - Iterates over `data.upcomingClasses` (hired teachers).
 - Displays a **Review Teacher** button next to the "View Details" button for each class.
 - Uses a `ReviewModal` component featuring interactive stars (1-5) and an optional text area.
-- Disables the button if a review has already been submitted for that specific `applicationId`.
+- Disables the button if a review has already been submitted for that specific `applicationDocId`.
+
+### Tutor Profile Modal (Student Portal)
+- When a parent clicks "View Details" on a teacher, the profile modal dynamically fetches the teacher's past reviews from the API.
+- A scrollable list of beautifully formatted review cards is displayed, allowing new parents to read feedback from past clients before hiring.
+
+### "My Reviews" Tab (Teacher Portal)
+- Teachers have a dedicated "My Reviews" tab directly inside their dashboard (accessible via the top-right profile dropdown).
+- The tab displays fully contextualized review cards showing the Star Rating, Text Comment, the Parent's Name, the specific Group ID, and the Student Names involved. 
 
 ### "New Tuition" Tab (Teacher Discovery)
 - Seamlessly maps over the `tutors` collection.
