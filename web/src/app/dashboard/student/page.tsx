@@ -149,7 +149,7 @@ export default function StudentDashboard() {
       if (!acc[gId]) acc[gId] = { id: gId, students: [], totalBudget: 0, categories: [] };
       acc[gId].students.push(student);
       acc[gId].totalBudget += (parseInt(student.budget) || 0);
-      acc[gId].categories.push(student.category);
+      if (student.category) acc[gId].categories.push(student.category);
     });
     return Object.values(acc)
       .filter((g: any) => g.id !== 'unassigned')
@@ -171,6 +171,7 @@ export default function StudentDashboard() {
       const { db } = await import('@/utils/firebase/client');
       const { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, where, deleteDoc } = await import('firebase/firestore');
       const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+      const { generateCustomId } = await import('@/utils/idGenerator');
       
       const newGroupIds = new Set<string>();
 
@@ -198,6 +199,8 @@ export default function StudentDashboard() {
             
             await setDoc(groupRef, {
                 id: groupId,
+                groupDocId: groupId,
+                groupId: generateCustomId('MTG'),
                 parentDocId: data?.user?.uid,
                 mode: oldGroupData.mode || '',
                 area: oldGroupData.area || '',
@@ -222,10 +225,9 @@ export default function StudentDashboard() {
       const allGroupsQuery = query(collection(db, 'groups'), where('parentDocId', '==', data?.user?.uid));
       const allGroupsSnap = await getDocs(allGroupsQuery);
       for (const groupDoc of allGroupsSnap.docs) {
-          const reqData = groupDoc.data();
-          if (reqData.id && !newGroupIds.has(reqData.id)) {
-            await deleteDoc(doc(db, 'groups', reqData.id));
-            const requestQuery = query(collection(db, 'tuition_requests'), where('groupDocId', '==', reqData.id));
+          if (!newGroupIds.has(groupDoc.id)) {
+            await deleteDoc(doc(db, 'groups', groupDoc.id));
+            const requestQuery = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupDoc.id));
             const requestSnap = await getDocs(requestQuery);
             for(const r of requestSnap.docs) await deleteDoc(r.ref);
           }
@@ -295,8 +297,9 @@ export default function StudentDashboard() {
   
   const activeGroupDoc = data?.groups?.find((g: any) => g.id === activeGroup?.id) || data?.tuitionRequests?.find((req: any) => req.groupDocId === activeGroup?.id);
   const scoringContext = {
-    ...(activeGroup || activeStudent),
-    requestDoc: activeGroupDoc
+    ...(activeGroupDoc || {}),          // Group prefs as base (teacherGenderPreference, mode etc.)
+    ...(activeGroup || activeStudent),  // Student data wins on conflict
+    requestDoc: activeGroupDoc          // Keep for legacy fallback
   };
 
   const allTutorsWithScores = (data?.allTutors || []).filter((tutor: any) => {

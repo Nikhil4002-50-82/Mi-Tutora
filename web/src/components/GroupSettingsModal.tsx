@@ -370,26 +370,32 @@ export default function GroupSettingsModal({
                   <option value="7">Everyday</option>
                 </select>
               </div>
-              
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Or Select Specific Days</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => handleSpecificDay(day)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors border ${
-                        formData.specificDays.includes(day) 
-                          ? 'bg-[#00a992] text-white border-[#00a992]' 
-                          : 'bg-white text-slate-600 border-slate-300 hover:border-[#00a992]'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
+
+              {formData.days && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Specific Days of the Week (Optional)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                      const isChecked = formData.specificDays.includes(day);
+                      const maxDays = formData.days === '7' ? 7 : parseInt(formData.days) || 0;
+                      const isAtMax = maxDays > 0 && formData.specificDays.length >= maxDays;
+                      const isDisabled = !isChecked && isAtMax;
+                      return (
+                        <label key={day} className={`flex items-center gap-2 border rounded-lg px-3 py-2 bg-white transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200' : 'cursor-pointer border-slate-300 hover:border-[#00a992]'} ${isChecked ? 'border-[#00a992] bg-emerald-50' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isDisabled}
+                            onChange={() => handleSpecificDay(day)}
+                            className="accent-[#00a992]"
+                          />
+                          <span className="text-xs font-medium">{day.substring(0, 3)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
           </form>

@@ -1196,17 +1196,18 @@ export default function DemoForm({
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold mb-2">⏱ Preferred Study Time *</label>
+                      <label className="block text-sm font-semibold mb-2">⏱ Preferred Time Range *</label>
                       <select 
                         value={pref.hours || ''} 
                         onChange={(e) => handleGroupPrefChange(groupId, 'hours', e.target.value)} 
                         className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white text-sm"
                         required
                       >
-                        <option value="">Select duration</option>
-                        <option value="1 Hour/Day">1 Hour / Day</option>
-                        <option value="1.5 Hours/Day">1.5 Hours / Day</option>
-                        <option value="2 Hours/Day">2 Hours / Day</option>
+                        <option value="">Flexible / Any Time</option>
+                        <option value="Morning (8 AM - 12 PM)">Morning (8 AM - 12 PM)</option>
+                        <option value="Afternoon (12 PM - 4 PM)">Afternoon (12 PM - 4 PM)</option>
+                        <option value="Evening (4 PM - 8 PM)">Evening (4 PM - 8 PM)</option>
+                        <option value="Night (After 8 PM)">Night (After 8 PM)</option>
                       </select>
                     </div>
                     <div>

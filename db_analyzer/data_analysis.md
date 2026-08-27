@@ -1,6 +1,6 @@
 # Firestore Data Dump
 
-Generated on: 2026-08-27T13:20:31.542Z
+Generated on: 2026-08-27T20:43:10.951Z
 
 This file contains the raw data from all documents in the database to help trace foreign keys and logic.
 
@@ -156,7 +156,8 @@ This file contains the raw data from all documents in the database to help trace
     "_seconds": 1787834197,
     "_nanoseconds": 171000000
   },
-  "status": "tuition_started"
+  "status": "tuition_started",
+  "applicationDocId": "rXAgexdkTyYMKQU5KbeE"
 }
 ```
 
@@ -611,7 +612,6 @@ This file contains the raw data from all documents in the database to help trace
 ```json
 {
   "razorpayOrderId": "mock_order_1787834040102",
-  "applicationId": "rXAgexdkTyYMKQU5KbeE",
   "userId": "DiJjAkrHDVdu3pLxvH0DHEXbSK03",
   "amount": 531,
   "currency": "INR",
@@ -624,7 +624,8 @@ This file contains the raw data from all documents in the database to help trace
   "updatedAt": {
     "_seconds": 1787834040,
     "_nanoseconds": 807000000
-  }
+  },
+  "applicationDocId": "rXAgexdkTyYMKQU5KbeE"
 }
 ```
 
@@ -671,10 +672,10 @@ This file contains the raw data from all documents in the database to help trace
 {
   "tutorDocId": "DiJjAkrHDVdu3pLxvH0DHEXbSK03",
   "parentDocId": "t6GWjTyqutOz3Epun8ZzU0MrOsw2",
-  "applicationId": "rXAgexdkTyYMKQU5KbeE",
   "rating": 5,
   "comment": "very good teacher",
-  "createdAt": 1787834219495
+  "createdAt": 1787834219495,
+  "applicationDocId": "rXAgexdkTyYMKQU5KbeE"
 }
 ```
 
