@@ -457,13 +457,41 @@ export default function TeacherDashboard() {
   d.setDate(diff);
   const currentWeekStart = d.toISOString().split('T')[0];
 
-  const isProPlan = data?.userData?.subscriptionPlan === 'pro' || data?.userData?.isSubscribed;
+  const isProPlan = data?.profile?.subscriptionPlan === 'pro' || data?.profile?.isSubscribed;
   const quotaLimit = isProPlan ? 15 : 5;
-  const isCurrentWeek = data?.userData?.weeklyQuota?.weekStartDate === currentWeekStart;
-  const tokensUsed = isCurrentWeek ? (data?.userData?.weeklyQuota?.tokensUsed || 0) : 0;
+  const isCurrentWeek = data?.profile?.weeklyQuota?.weekStartDate === currentWeekStart;
+  const tokensUsed = isCurrentWeek ? (data?.profile?.weeklyQuota?.tokensUsed || 0) : 0;
   const tokensRemaining = Math.max(0, quotaLimit - tokensUsed);
   const ALL_ACTIVE_STATUSES = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
   const activePendingOffers = data?.applications?.filter((app: any) => app.tutorDocId === data?.userData?.id && ALL_ACTIVE_STATUSES.includes(app.status)).length || 0;
+
+  const buildStudentViewUser = (app: any, fallback: any = {}) => {
+    const sourceApp = app?.app || app || {};
+    const matchedGroup = data?.allStudents?.find((student: any) => student.id === (sourceApp.groupDocId || sourceApp.studentDocId));
+    const students = sourceApp.studentsList?.length
+      ? sourceApp.studentsList
+      : sourceApp.studentDetails
+        ? [sourceApp.studentDetails]
+        : matchedGroup?.students || fallback.students || [];
+    const primaryStudent = sourceApp.studentDetails || students[0] || matchedGroup || fallback;
+    const parentContact = sourceApp.parentDetails || sourceApp.parentContact || primaryStudent.parentDetails || {};
+
+    return {
+      ...(matchedGroup || {}),
+      ...fallback,
+      id: sourceApp.groupDocId || sourceApp.studentDocId || matchedGroup?.id || fallback.id || sourceApp.id,
+      name: sourceApp.studentName || matchedGroup?.name || fallback.name || primaryStudent.name || 'Student',
+      category: sourceApp.category || matchedGroup?.category || fallback.category || primaryStudent.category,
+      students,
+      phoneNumber: primaryStudent.phoneNumber || primaryStudent.whatsappNumber || parentContact.phone || parentContact.whatsapp || fallback.phoneNumber || '',
+      email: primaryStudent.email || parentContact.email || fallback.email || '',
+      parentDetails: parentContact,
+      budget: sourceApp.finalPrice || sourceApp.currentOffer || matchedGroup?.budget || fallback.budget || 0,
+      preferredMode: primaryStudent.preferredMode || sourceApp.preferredMode || sourceApp.mode || matchedGroup?.preferredMode || fallback.preferredMode || 'Online',
+      address: primaryStudent.address || parentContact.address || matchedGroup?.address || fallback.address,
+      area: primaryStudent.area || parentContact.area || matchedGroup?.area || fallback.area,
+    };
+  };
 
   const handleSendOffer = async (student: any) => {
     const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
@@ -993,6 +1021,31 @@ export default function TeacherDashboard() {
                         activeMRR={data?.earningsData?.activeMRR || 0}
                         onClick={() => setActiveTab('earnings')}
                       />
+
+                      <div
+                        onClick={() => setActiveTab('subscriptions')}
+                        className="flex-1 bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <CreditCard className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-gray-900 tracking-tight">Weekly Tokens</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-2">Used: {tokensUsed} / {quotaLimit}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-3 bg-emerald-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#00a992] rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min((tokensUsed / quotaLimit) * 100, 100)}%` }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-900">{tokensRemaining} left</span>
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+                            <span className="text-xs font-bold text-slate-500">{isProPlan ? 'Pro Plan' : 'Basic Plan'}</span>
+                            {!isProPlan && <span className="text-xs font-bold text-emerald-600 group-hover:text-emerald-700">Upgrade</span>}
+                          </div>
+                        </div>
+                      </div>
 
                       {/* Profile Completeness Card */}
                       <ProfileCompletenessCard 
@@ -1590,12 +1643,12 @@ export default function TeacherDashboard() {
                               <div className="mt-auto space-y-2">
                                 <button
                                   onClick={() => {
-                                    const studentUser = data?.allStudents?.find((s:any) => s.id === (neg.groupDocId || neg.studentDocId)) || { 
+                                    const studentUser = buildStudentViewUser(neg, {
                                       id: neg.groupDocId || neg.studentDocId, 
                                       name: neg.studentName || 'Student',
                                       category: neg.category,
                                       budget: neg.initialBudget || neg.currentOffer,
-                                    };
+                                    });
                                     setSelectedViewUser(studentUser);
                                     setSelectedViewApp(neg);
                                   }}
@@ -1968,15 +2021,16 @@ export default function TeacherDashboard() {
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const viewUser = cls.studentDetails || { 
+                                  const viewUser = buildStudentViewUser(cls.app || cls, {
                                     id: cls.id, 
                                     name: cls.student || 'Group', 
-                                    students: cls.app?.studentsList || [], 
+                                    phoneNumber: cls.app?.parentContact?.phone || '',
+                                    email: cls.app?.parentContact?.email || '',
                                     budget: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                     preferredMode: cls.app?.preferredMode || 'Online'
-                                  };
+                                  });
                                   setSelectedViewUser(viewUser);
-                                  setSelectedViewApp(cls);
+                                  setSelectedViewApp(cls.app || cls);
                                 }}
                                 className="w-full bg-white border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >
@@ -2101,15 +2155,16 @@ export default function TeacherDashboard() {
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const viewUser = cls.studentDetails || { 
+                                  const viewUser = buildStudentViewUser(cls.app || cls, {
                                     id: cls.id, 
                                     name: cls.student || 'Group', 
-                                    students: cls.app?.studentsList || [], 
+                                    phoneNumber: cls.app?.parentContact?.phone || '',
+                                    email: cls.app?.parentContact?.email || '',
                                     budget: cls.app?.finalPrice || cls.app?.currentOffer || 0,
                                     preferredMode: cls.app?.preferredMode || 'Online'
-                                  };
+                                  });
                                   setSelectedViewUser(viewUser);
-                                  setSelectedViewApp(cls);
+                                  setSelectedViewApp(cls.app || cls);
                                 }}
                                 className="w-full bg-white border-2 border-slate-200 hover:border-[#00a992] hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-700 px-4 py-3 rounded-xl font-bold text-sm transition-all"
                             >

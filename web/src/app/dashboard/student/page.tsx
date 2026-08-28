@@ -479,6 +479,20 @@ export default function StudentDashboard() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const dailyRequestsCount = data?.applications?.filter((app: any) => app.initiator === 'student' && app.createdAt >= todayStart.getTime()).length || 0;
+  const todayKey = new Date().toISOString().split('T')[0];
+  const dailyUsage = data?.profile?.dailyUsage;
+  const requestsUsedToday = dailyUsage?.date === todayKey ? (dailyUsage.count || 0) : 0;
+  const requestsLimit = 5;
+  const requestsRemaining = Math.max(0, requestsLimit - requestsUsedToday);
+  const groupQueueStatuses = studentGroups.map((group: any) => {
+    const activeStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'];
+    const activeCount = data?.applications?.filter((app: any) => app.groupDocId === group.id && activeStatuses.includes(app.status)).length || 0;
+    return {
+      id: group.id,
+      name: String(group.name || 'Group').replace(/^Group:\s*/i, ''),
+      activeCount,
+    };
+  });
   const handleReviewSubmit = async (rating: number, comment: string) => {
     try {
       const response = await fetch('/api/submit-review', {
@@ -1195,6 +1209,37 @@ export default function StudentDashboard() {
                     </div>
 
                     <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
+                      <div className="flex-1 max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <Activity className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-gray-900 tracking-tight">Request Activity</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm tracking-tight mb-2">Requests today: {requestsUsedToday} / {requestsLimit}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-3 bg-emerald-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#00a992] rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min((requestsUsedToday / requestsLimit) * 100, 100)}%` }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-900">{requestsRemaining} left</span>
+                          </div>
+                          {groupQueueStatuses.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Group Queue</p>
+                              <div className="space-y-1.5">
+                                {groupQueueStatuses.slice(0, 2).map((group: any) => (
+                                  <div key={group.id} className="flex items-center justify-between gap-3 text-xs font-bold">
+                                    <span className="text-slate-600 truncate">{group.name}</span>
+                                    <span className={group.activeCount >= 5 ? 'text-red-500' : 'text-emerald-600'}>{group.activeCount}/5</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Profile Completeness Card */}
                       <ProfileCompletenessCard 
                         completeness={profileCompleteness}
@@ -3172,8 +3217,16 @@ export default function StudentDashboard() {
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-4xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">Group {viewingGroupDetails.index}: Student Details {viewingGroupDetails.students?.[0]?.groupId ? `(ID: ${viewingGroupDetails.students[0].groupId})` : ''}</h3>
-                <p className="text-slate-500 font-medium">Group: {viewingGroupDetails.name}</p>
+                {(() => {
+                  const groupDoc = data?.groups?.find((g: any) => g.id === viewingGroupDetails.id);
+                  const groupDisplayName = String(viewingGroupDetails.name || '').replace(/^Group:\s*/i, '');
+                  return (
+                    <>
+                      <h3 className="text-2xl font-black text-slate-900">Group {viewingGroupDetails.index}: {groupDisplayName}</h3>
+                      {groupDoc?.groupId && <p className="text-slate-500 font-medium">ID: {groupDoc.groupId}</p>}
+                    </>
+                  );
+                })()}
               </div>
               <button onClick={() => setViewingGroupDetails(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                 <X className="w-6 h-6 text-slate-400" />

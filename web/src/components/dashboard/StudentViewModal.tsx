@@ -112,6 +112,11 @@ export function StudentViewModal({
                 <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                   {studentDetail.name || 'Student'} <span className="text-sm font-medium text-gray-500">({studentDetail.category})</span>
                 </h4>
+                {studentDetail.studentId && (
+                  <p className="text-xs text-slate-500 font-mono font-bold mb-3 uppercase tracking-wider">
+                    ID: {studentDetail.studentId}
+                  </p>
+                )}
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
