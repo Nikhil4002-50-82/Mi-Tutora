@@ -111,7 +111,9 @@ export async function POST(req: NextRequest) {
         const tutorSnap = await tutorRef.get();
         const tutorData = tutorSnap.data() || {};
         
-        const isPro = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
+        const isSubscribedFlags = tutorData.subscriptionPlan === 'pro' || tutorData.isSubscribed;
+        const hasValidExpiry = tutorData.subscriptionExpiry ? tutorData.subscriptionExpiry > Date.now() : false;
+        const isPro = isSubscribedFlags && hasValidExpiry;
         const teacherLimit = isPro ? 15 : 5;
         
         const d = new Date();

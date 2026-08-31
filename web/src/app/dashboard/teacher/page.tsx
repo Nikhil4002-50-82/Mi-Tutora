@@ -457,7 +457,9 @@ export default function TeacherDashboard() {
   d.setDate(diff);
   const currentWeekStart = d.toISOString().split('T')[0];
 
-  const isProPlan = data?.profile?.subscriptionPlan === 'pro' || data?.profile?.isSubscribed;
+  const isSubscribedFlags = data?.profile?.subscriptionPlan === 'pro' || data?.profile?.isSubscribed;
+  const hasValidExpiry = data?.profile?.subscriptionExpiry ? data?.profile?.subscriptionExpiry > Date.now() : false;
+  const isProPlan = isSubscribedFlags && hasValidExpiry;
   const quotaLimit = isProPlan ? 15 : 5;
   const isCurrentWeek = data?.profile?.weeklyQuota?.weekStartDate === currentWeekStart;
   const tokensUsed = isCurrentWeek ? (data?.profile?.weeklyQuota?.tokensUsed || 0) : 0;
@@ -776,16 +778,94 @@ export default function TeacherDashboard() {
 
   const handleUpgradeToPro = async () => {
     setUpgradeModalOpen(false);
+    const loadingToast = toast.loading("Initiating secure checkout...");
     try {
-      const { db } = await import('@/utils/firebase/client');
-      const { doc, updateDoc } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'tutors', data?.user?.uid as string), {
-        subscriptionPlan: 'pro',
-        isSubscribed: true
+      // 1. Create Subscription Order
+      const res = await fetch('/api/create-subscription-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: data?.user?.uid })
       });
-      toast.success("Successfully upgraded to Pro! You now have 15 tokens per week.");
-      mutate();
+      
+      const order = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(order.error || 'Failed to create order');
+      }
+
+      toast.dismiss(loadingToast);
+
+      // 2. Load Razorpay SDK
+      const loadRazorpay = () => new Promise(resolve => {
+         if ((window as any).Razorpay) return resolve(true);
+         const script = document.createElement('script');
+         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+         script.onload = () => resolve(true);
+         script.onerror = () => resolve(false);
+         document.body.appendChild(script);
+      });
+      
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) throw new Error('Razorpay SDK failed to load');
+
+      // 3. Setup options
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'mock_key',
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Mushi Education',
+        description: 'Pro Subscription Upgrade (1 Month)',
+        order_id: order.id,
+        handler: async function (response: any) {
+           const verifyToast = toast.loading("Verifying payment...");
+           try {
+               const verifyRes = await fetch('/api/verify-subscription-payment', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                       razorpay_order_id: response.razorpay_order_id || order.id,
+                       razorpay_payment_id: response.razorpay_payment_id || 'mock_payment_id',
+                       razorpay_signature: response.razorpay_signature || 'mock_signature',
+                       userId: data?.user?.uid
+                   })
+               });
+               
+               const verifyData = await verifyRes.json();
+               if (verifyData.success) {
+                   toast.success("Successfully upgraded to Pro! You now have 15 tokens per week.");
+                   mutate();
+               } else {
+                   throw new Error(verifyData.error || 'Verification failed');
+               }
+           } catch (err: any) {
+               toast.error("Payment verification failed: " + err.message);
+           } finally {
+               toast.dismiss(verifyToast);
+           }
+        },
+        prefill: {
+            name: data?.user?.displayName || 'Teacher',
+            email: data?.user?.email || '',
+        },
+        theme: {
+            color: '#00a992'
+        }
+      };
+
+      // Mock mode shortcut
+      if (order.mockMode) {
+          options.handler({ razorpay_order_id: order.id, razorpay_payment_id: 'mock_payment', razorpay_signature: 'mock_signature' });
+          return;
+      }
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+          toast.error(`Payment failed: ${response.error.description}`);
+      });
+      rzp.open();
+
     } catch (e: any) {
+      toast.dismiss(loadingToast);
       toast.error("Failed to upgrade: " + e.message);
     }
   };
@@ -1634,7 +1714,7 @@ export default function TeacherDashboard() {
                                 ) : (
                                   <div className="text-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-auto">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                                    <p className="text-2xl font-black text-emerald-600 tracking-tight">₹{neg.finalPrice || neg.currentOffer}</p>
+                                    <p className="text-2xl font-black text-emerald-600 tracking-tight">₹{neg.currentOffer}</p>
                                   </div>
                                 )}                  
                             </div>
@@ -2321,7 +2401,7 @@ export default function TeacherDashboard() {
                       </div>
                       <p className="text-emerald-100/80 font-medium mb-6">For serious tutors looking to scale.</p>
                       <div className="text-4xl font-black text-white mb-8">
-                        ₹499 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/month</span>
+                        ₹299 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/month</span>
                       </div>
                       
                       <ul className="space-y-4 mb-8 flex-1">
@@ -2807,7 +2887,7 @@ export default function TeacherDashboard() {
         isOpen={upgradeModalOpen}
         type="success"
         title="Upgrade to Pro"
-        description="Are you sure you want to upgrade to the Pro plan for ₹499/month? You will receive 15 tokens per week and priority matching."
+        description="Are you sure you want to upgrade to the Pro plan for ₹299/month? You will receive 15 tokens per week and priority matching."
         confirmText="Confirm & Pay"
         onConfirm={handleUpgradeToPro}
         onCancel={() => setUpgradeModalOpen(false)}

@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { getAdminDb } from '@/utils/firebase/admin';
+import * as admin from 'firebase-admin';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { 
+      razorpay_order_id, 
+      razorpay_payment_id, 
+      razorpay_signature, 
+      userId
+    } = body;
+
+    if (!userId || !razorpay_order_id || !razorpay_payment_id) {
+        return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    }
+
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    // SIMULATION MODE
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.warn('RAZORPAY credentials not found. MOCKING verification.');
+      
+      if (razorpay_order_id && String(razorpay_order_id).startsWith('mock_order_sub_')) {
+         await processSubscriptionUpdate(adminDb, userId, razorpay_order_id, 'mock_payment_id');
+         return NextResponse.json({ success: true, mockMode: true });
+      }
+      return NextResponse.json({ error: 'Invalid Mock Order' }, { status: 400 });
+    }
+
+    // LIVE MODE: Cryptographic Verification
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    
+    // The signature is essentially an HMAC SHA256 of "order_id|payment_id"
+    const generated_signature = crypto
+      .createHmac('sha256', secret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    if (generated_signature !== razorpay_signature) {
+      // Log failed attempt
+      const paymentsRef = adminDb.collection('payments');
+      const q = paymentsRef.where('razorpayOrderId', '==', razorpay_order_id).limit(1);
+      const snap = await q.get();
+      if (!snap.empty) {
+        await snap.docs[0].ref.update({ status: 'failed', updatedAt: new Date() });
+      }
+      return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 });
+    }
+
+    // Payment is 100% authentic. Perform secure backend database update.
+    await processSubscriptionUpdate(adminDb, userId, razorpay_order_id, razorpay_payment_id);
+
+    return NextResponse.json({ success: true });
+
+  } catch (error: any) {
+    console.error('Error verifying subscription payment:', error);
+    return NextResponse.json({ error: error.message || 'Failed to verify subscription payment' }, { status: 500 });
+  }
+}
+
+async function processSubscriptionUpdate(adminDb: any, userId: string, orderId: string, paymentId: string) {
+    const batch = adminDb.batch();
+    
+    // 1. Update the ledger
+    const paymentsRef = adminDb.collection('payments');
+    const q = paymentsRef.where('razorpayOrderId', '==', orderId).limit(1);
+    const snap = await q.get();
+    
+    if (!snap.empty) {
+        batch.update(snap.docs[0].ref, {
+            status: 'paid',
+            razorpayPaymentId: paymentId,
+            updatedAt: new Date()
+        });
+    } else {
+        throw new Error("Order ID not found in secure ledger. Payment rejected.");
+    }
+
+    // 2. Update the Tutor Document
+    const tutorRef = adminDb.collection('tutors').doc(userId);
+    const tutorSnap = await tutorRef.get();
+    
+    if (!tutorSnap.exists) {
+        throw new Error("Tutor profile not found.");
+    }
+
+    const { Timestamp, FieldValue } = await import('firebase-admin/firestore');
+    
+    const oneMonthMillis = 30 * 24 * 60 * 60 * 1000; 
+    const expiryDate = Timestamp.now().toMillis() + oneMonthMillis;
+
+    batch.update(tutorRef, {
+        subscriptionPlan: 'pro',
+        isSubscribed: true,
+        subscriptionExpiry: expiryDate,
+        subscriptionUpdatedAt: FieldValue.serverTimestamp()
+    });
+
+    await batch.commit();
+}

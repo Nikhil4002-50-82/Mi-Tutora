@@ -532,13 +532,7 @@ export default function StudentDashboard() {
     isSubmittingRef.current = true;
     if (requestLoading) { isSubmittingRef.current = false; return false; }
     
-    const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
-    
-    if (activeAppForGroup) {
-      toast.error("This group already has an active demo request in progress. Please wait for a response or decline the current request before requesting another tutor.");
-      isSubmittingRef.current = false;
-      return;
-    }
+    // Rogue 1-request blocker removed to allow Layer 2 (5-queue) and Layer 3 (2-demo) to function normally.
     const offerPrice = parseInt(negotiationOffer[tutor.id]);
     if (!offerPrice || offerPrice <= 0) {
       toast.error("Please enter a valid budget offer.");
@@ -641,12 +635,7 @@ export default function StudentDashboard() {
     
     if (requestLoading) return;
     
-    const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
-    
-    if (activeAppForGroup) {
-      toast.error("This group already has an active demo request in progress. Please wait for a response or decline the current request before requesting another tutor.");
-      return;
-    }
+    // Rogue 1-request blocker removed to allow Layer 2 (5-queue) and Layer 3 (2-demo) to function normally.
     try {
       setRequestLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
@@ -1864,7 +1853,7 @@ export default function StudentDashboard() {
                                 ) : (
                                   <div className="text-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-auto">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{neg.status === 'demo_pending_payment' ? 'Agreed Price' : 'Current Offer'}</p>
-                                    <p className="text-2xl font-black text-emerald-600 tracking-tight">₹{neg.finalPrice || neg.currentOffer}</p>
+                                    <p className="text-2xl font-black text-emerald-600 tracking-tight">₹{neg.currentOffer}</p>
                                   </div>
                                 )}                  
                             </div>
