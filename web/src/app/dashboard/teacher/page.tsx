@@ -2811,7 +2811,7 @@ export default function TeacherDashboard() {
                               <p className="text-xs text-slate-500 font-medium mt-0.5 mb-2">{cls.subject} • ₹{cls.app.finalPrice}/mo</p>
                               <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
-                                  Next Due: {cls.app.nextPaymentDate ? new Date(cls.app.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : new Date(cls.app.updatedAt + 30*24*60*60*1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                  Next Due: {cls.app.nextPaymentDate ? new Date(cls.app.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : new Date(cls.app.updatedAt + 7*24*60*60*1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                 </span>
                                 <span className="text-xs font-bold text-slate-500">
                                   {cls.app.paymentHistory?.length || 0} Payments Received

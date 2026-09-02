@@ -1,6 +1,6 @@
 # Firestore Data Dump
 
-Generated on: 2026-08-28T08:18:36.664Z
+Generated on: 2026-09-02T17:51:59.783Z
 
 This file contains the raw data from all documents in the database to help trace foreign keys and logic.
 
@@ -110,6 +110,59 @@ This file contains the raw data from all documents in the database to help trace
 
 ---
 
+## Collection: `applications`
+
+### Document: `q79FbFfUBx8ECoBTwAV5`
+```json
+{
+  "applicationDocId": "q79FbFfUBx8ECoBTwAV5",
+  "applicationId": "MTA1G4DR0",
+  "tutorDocId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "tutorName": "Krishna",
+  "requestDocId": "",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "studentDocId": "UNYgioNieFTuj9eFbeCq",
+  "groupDocId": "MLOraVxLQ8PRnfE3k5pk",
+  "studentDocIds": [
+    "UNYgioNieFTuj9eFbeCq",
+    "uxy4RnjSDS4cbXtRGqEy"
+  ],
+  "studentName": "Group: Nikhil R Nambiar, Abhilash V",
+  "currentOffer": 6000,
+  "finalPrice": 6000,
+  "initialBudget": 6000,
+  "absoluteMin": 6000,
+  "absoluteMax": 8400,
+  "initiator": "teacher",
+  "source": "direct",
+  "category": "school",
+  "mode": "Online",
+  "demoHours": "Flexible",
+  "createdAt": {
+    "_seconds": 1788341619,
+    "_nanoseconds": 313000000
+  },
+  "demoPaymentPaid": true,
+  "proposedDate": "2026-09-02",
+  "proposedTime": "16:15",
+  "demoDate": "2026-09-02",
+  "demoTime": "16:15",
+  "lastUpdatedBy": "teacher",
+  "updatedAt": {
+    "_seconds": 1788350206,
+    "_nanoseconds": 602000000
+  },
+  "feePaid": false,
+  "startDate": {
+    "_seconds": 1788368679,
+    "_nanoseconds": 72000000
+  },
+  "status": "tuition_started"
+}
+```
+
+---
+
 ## Collection: `global_config`
 
 ### Document: `app`
@@ -143,30 +196,33 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `groups`
 
-### Document: `Cmg1V1eA7EqRuYQlHWM3`
+### Document: `MLOraVxLQ8PRnfE3k5pk`
 ```json
 {
-  "longitude": null,
-  "mode": "Online",
-  "area": "",
-  "groupDocId": "Cmg1V1eA7EqRuYQlHWM3",
-  "parentDocId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "groupId": "MTGILF0YZ",
-  "specificDays": [
-    "Saturday",
-    "Sunday"
-  ],
-  "createdAt": 1787902683453,
-  "city": "",
   "studentDocIds": [
-    "EjZ77JdzmQJ91G6XXjxA",
-    "9oKjT6eVoUP1wJ6AxoEO"
+    "UNYgioNieFTuj9eFbeCq",
+    "uxy4RnjSDS4cbXtRGqEy"
   ],
-  "daysPerWeek": "2 Days/Week",
+  "groupId": "MTGQFCSWY",
+  "longitude": null,
+  "specificDays": [
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Monday"
+  ],
+  "groupDocId": "MLOraVxLQ8PRnfE3k5pk",
+  "city": "",
+  "daysPerWeek": "5 Days/Week",
+  "preferredTimeRange": "Evening (4 PM - 8 PM)",
   "latitude": null,
-  "teacherGenderPreference": "No Preference",
   "status": "active",
-  "preferredTimeRange": "Evening (4 PM - 8 PM)"
+  "mode": "Online",
+  "createdAt": 1788341511052,
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "area": "",
+  "teacherGenderPreference": "No Preference"
 }
 ```
 
@@ -458,16 +514,84 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `parents`
 
-### Document: `VuPaItyqNFfZo7LFG0MB4JZVrU73`
+### Document: `5WL4MABTmFWQJ9QPfU33URxGLRW2`
 ```json
 {
   "whatsapp": "9148018041",
   "phone": "9148018041",
   "name": "Ramachandran M M",
-  "parentDocId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "authUid": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "authUid": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
   "email": "nikhil.4002.50.82@gmail.com",
-  "parentId": "MTPPFC8Z1"
+  "parentId": "MTPZHVJ3P"
+}
+```
+
+---
+
+## Collection: `payments`
+
+### Document: `GLFMJws2RHy7GUaP6SJj`
+```json
+{
+  "razorpayOrderId": "order_TX7Wo68pkrIIt3",
+  "applicationDocId": "q79FbFfUBx8ECoBTwAV5",
+  "userId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "amount": 354,
+  "walletDiscountApplied": 0,
+  "currency": "INR",
+  "type": "demo",
+  "isRemoval": false,
+  "createdAt": {
+    "_seconds": 1788341649,
+    "_nanoseconds": 671000000
+  },
+  "razorpayPaymentId": "pay_TX7bMYc8k89ZWv",
+  "status": "paid",
+  "updatedAt": {
+    "_seconds": 1788341939,
+    "_nanoseconds": 35000000
+  }
+}
+```
+
+### Document: `qjL8gTo2TgzOKejEqfSE`
+```json
+{
+  "razorpayOrderId": "order_TXA7z2pl3XYRmp",
+  "userId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "amount": 299,
+  "currency": "INR",
+  "type": "subscription",
+  "createdAt": {
+    "_seconds": 1788350804,
+    "_nanoseconds": 494000000
+  },
+  "razorpayPaymentId": "pay_TXA8J4IjKWk3Ix",
+  "status": "paid",
+  "updatedAt": {
+    "_seconds": 1788350838,
+    "_nanoseconds": 212000000
+  }
+}
+```
+
+---
+
+## Collection: `pending_tuition_fees`
+
+### Document: `q79FbFfUBx8ECoBTwAV5`
+```json
+{
+  "applicationDocId": "q79FbFfUBx8ECoBTwAV5",
+  "studentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "tutorDocId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "status": "pending",
+  "amount": 6000,
+  "startDate": {
+    "_seconds": 1788368679,
+    "_nanoseconds": 72000000
+  }
 }
 ```
 
@@ -475,18 +599,34 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `referrals`
 
-### Document: `DysNvl2BlYOq2FeD5JCH`
+### Document: `CRcP0iw7Un96AX9IB6nZ`
 ```json
 {
-  "referralCode": "RAMA-ITYQNF",
-  "referrerName": "Ramachandran M M",
-  "createdAt": 1787902728982,
-  "referredUserId": "1FvKT8311basBtfPQcYNfStf0Un2",
-  "status": "pending",
-  "referrerId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "referralType": "teacher",
+  "referralCode": "RAMA-MABTMF",
   "estimatedReward": 0,
+  "referralType": "teacher",
+  "status": "pending",
+  "createdAt": 1788341549464,
+  "referrerName": "Ramachandran M M",
+  "referrerId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "referredUserId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
   "referredUserName": "Krishna"
+}
+```
+
+---
+
+## Collection: `reviews`
+
+### Document: `S7op9B5E4Ra2Zn3QttFS`
+```json
+{
+  "tutorDocId": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "applicationDocId": "q79FbFfUBx8ECoBTwAV5",
+  "rating": 5,
+  "comment": "Very good teaching",
+  "createdAt": 1788371270043
 }
 ```
 
@@ -494,62 +634,64 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `students`
 
-### Document: `9oKjT6eVoUP1wJ6AxoEO`
+### Document: `UNYgioNieFTuj9eFbeCq`
 ```json
 {
+  "name": "Nikhil R Nambiar",
+  "classLevel": "8th Standard",
+  "gender": "Male",
+  "category": "school",
+  "languages": [],
+  "createdAt": 1788341510360,
+  "studentId": "MTS8TGC6O",
+  "guardianName": "Ramachandran M M",
+  "email": "nikhil.4002.50.82@gmail.com",
+  "dob": "",
+  "budget": 3000,
+  "technologies": [],
+  "studentType": "School Student",
+  "whatsappNumber": "9148018041",
+  "id": "UNYgioNieFTuj9eFbeCq",
+  "subjects": [
+    "Mathematics"
+  ],
+  "board": "ICSE",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "phoneNumber": "9148018041",
+  "groupDocId": "MLOraVxLQ8PRnfE3k5pk",
+  "isAvailable": false,
+  "pendingRequests": []
+}
+```
+
+### Document: `uxy4RnjSDS4cbXtRGqEy`
+```json
+{
+  "category": "school",
+  "phoneNumber": "9148018041",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "name": "Abhilash V",
+  "guardianName": "Ramachandran M M",
+  "board": "CBSE",
+  "studentId": "MTSICHAJP",
+  "dob": "",
+  "id": "uxy4RnjSDS4cbXtRGqEy",
+  "languages": [],
+  "studentType": "School Student",
+  "createdAt": 1788341510360,
+  "gender": "Male",
+  "classLevel": "6th Standard",
+  "technologies": [],
+  "whatsappNumber": "9148018041",
+  "budget": 3000,
   "subjects": [
     "Mathematics",
     "Science"
   ],
-  "category": "school",
-  "guardianName": "Ramachandran M M",
-  "parentDocId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "whatsappNumber": "9148018041",
-  "createdAt": 1787902682971,
-  "budget": 3000,
-  "id": "9oKjT6eVoUP1wJ6AxoEO",
   "email": "nikhil.4002.50.82@gmail.com",
-  "isAvailable": true,
-  "technologies": [],
-  "studentId": "MTSCPJ4ZJ",
-  "languages": [],
-  "name": "Abhilash V",
-  "board": "CBSE",
-  "classLevel": "6th Standard",
-  "studentType": "School Student",
-  "dob": "",
-  "phoneNumber": "9148018041",
-  "gender": "Male",
-  "groupDocId": "Cmg1V1eA7EqRuYQlHWM3"
-}
-```
-
-### Document: `EjZ77JdzmQJ91G6XXjxA`
-```json
-{
-  "technologies": [],
-  "subjects": [
-    "Mathematics"
-  ],
-  "category": "school",
-  "budget": 3000,
-  "isAvailable": true,
-  "board": "ICSE",
-  "parentDocId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "guardianName": "Ramachandran M M",
-  "languages": [],
-  "studentType": "School Student",
-  "studentId": "MTS25FKWG",
-  "whatsappNumber": "9148018041",
-  "gender": "Male",
-  "phoneNumber": "9148018041",
-  "createdAt": 1787902682971,
-  "name": "Nikhil R Nambiar",
-  "classLevel": "10th Standard",
-  "id": "EjZ77JdzmQJ91G6XXjxA",
-  "dob": "",
-  "email": "nikhil.4002.50.82@gmail.com",
-  "groupDocId": "Cmg1V1eA7EqRuYQlHWM3"
+  "groupDocId": "MLOraVxLQ8PRnfE3k5pk",
+  "isAvailable": false,
+  "pendingRequests": []
 }
 ```
 
@@ -557,31 +699,24 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `tuition_requests`
 
-### Document: `l17glmSyRSBguaPq9eC1`
+### Document: `LFwlM4vDILY1k5qmpK5Q`
 ```json
 {
-  "category": "school",
-  "preferredTimeRange": "Evening (4 PM - 8 PM)",
-  "city": "",
+  "parentDocId": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
+  "groupDocId": "MLOraVxLQ8PRnfE3k5pk",
+  "longitude": null,
+  "acceptedTutorId": "",
   "combinedSubjects": [
     "Mathematics",
     "Science"
   ],
-  "combinedLanguages": [],
-  "groupDocId": "Cmg1V1eA7EqRuYQlHWM3",
-  "parentDocId": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "specificDays": [
-    "Saturday",
-    "Sunday"
-  ],
-  "latitude": null,
-  "status": "open",
   "combinedTechnologies": [],
+  "city": "",
   "studentsDetails": [
     {
-      "id": "EjZ77JdzmQJ91G6XXjxA",
+      "id": "UNYgioNieFTuj9eFbeCq",
       "name": "Nikhil R Nambiar",
-      "classLevel": "10th Standard",
+      "classLevel": "8th Standard",
       "board": "ICSE",
       "subjects": [
         "Mathematics"
@@ -591,7 +726,7 @@ This file contains the raw data from all documents in the database to help trace
       "budget": 3000
     },
     {
-      "id": "9oKjT6eVoUP1wJ6AxoEO",
+      "id": "uxy4RnjSDS4cbXtRGqEy",
       "name": "Abhilash V",
       "classLevel": "6th Standard",
       "board": "CBSE",
@@ -604,15 +739,25 @@ This file contains the raw data from all documents in the database to help trace
       "budget": 3000
     }
   ],
-  "daysPerWeek": "2 Days/Week",
-  "acceptedTutorId": "",
+  "status": "open",
   "combinedBudget": 6000,
+  "specificDays": [
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Monday"
+  ],
   "area": "",
-  "createdAt": 1787902683595,
-  "mode": "Online",
+  "latitude": null,
+  "requestId": "REQLIVMX5",
+  "category": "school",
+  "daysPerWeek": "5 Days/Week",
   "teacherGenderPreference": "No Preference",
-  "longitude": null,
-  "requestId": "REQIFIY7R"
+  "preferredTimeRange": "Evening (4 PM - 8 PM)",
+  "combinedLanguages": [],
+  "createdAt": 1788341511189,
+  "mode": "Online"
 }
 ```
 
@@ -620,7 +765,7 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `tutors`
 
-### Document: `1FvKT8311basBtfPQcYNfStf0Un2`
+### Document: `fhGEXT3GnBPGHjC3vEwFNtrDAg73`
 ```json
 {
   "whatsapp": "9148018043",
@@ -633,7 +778,6 @@ This file contains the raw data from all documents in the database to help trace
     "9th - 10th"
   ],
   "latitude": 0,
-  "rating": 0,
   "boards": [
     "CBSE",
     "ICSE"
@@ -642,7 +786,7 @@ This file contains the raw data from all documents in the database to help trace
   "knownLanguages": [],
   "feeRange": "8000",
   "mode": "Online",
-  "createdAt": 1787902777389,
+  "createdAt": 1788341595703,
   "price": 0,
   "travelDistance": "",
   "hasProfile": true,
@@ -651,7 +795,7 @@ This file contains the raw data from all documents in the database to help trace
   "schoolNames": "",
   "longitude": 0,
   "area": "",
-  "tutorId": "MTTFVUKHJ",
+  "tutorId": "MTTQUJBMN",
   "address": "",
   "subjects": [
     "Biology",
@@ -667,7 +811,31 @@ This file contains the raw data from all documents in the database to help trace
   "teachingApproach": "",
   "preferredLocations": "",
   "category": "school",
-  "authUid": "1FvKT8311basBtfPQcYNfStf0Un2"
+  "authUid": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "weeklyQuota": {
+    "weekStartDate": "2026-08-30",
+    "tokensUsed": 1,
+    "lastUpdated": {
+      "_seconds": 1788341619,
+      "_nanoseconds": 313000000
+    }
+  },
+  "isSubscribed": true,
+  "subscriptionExpiry": 1790942838356,
+  "subscriptionUpdatedAt": {
+    "_seconds": 1788350837,
+    "_nanoseconds": 25000000
+  },
+  "subscriptionPlan": "pro",
+  "kycUpdatedAt": {
+    "_seconds": 1788364737,
+    "_nanoseconds": 12000000
+  },
+  "maskedAadhar": "XXXX-XXXX-5661",
+  "aadharVerified": true,
+  "pendingRequests": [],
+  "reviewCount": 1,
+  "rating": 5
 }
 ```
 
@@ -675,33 +843,33 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `users`
 
-### Document: `1FvKT8311basBtfPQcYNfStf0Un2`
+### Document: `5WL4MABTmFWQJ9QPfU33URxGLRW2`
 ```json
 {
-  "referredBy": "RAMA-ITYQNF",
-  "id": "1FvKT8311basBtfPQcYNfStf0Un2",
-  "referrerName": "Ramachandran M M",
-  "email": "krishnarnambiar760@gmail.com",
-  "roles": [
-    "teacher"
-  ],
-  "referralCode": "KRIS-T8311B",
-  "name": "Krishna",
-  "hasProfile": true
-}
-```
-
-### Document: `VuPaItyqNFfZo7LFG0MB4JZVrU73`
-```json
-{
-  "referredBy": "",
+  "id": "5WL4MABTmFWQJ9QPfU33URxGLRW2",
   "email": "nikhil.4002.50.82@gmail.com",
   "roles": [
     "student"
   ],
-  "id": "VuPaItyqNFfZo7LFG0MB4JZVrU73",
-  "referralCode": "RAMA-ITYQNF",
+  "referredBy": "",
+  "referralCode": "RAMA-MABTMF",
   "name": "Ramachandran M M",
+  "hasProfile": true
+}
+```
+
+### Document: `fhGEXT3GnBPGHjC3vEwFNtrDAg73`
+```json
+{
+  "referredBy": "RAMA-MABTMF",
+  "email": "krishnarnambiar760@gmail.com",
+  "roles": [
+    "teacher"
+  ],
+  "id": "fhGEXT3GnBPGHjC3vEwFNtrDAg73",
+  "referrerName": "Ramachandran M M",
+  "referralCode": "KRIS-XT3GNB",
+  "name": "Krishna",
   "hasProfile": true
 }
 ```

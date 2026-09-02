@@ -540,17 +540,20 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     // Track First Month Fee (Teacher Inflow)
     if (app.status === 'tuition_started') {
       const fFee = app.finalPrice || 0;
-      totalRevenue += fFee;
       activeMRR += fFee;
-      ledgerEntries.push({
-        id: `${app.id}_first_month`,
-        date: app.updatedAt || Date.now(), // Approximate start date
-        studentName: app.studentName || 'Student',
-        subject: app.category || 'General',
-        amount: fFee,
-        type: 'first_month_received',
-        isOutflow: false
-      });
+      
+      if (app.feePaid === true) {
+        totalRevenue += fFee;
+        ledgerEntries.push({
+          id: `${app.id}_first_month`,
+          date: app.updatedAt || Date.now(), // Approximate start date
+          studentName: app.studentName || 'Student',
+          subject: app.category || 'General',
+          amount: fFee,
+          type: 'first_month_received',
+          isOutflow: false
+        });
+      }
     }
 
     // Track Subsequent Manual Payments

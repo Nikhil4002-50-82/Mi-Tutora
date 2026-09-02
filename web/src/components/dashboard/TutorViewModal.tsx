@@ -203,7 +203,7 @@ export function TutorViewModal({
                     <p className="font-black text-gray-900 text-lg">
                       {selectedViewApp.nextPaymentDate 
                         ? new Date(selectedViewApp.nextPaymentDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
-                        : new Date(selectedViewApp.updatedAt + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        : new Date(selectedViewApp.updatedAt + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
