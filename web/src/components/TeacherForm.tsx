@@ -59,7 +59,6 @@ export default function TeacherForm({
     languages: initialData?.languages || [] as string[],
     category: initialData?.category || category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
   });
-
   const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
@@ -1123,6 +1122,8 @@ export default function TeacherForm({
 
           </div>
         )}
+
+
 
         {/* FEES */}
         <div>

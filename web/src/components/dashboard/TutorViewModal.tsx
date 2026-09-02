@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star } from 'lucide-react';
+import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star, ShieldCheck } from 'lucide-react';
 
 interface TutorViewModalProps {
   selectedViewUser: any;
@@ -71,7 +71,12 @@ export function TutorViewModal({
               {selectedViewUser.name?.charAt(0) || 'T'}
             </div>
             <div>
-              <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
+                {selectedViewUser.aadharVerified && (
+                  <ShieldCheck className="w-8 h-8 text-white/90 drop-shadow-md flex-shrink-0" />
+                )}
+              </div>
               {selectedViewUser.tutorId && (
                 <p className="text-emerald-100 font-mono font-bold mt-1.5 uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
                   ID: {selectedViewUser.tutorId}

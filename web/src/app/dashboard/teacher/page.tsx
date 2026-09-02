@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -93,6 +93,15 @@ export default function TeacherDashboard() {
   const [savingGmeetAppId, setSavingGmeetAppId] = useState<string | null>(null);
   const [hasFetchedLinks, setHasFetchedLinks] = useState(false);
   const [meetingPlatforms, setMeetingPlatforms] = useState<{ [key: string]: 'gmeet' | 'zoom' | 'teams' }>({});
+  
+  // KYC State
+  const [kycStep, setKycStep] = useState<'input' | 'otp' | 'verified'>('input');
+  const [aadharInput, setAadharInput] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [kycRefId, setKycRefId] = useState('');
+  const [mockAadhar, setMockAadhar] = useState('');
+  const [kycLoading, setKycLoading] = useState(false);
+
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useTeacherData();
@@ -141,6 +150,72 @@ export default function TeacherDashboard() {
       fetchLinks();
     }
   }, [data?.applications, data?.profile, hasFetchedLinks]);
+
+  useEffect(() => {
+    if (data?.profile?.aadharVerified) {
+      setKycStep('verified');
+    }
+  }, [data?.profile?.aadharVerified]);
+
+  const handleGenerateOTP = async () => {
+    if (!aadharInput || aadharInput.replace(/\s+/g, '').length !== 12) {
+      toast.error('Please enter a valid 12-digit Aadhar number');
+      return;
+    }
+    setKycLoading(true);
+    try {
+      const res = await fetch('/api/kyc/generate-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aadharNumber: aadharInput })
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        setKycRefId(resData.reference_id);
+        setMockAadhar(resData._mockAadhar || '');
+        setKycStep('otp');
+        toast.success(resData.message || 'OTP sent successfully');
+      } else {
+        toast.error(resData.error || 'Failed to generate OTP');
+      }
+    } catch (error: any) {
+      toast.error('Network error. Try again.');
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpInput || otpInput.length < 4) {
+      toast.error('Please enter a valid OTP');
+      return;
+    }
+    setKycLoading(true);
+    try {
+      const res = await fetch('/api/kyc/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reference_id: kycRefId, 
+          otp: otpInput, 
+          tutorDocId: data?.profile?.id || data?.user?.uid || '', 
+          _mockAadhar: mockAadhar 
+        })
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        setKycStep('verified');
+        toast.success(resData.message || 'Aadhar Verified successfully! +20 Points Boost added.');
+        await mutate(); // Refresh dashboard data to reflect points/badge
+      } else {
+        toast.error(resData.error || 'Invalid OTP');
+      }
+    } catch (error: any) {
+      toast.error('Network error. Try again.');
+    } finally {
+      setKycLoading(false);
+    }
+  };
 
   const [myReviews, setMyReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -1097,8 +1172,12 @@ export default function TeacherDashboard() {
                   {/* Hero Section */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-6 xl:col-span-7 flex flex-col justify-center">
-                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
-                        Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2 flex-wrap">
+                        Hello {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! 
+                        {data?.profile?.aadharVerified && (
+                          <ShieldCheck className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 drop-shadow-sm flex-shrink-0" />
+                        )}
+                        <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
                       <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
                     </div>
@@ -2782,6 +2861,73 @@ export default function TeacherDashboard() {
                     onSuccess={async () => await mutate()} 
                   />
                 </div>
+
+                {/* TRUST & SAFETY VERIFICATION */}
+                {hasProfile && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-8">
+                    <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <ShieldCheck className={`w-6 h-6 ${kycStep === 'verified' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                      Trust & Safety Verification
+                    </h3>
+                    
+                    {kycStep === 'verified' ? (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                          <p className="text-lg font-black text-emerald-900 flex items-center gap-2 mb-1">
+                            <ShieldCheck className="w-5 h-5 text-emerald-600" /> Identity Verified
+                          </p>
+                          <p className="text-sm text-emerald-700 font-medium tracking-wide">Aadhar: {data?.profile?.maskedAadhar || 'XXXX-XXXX-XXXX'}</p>
+                        </div>
+                        <div className="bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-sm flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4" /> +20 Match Points
+                        </div>
+                      </div>
+                    ) : kycStep === 'input' ? (
+                      <div>
+                        <p className="text-sm text-slate-600 mb-5 max-w-xl">Verify your Aadhar to get an "Identity Verified" badge on your public profile and a <strong className="text-emerald-600">+20 points boost</strong> in the matchmaking ranking system.</p>
+                        <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
+                          <input
+                            type="text"
+                            maxLength={12}
+                            placeholder="Enter 12-digit Aadhar Number"
+                            value={aadharInput}
+                            onChange={(e) => setAadharInput(e.target.value.replace(/\D/g, ''))}
+                            className="flex-1 border border-slate-300 rounded-xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+                          />
+                          <button
+                            onClick={handleGenerateOTP}
+                            disabled={kycLoading || aadharInput.length !== 12}
+                            className="bg-slate-900 text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-800 disabled:opacity-50 transition-all flex justify-center shadow-md whitespace-nowrap"
+                          >
+                            {kycLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send OTP'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-slate-600 mb-5 max-w-xl">Enter the 6-digit OTP sent to your Aadhar-linked mobile number.</p>
+                        <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="Enter 6-digit OTP"
+                            value={otpInput}
+                            onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                            className="flex-1 border border-slate-300 rounded-xl px-5 py-3.5 text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 tracking-widest font-black text-center sm:text-left"
+                          />
+                          <button
+                            onClick={handleVerifyOTP}
+                            disabled={kycLoading || otpInput.length < 4}
+                            className="bg-emerald-600 text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex justify-center shadow-md whitespace-nowrap shadow-emerald-600/20"
+                          >
+                            {kycLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify Aadhar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {data?.userData?.roles?.includes('student') && (
                   <div className="mt-12 pt-8 border-t border-slate-100">
                     <div className="bg-gradient-to-br from-[#00a992] to-teal-600 rounded-3xl p-8 sm:p-10 shadow-xl shadow-teal-900/10 border border-[#00a992]/20 relative overflow-hidden group">

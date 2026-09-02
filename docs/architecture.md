@@ -6,12 +6,13 @@ Welcome! This document explains how the platform works from both a business pers
 
 ## The Big Picture: How the Platform Works
 
-At its core, the platform connects **Students/Parents** with **Teachers**. The journey goes through four main phases:
+At its core, the platform connects **Students/Parents** with **Teachers**. The journey goes through five main phases:
 
 1. **Onboarding & Grouping:** Parents create profiles and add their kids.
 2. **Discovery & Negotiation:** Teachers and Students find each other and haggle on price.
-3. **Demo Phase:** The teacher pays a fee and a trial class is scheduled.
-4. **The 7-Day Trial:** The final decision and payment phase.
+3. **Demo Phase:** The teacher pays a fee and a trial class is scheduled and completed.
+4. **Hiring Decision:** The student has a strict 48-hour window to hire or reject the teacher.
+5. **The 7-Day Trial & Tuition:** The final decision and payment phase.
 
 Here is a visual map of the entire business flow:
 
@@ -32,19 +33,24 @@ stateDiagram-v2
     state "3. Demo Phase" as Phase3 {
         PriceAgreed --> TeacherPaysDemoFee
         TeacherPaysDemoFee --> DemoScheduled
-        DemoScheduled --> DemoCompleted
+        DemoScheduled --> DemoCompleted(TeacherMarksFinished)
     }
     
-    state "4. The 7-Day Trial" as Phase4 {
-        DemoCompleted --> WaitingForDecision
+    state "4. Hiring Decision (48h Window)" as Phase4 {
+        DemoCompleted(TeacherMarksFinished) --> WaitingForDecision
         WaitingForDecision --> Hired(TuitionStarted)
-        WaitingForDecision --> Rejected(Within7Days)
-        Hired(TuitionStarted) --> Discontinued(After7Days)
+        WaitingForDecision --> Rejected(Or48hTimeout)
+    }
+    
+    state "5. The 7-Day Trial & Tuition" as Phase5 {
+        Hired(TuitionStarted) --> Discontinued(Under7Days) : Prorated Fee
+        Hired(TuitionStarted) --> Discontinued(Over7Days) : Full Fee Penalty
     }
 
     Phase1 --> Phase2
     Phase2 --> Phase3
     Phase3 --> Phase4
+    Phase4 --> Phase5
 ```
 
 ---
@@ -79,9 +85,9 @@ When a Parent signs up, they create a profile and add their children (Students).
 
 ---
 
-## 3. The Demo Fee & Scheduling
+## 3. The Demo Fee & Demo Completion
 
-**The Business Rule:** Once a price is agreed upon, the Teacher MUST pay a small "Demo Fee" to the platform before the demo class can be scheduled.
+**The Business Rule:** Once a price is agreed upon, the Teacher MUST pay a small "Demo Fee" to the platform before the demo class can be scheduled. After the demo occurs, the teacher must manually mark it as finished.
 
 **Database Architecture:**
 - **Fields used:** `status`, `demoPaymentPaid`
@@ -90,14 +96,25 @@ When a Parent signs up, they create a profile and add their children (Students).
   2. The Teacher pays the fee (which is dynamically calculated based on the category).
   3. `demoPaymentPaid` is set to `true`, and the status moves to `demo_booking_phase`.
   4. They propose a date/time and it becomes `demo_scheduled`.
+  5. The teacher conducts the demo and explicitly clicks "Mark Demo as Finished", moving the status to `waiting_for_parent_decision`.
 
 ---
 
-## 4. The 7-Day Trial & Payment Logic
+## 4. The 48-Hour Decision Window
 
-**The Business Rule:** After the demo class finishes, a 7-day countdown begins. The Parent must decide whether to permanently hire the Teacher or reject them.
+**The Business Rule:** Once the teacher marks the demo as finished, the student has exactly 48 hours to make a decision to hire or reject the teacher.
 
-**Scenario A: Rejection within 7 days**
+**Technical Logic:** 
+- A strict 48-hour timeout is enforced.
+- If the student ignores their dashboard for 48 hours after the teacher clicked "Mark Demo as Finished", the system automatically declines the request to free up the teacher's schedule.
+
+---
+
+## 5. The 7-Day Trial & Payment Logic
+
+**The Business Rule:** Once the student clicks "Hire", the status becomes `tuition_started` and a 7-day countdown begins. The Parent has a safety window to discontinue the tuitions before the full monthly fee is locked in.
+
+**Scenario A: Discontinuation UNDER 7 days**
 - **Business Rule:** The Parent only pays for the exact number of days they used.
 - **Technical Logic:** The system calculates the days elapsed. If it is less than 7, it calculates a `proratedFee` (Monthly Fee divided by Days in Month, multiplied by Days Elapsed). The Parent pays this small amount to disconnect.
 
@@ -105,9 +122,8 @@ When a Parent signs up, they create a profile and add their children (Students).
 - **Business Rule:** If the Parent tries to cancel the teacher *after* the 7-day safety window, they are penalized and must pay the **FULL** monthly fee to cancel.
 - **Technical Logic:** If 7 or more days have elapsed, the proration calculation is ignored. The system forces the payment of the `finalPrice` (the full monthly fee) to discontinue.
 
-**Scenario C: Hired!**
-- **Technical Logic:** The status becomes `tuition_started`.
-- **Auto-Rejection Automation:** The system automatically finds every *other* teacher who was negotiating with this group, and changes their status to `declined` with the reason `student_hired_another_tutor`. This keeps the database clean.
+**Scenario C: Hired and Locked!**
+- **Auto-Rejection Automation:** The moment the student hired the teacher, the system automatically found every *other* teacher who was negotiating with this group, and changed their status to `declined` with the reason `student_hired_another_tutor`. This keeps the database clean.
 
 ---
 

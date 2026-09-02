@@ -1573,7 +1573,12 @@ export default function StudentDashboard() {
                                   #{teacher.rank}
                                 </div>
                               )}
-                              <h3 className="text-lg font-bold text-white tracking-tight truncate">{teacher.name}</h3>
+                              <div className="flex items-center gap-1.5 truncate">
+                                <h3 className="text-lg font-bold text-white tracking-tight truncate">{teacher.name}</h3>
+                                {teacher.aadharVerified && (
+                                  <ShieldCheck className="w-5 h-5 text-white/90 drop-shadow-sm flex-shrink-0" />
+                                )}
+                              </div>
                             </div>
                             {labelText ? (
                               <span className={`px-3 py-1 text-[10px] font-black rounded-full border shadow-sm uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isRed ? 'bg-white/95 text-red-600 border-red-100' : 'bg-white/95 text-teal-700 border-teal-100'}`}>

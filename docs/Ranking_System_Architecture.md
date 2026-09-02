@@ -42,6 +42,13 @@ Points are awarded based on how well the Teacher and Student match:
 - **+50 Points** for **EVERY** subject they have in common. (e.g., matching Math and Science = 100 points!)
 - **+0 to +30 Points** based on Budget. If the student's budget exactly matches the teacher's fee, they get 30 points. As the price gap widens, the points decrease.
 
+### Trust & Premium Bonuses
+To reward our most trusted and active teachers without breaking the organic matchmaking system:
+- **+20 Points** for having an active **Pro Subscription**.
+- **+20 Points** for having a verified **Aadhar ID** (Trust & Safety).
+
+*Example:* A Pro Subscription (+20) gives a helpful nudge, but a free teacher who perfectly matches multiple subjects (+100) will still outrank a Pro teacher who only matches one subject (+50). This keeps the platform fair and academically focused!
+
 ---
 
 ## 3. The Sorting Order (Who is #1?)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, User, BookOpen, CreditCard, LogOut, X, Star } from 'lucide-react';
+import { Bell, User, BookOpen, CreditCard, LogOut, X, Star, ShieldCheck } from 'lucide-react';
 
 interface DashboardHeaderProps {
   role: 'student' | 'teacher';
@@ -110,8 +110,15 @@ export function DashboardHeader({
         
         <div className="relative group cursor-pointer" ref={profileRef} onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setIsProfileDropdownOpen(!isProfileDropdownOpen) }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
-              {(data?.profile?.name || data?.user?.displayName || defaultInitial).charAt(0).toUpperCase()}
+            <div className="relative">
+              <div className="w-9 h-9 rounded-full bg-[#063831] text-white flex items-center justify-center font-bold shadow-md ring-2 ring-transparent group-hover:ring-emerald-500 transition-all">
+                {(data?.profile?.name || data?.user?.displayName || defaultInitial).charAt(0).toUpperCase()}
+              </div>
+              {role === 'teacher' && data?.profile?.aadharVerified && (
+                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-[1px] shadow-sm">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                </div>
+              )}
             </div>
           </div>
           
@@ -120,7 +127,12 @@ export function DashboardHeader({
             onClick={(e) => e.stopPropagation()}
           >
              <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-               <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || displayTitle}</p>
+               <div className="flex items-center gap-1.5">
+                 <p className="font-bold text-sm text-gray-900 truncate">{data?.profile?.name || data?.user?.displayName || displayTitle}</p>
+                 {role === 'teacher' && data?.profile?.aadharVerified && (
+                   <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                 )}
+               </div>
                <p className="text-xs text-gray-500 truncate mt-0.5">{data?.user?.email}</p>
                {role === 'student' && data?.profile?.parentId && <p className="text-xs text-gray-500 truncate mt-0.5 font-mono">ID: {data?.profile?.parentId}</p>}
                {role === 'teacher' && data?.profile?.tutorId && <p className="text-xs text-gray-500 truncate mt-0.5 font-mono">ID: {data?.profile?.tutorId}</p>}

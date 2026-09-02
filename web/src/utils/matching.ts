@@ -92,6 +92,19 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
     score += budgetPoints;
   }
 
+  // Aadhar Verification Boost (Trust & Safety)
+  if (teacher.aadharVerified === true) {
+    score += 20;
+  }
+
+  // Premium Subscription Boost
+  const isSubscribedFlags = teacher.subscriptionPlan === 'pro' || teacher.isSubscribed;
+  const hasValidExpiry = teacher.subscriptionExpiry ? teacher.subscriptionExpiry > Date.now() : false;
+  
+  if (isSubscribedFlags && hasValidExpiry) {
+      score += 20;
+  }
+
   return score;
 }
 
