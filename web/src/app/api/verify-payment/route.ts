@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
     // LIVE MODE: Cryptographic Verification
     const secret = process.env.RAZORPAY_KEY_SECRET;
     
+    if (!secret) {
+      return NextResponse.json({ success: false, error: 'Razorpay secret is not configured.' }, { status: 500 });
+    }
+
     // The signature is essentially an HMAC SHA256 of "order_id|payment_id"
     const generated_signature = crypto
       .createHmac('sha256', secret)

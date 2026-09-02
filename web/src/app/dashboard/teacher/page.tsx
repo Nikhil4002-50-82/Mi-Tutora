@@ -544,8 +544,17 @@ export default function TeacherDashboard() {
   d.setDate(diff);
   const currentWeekStart = d.toISOString().split('T')[0];
 
+  // Find the most recent trusted server timestamp from their database documents
+  const latestServerTime = data?.applications?.reduce((max: number, app: any) => {
+    const appTime = app.updatedAt ? (typeof app.updatedAt === 'number' ? app.updatedAt : new Date(app.updatedAt).getTime()) : 0;
+    return Math.max(max, appTime || 0);
+  }, 0) || 0;
+
+  // Force the clock forward if they tried to rewind their device time
+  const trustedNow = Math.max(Date.now(), latestServerTime);
+
   const isSubscribedFlags = data?.profile?.subscriptionPlan === 'pro' || data?.profile?.isSubscribed;
-  const hasValidExpiry = data?.profile?.subscriptionExpiry ? data?.profile?.subscriptionExpiry > Date.now() : false;
+  const hasValidExpiry = data?.profile?.subscriptionExpiry ? data?.profile?.subscriptionExpiry > trustedNow : false;
   const isProPlan = isSubscribedFlags && hasValidExpiry;
   const quotaLimit = isProPlan ? 15 : 5;
   const isCurrentWeek = data?.profile?.weeklyQuota?.weekStartDate === currentWeekStart;
