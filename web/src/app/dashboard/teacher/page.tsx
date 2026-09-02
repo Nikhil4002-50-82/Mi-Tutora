@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -92,6 +92,7 @@ export default function TeacherDashboard() {
   const [gmeetLinks, setGmeetLinks] = useState<{ [key: string]: string }>({});
   const [savingGmeetAppId, setSavingGmeetAppId] = useState<string | null>(null);
   const [hasFetchedLinks, setHasFetchedLinks] = useState(false);
+  const [meetingPlatforms, setMeetingPlatforms] = useState<{ [key: string]: 'gmeet' | 'zoom' | 'teams' }>({});
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useTeacherData();
@@ -126,8 +127,9 @@ export default function TeacherDashboard() {
               })
             });
             const resData = await res.json();
-            if (res.ok && resData.link) {
-              setGmeetLinks(prev => ({ ...prev, [app.id]: resData.link }));
+            if (res.ok) {
+              if (resData.link) setGmeetLinks(prev => ({ ...prev, [app.id]: resData.link }));
+              if (resData.platform) setMeetingPlatforms(prev => ({ ...prev, [app.id]: resData.platform }));
             }
           } catch (err) {
             console.error('Failed to fetch link for app:', app.id, err);
@@ -269,6 +271,24 @@ export default function TeacherDashboard() {
     window.location.href = '/login';
   };
 
+  const handleRedeemToken = async () => {
+    try {
+      const { db, auth } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, increment } = await import('firebase/firestore');
+      const user = auth.currentUser;
+      if (!user) return;
+      const tutorRef = doc(db, 'tutors', user.uid);
+      await updateDoc(tutorRef, {
+        bankedTokens: increment(-1),
+        'weeklyQuota.tokensUsed': increment(-1)
+      });
+      toast.success("Token redeemed! You have 1 extra request this week.");
+      mutate();
+    } catch(err) {
+      toast.error('Failed to redeem token.');
+    }
+  };
+
   const handleDismissNotification = async (notifId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
@@ -404,15 +424,7 @@ export default function TeacherDashboard() {
         }
       };
 
-      // 4. MOCK MODE BYPASS
-      if (order.mockMode) {
-          options.handler({
-             razorpay_order_id: order.id,
-             razorpay_payment_id: 'mock_payment_id',
-             razorpay_signature: 'mock_signature'
-          });
-          return;
-      }
+
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
@@ -703,6 +715,9 @@ export default function TeacherDashboard() {
           updateData.demoDate = neg?.proposedDate || appData.proposedDate;
           updateData.demoTime = neg?.proposedTime || appData.proposedTime;
           updateData.lastUpdatedBy = 'teacher';
+        } else if (action === 'demo_finished') {
+          updateData.status = 'waiting_for_parent_decision';
+          updateData.lastUpdatedBy = 'teacher';
         } else if (action === 'counter_price') {
           updateData.currentOffer = newOffer;
           updateData.lastUpdatedBy = 'teacher';
@@ -852,11 +867,7 @@ export default function TeacherDashboard() {
         }
       };
 
-      // Mock mode shortcut
-      if (order.mockMode) {
-          options.handler({ razorpay_order_id: order.id, razorpay_payment_id: 'mock_payment', razorpay_signature: 'mock_signature' });
-          return;
-      }
+
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
@@ -923,15 +934,12 @@ export default function TeacherDashboard() {
       return true;
   });
 
-  const handleSaveGmeetLink = async (appId: string) => {
+  const handleSaveMeetingLink = async (appId: string) => {
     const link = gmeetLinks[appId];
+    const platform = meetingPlatforms[appId] || 'gmeet';
+    
     if (!link) {
-      toast.error('Please enter a Google Meet link.');
-      return;
-    }
-    const gmeetRegex = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/;
-    if (!gmeetRegex.test(link)) {
-      toast.error('Invalid link format. Must be https://meet.google.com/...');
+      toast.error('Please enter a meeting link.');
       return;
     }
 
@@ -943,13 +951,14 @@ export default function TeacherDashboard() {
         body: JSON.stringify({
           applicationId: appId,
           tutorDocId: data?.profile?.id || data?.user?.uid,
-          gmeetLink: link
+          gmeetLink: link,
+          platform
         })
       });
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error || 'Failed to save link');
       
-      toast.success('Google Meet link saved securely!');
+      toast.success('Meeting link saved securely!');
       // Do not clear the input! We want the teacher to see the link they just saved.
     } catch (err: any) {
       toast.error(err.message || 'Failed to save link');
@@ -1936,16 +1945,25 @@ export default function TeacherDashboard() {
                                     </div>
                                     {(neg.mode || 'Online').toLowerCase() === 'online' && (
                                       <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
-                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
+                                        <div className="flex justify-between items-center">
+                                          <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                            {meetingPlatforms[neg.id] === 'zoom' ? 'Zoom Link' : meetingPlatforms[neg.id] === 'teams' ? 'MS Teams Link' : 'Google Meet Link'}
+                                          </p>
+                                          <div className="flex bg-white rounded-md border border-slate-200 p-0.5 shadow-sm">
+                                            <button onClick={() => setMeetingPlatforms(prev => ({...prev, [neg.id]: 'gmeet'}))} className={`px-2 py-1 text-[10px] font-bold rounded ${(!meetingPlatforms[neg.id] || meetingPlatforms[neg.id] === 'gmeet') ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Meet</button>
+                                            <button onClick={() => setMeetingPlatforms(prev => ({...prev, [neg.id]: 'zoom'}))} className={`px-2 py-1 text-[10px] font-bold rounded ${meetingPlatforms[neg.id] === 'zoom' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Zoom</button>
+                                            <button onClick={() => setMeetingPlatforms(prev => ({...prev, [neg.id]: 'teams'}))} className={`px-2 py-1 text-[10px] font-bold rounded ${meetingPlatforms[neg.id] === 'teams' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Teams</button>
+                                          </div>
+                                        </div>
                                         <input 
                                           type="text" 
-                                          placeholder="https://meet.google.com/..." 
+                                          placeholder={meetingPlatforms[neg.id] === 'zoom' ? 'https://zoom.us/j/...' : meetingPlatforms[neg.id] === 'teams' ? 'https://teams.microsoft.com/...' : 'https://meet.google.com/...'}
                                           value={gmeetLinks[neg.id] || ''}
                                           onChange={(e) => setGmeetLinks(prev => ({...prev, [neg.id]: e.target.value}))}
                                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00a992]"
                                         />
                                         <button 
-                                          onClick={() => handleSaveGmeetLink(neg.id)}
+                                          onClick={() => handleSaveMeetingLink(neg.id)}
                                           disabled={savingGmeetAppId === neg.id}
                                           className={`w-full mt-1 bg-[#00a992] text-white py-2 rounded-lg text-sm font-bold transition-all ${savingGmeetAppId === neg.id ? 'opacity-50 cursor-wait' : 'hover:bg-[#008f7b]'}`}
                                         >
@@ -1953,6 +1971,13 @@ export default function TeacherDashboard() {
                                         </button>
                                       </div>
                                     )}
+                                    <button 
+                                      onClick={() => handleNegotiationAction(neg.id, 'demo_finished')}
+                                      disabled={actionLoadingAppId === neg.id}
+                                      className={`w-full mt-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
+                                    >
+                                      {actionLoadingAppId === neg.id ? 'Processing...' : 'Mark Demo as Finished'}
+                                    </button>
                                   </>
                                 )}
                                 {neg.status === 'waiting_for_parent_decision' && (
@@ -2078,23 +2103,42 @@ export default function TeacherDashboard() {
                           
                           {cls.status === 'demo_scheduled' && (cls.app?.mode || 'Online').toLowerCase() === 'online' && (
                             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2 mt-3">
-                              <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Google Meet Link</p>
+                              <div className="flex justify-between items-center">
+                                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                                  {meetingPlatforms[cls.id] === 'zoom' ? 'Zoom Link' : meetingPlatforms[cls.id] === 'teams' ? 'MS Teams Link' : 'Google Meet Link'}
+                                </p>
+                                <div className="flex bg-white rounded-md border border-slate-200 p-[2px] shadow-sm">
+                                  <button onClick={(e) => { e.stopPropagation(); setMeetingPlatforms(prev => ({...prev, [cls.id]: 'gmeet'})); }} className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${(!meetingPlatforms[cls.id] || meetingPlatforms[cls.id] === 'gmeet') ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Meet</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setMeetingPlatforms(prev => ({...prev, [cls.id]: 'zoom'})); }} className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${meetingPlatforms[cls.id] === 'zoom' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Zoom</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setMeetingPlatforms(prev => ({...prev, [cls.id]: 'teams'})); }} className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${meetingPlatforms[cls.id] === 'teams' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>Teams</button>
+                                </div>
+                              </div>
                               <input 
                                 type="text" 
-                                placeholder="https://meet.google.com/..." 
+                                placeholder={meetingPlatforms[cls.id] === 'zoom' ? 'https://zoom.us/j/...' : meetingPlatforms[cls.id] === 'teams' ? 'https://teams.microsoft.com/...' : 'https://meet.google.com/...'}
                                 value={gmeetLinks[cls.id] || ''}
                                 onChange={(e) => setGmeetLinks(prev => ({...prev, [cls.id]: e.target.value}))}
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#00a992]"
                               />
                               <button 
-                                onClick={(e) => { e.stopPropagation(); handleSaveGmeetLink(cls.id); }}
+                                onClick={(e) => { e.stopPropagation(); handleSaveMeetingLink(cls.id); }}
                                 disabled={savingGmeetAppId === cls.id}
                                 className={`w-full mt-1 bg-[#00a992] text-white py-1.5 rounded-lg text-xs font-bold transition-all ${savingGmeetAppId === cls.id ? 'opacity-50 cursor-wait' : 'hover:bg-[#008f7b]'}`}
                               >
                                 {savingGmeetAppId === cls.id ? 'Saving...' : gmeetLinks[cls.id] ? 'Update Link Securely' : 'Save Link Securely'}
                               </button>
                             </div>
+                          )}
+
+                          {cls.status === 'demo_scheduled' && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'demo_finished'); }}
+                              disabled={actionLoadingAppId === cls.id}
+                              className={`w-full mt-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 px-4 py-2.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}
+                            >
+                              {actionLoadingAppId === cls.id ? 'Processing...' : 'Mark Demo as Finished'}
+                            </button>
                           )}
 
                           <div className="mt-4 flex gap-2">
@@ -2229,6 +2273,32 @@ export default function TeacherDashboard() {
                                 <p className="text-sm font-medium text-slate-500 text-center">Contact details will be revealed once the tuition is active.</p>
                               </div>
                             );
+                          })()}
+                          
+                          {(() => {
+                            const appData = cls.app || cls;
+                            if (appData.status === 'tuition_started' && appData.feePaid === false) {
+                              const daysElapsed = Math.max(1, Math.ceil((Date.now() - (appData.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+                              if (daysElapsed >= 10) {
+                                return (
+                                  <div className="mt-2 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl flex items-start gap-2 shadow-sm">
+                                    <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-600" />
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-sm uppercase tracking-wide text-red-700 mb-0.5">STOP CLASSES</span>
+                                      <span className="text-xs font-medium">The student's payment is overdue and their account is locked. Please halt tuitions until the platform receives the fee.</span>
+                                    </div>
+                                  </div>
+                                );
+                              } else if (daysElapsed >= 7) {
+                                return (
+                                  <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-xl flex items-start gap-2 shadow-sm">
+                                    <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-yellow-600" />
+                                    <span className="text-xs font-bold leading-tight">The 7-day trial is over. The student has {10 - daysElapsed} days to complete the payment.</span>
+                                  </div>
+                                );
+                              }
+                            }
+                            return null;
                           })()}
 
                           <div className="mt-4 flex gap-2">
@@ -2444,6 +2514,29 @@ export default function TeacherDashboard() {
                   </div>
                 )}
                 
+                {(() => {
+                  const bankedTokens = data?.profile?.bankedTokens || 0;
+                  const tokensUsed = isCurrentWeek ? (data?.profile?.weeklyQuota?.tokensUsed || 0) : 0;
+                  if (bankedTokens > 0) {
+                    return (
+                      <div className="mb-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                        <div>
+                          <h4 className="font-black text-emerald-900 text-lg">Banked Tokens: {bankedTokens}</h4>
+                          <p className="text-sm font-medium text-emerald-700 mt-1">You earned free requests from referring teachers!</p>
+                        </div>
+                        <button 
+                          disabled={tokensUsed <= 0}
+                          onClick={handleRedeemToken}
+                          className="px-5 py-3 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-emerald-900/10"
+                        >
+                          Redeem 1 Token
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div className="flex flex-col mb-10">
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Refer & Earn</h2>
                   <p className="text-slate-500 font-medium mt-2">Invite your friends and earn rewards when they join.</p>
@@ -2464,10 +2557,14 @@ export default function TeacherDashboard() {
                         <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-100 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-emerald-400/20 backdrop-blur-md">
                           <Gift className="w-3.5 h-3.5" /> REWARD PROGRAM
                         </div>
-                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-emerald-300">Earn together.</span></h3>
-                        <p className="text-emerald-50/80 text-base sm:text-lg font-medium leading-relaxed">
-                          Share your unique referral code. Earn 25% of the initial company margin when they book their first class!
-                        </p>
+                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-emerald-300">Earn rewards.</span></h3>
+                        <div className="text-emerald-50/90 text-base sm:text-lg font-medium leading-relaxed space-y-3">
+                          <p>Share your unique referral code and unlock exclusive rewards based on who joins!</p>
+                          <ul className="text-sm sm:text-base space-y-2 mt-2 bg-black/20 p-4 rounded-xl border border-white/10">
+                            <li className="flex items-center gap-2"><span className="text-xl">🎓</span> <strong>Refer Students:</strong> Earn 25% of margin as Wallet Cash.</li>
+                            <li className="flex items-center gap-2"><span className="text-xl">👨‍🏫</span> <strong>Refer Teachers:</strong> Earn 1 Banked Token (Free Request).</li>
+                          </ul>
+                        </div>
                       </div>
                       
                       <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-white/15">

@@ -62,11 +62,12 @@ export async function POST(req: NextRequest) {
     }
 
     const meetingData = meetingSnap.data();
-    if (!meetingData?.gmeetLink) {
-      return NextResponse.json({ error: 'Google Meet link is empty.' }, { status: 404 });
+    const finalLink = meetingData?.meetingLink || meetingData?.gmeetLink;
+    if (!finalLink) {
+      return NextResponse.json({ error: 'Meeting link is empty.' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, link: meetingData.gmeetLink });
+    return NextResponse.json({ success: true, link: finalLink });
   } catch (error: any) {
     console.error('Error retrieving GMeet link:', error);
     return NextResponse.json({ error: error.message || 'Failed to retrieve link' }, { status: 500 });

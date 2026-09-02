@@ -24,17 +24,7 @@ export async function POST(req: NextRequest) {
 
     const appRef = adminDb.collection('applications').doc(applicationId);
     
-    // SIMULATION MODE
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.warn('RAZORPAY credentials not found. MOCKING verification.');
-      
-      if (razorpay_order_id && String(razorpay_order_id).startsWith('mock_order_')) {
-         // Proceed with secure DB updates in mock mode
-         await processDatabaseUpdate(adminDb, appRef, applicationId, role, isRemoval, razorpay_order_id, 'mock_payment_id', useWallet);
-         return NextResponse.json({ success: true, mockMode: true });
-      }
-      return NextResponse.json({ error: 'Invalid Mock Order' }, { status: 400 });
-    }
+
 
     // LIVE MODE: Cryptographic Verification
     const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -92,43 +82,15 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
     const appData = appSnap.data();
     if (!appData) throw new Error("Application data missing");
 
-    // 2. Handle Wallet Deductions
-    if (useWallet) {
-        let coursePrice = 4000;
-        if (role === 'teacher') {
-            const pricingSnap = await adminDb.collection('marketplace_pricing').get();
-            const pricingData = pricingSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-            let studentsList: any[] = [];
-            const studentDocIds = appData?.studentDocIds || [appData?.studentDocId];
-            if (studentDocIds.length > 0) {
-                for (const sId of studentDocIds) {
-                    if (sId) {
-                        const studentSnap = await adminDb.collection('students').doc(sId).get();
-                        if (studentSnap.exists) studentsList.push({ id: studentSnap.id, ...studentSnap.data() });
-                    }
-                }
-            }
-            const { calculateTotalDemoFee } = await import('@/utils/pricing');
-            coursePrice = calculateTotalDemoFee(studentsList, pricingData);
-        } else {
-            coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
-        }
-        
-        const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
+    // 2. Handle Wallet Deductions Securely
+    const paymentData = snap.docs[0].data();
+    if (paymentData.walletDiscountApplied > 0) {
         const userId = role === 'student' ? appData?.parentDocId : appData?.tutorDocId;
         
         if (userId) {
-            const userRef = adminDb.collection('users').doc(userId);
-            const userSnap = await userRef.get();
-            if (userSnap.exists) {
-                const walletBalance = userSnap.data()?.walletBalance || 0;
-                if (walletBalance > 0) {
-                    const discount = Math.min(totalToPay, walletBalance);
-                    batch.update(userRef, {
-                        walletBalance: FieldValue.increment(-discount)
-                    });
-                }
-            }
+            batch.update(adminDb.collection('users').doc(userId), {
+                walletBalance: FieldValue.increment(-paymentData.walletDiscountApplied)
+            });
         }
     }
 
@@ -147,6 +109,13 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                 updatedAt: Date.now()
             });
 
+            // Mark tracker as paid
+            const pendingFeeRef = adminDb.collection('pending_tuition_fees').doc(applicationId);
+            batch.update(pendingFeeRef, {
+                status: 'paid',
+                paidAt: FieldValue.serverTimestamp()
+            });
+
             // Process Referrals on full payment
             try {
                 const rewardBase = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
@@ -163,15 +132,29 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                     
                     if (!refSnap.empty) {
                         const refDoc = refSnap.docs[0];
-                        const referrerId = refDoc.data().referrerId;
-                        batch.update(adminDb.collection('referrals').doc(refDoc.id), {
-                            status: 'qualified',
-                            reward: rewardAmount,
-                            qualifiedAt: FieldValue.serverTimestamp()
-                        });
-                        batch.update(adminDb.collection('users').doc(referrerId), {
-                            walletBalance: FieldValue.increment(rewardAmount)
-                        });
+                        const refData = refDoc.data();
+                        const referrerId = refData.referrerId;
+                        
+                        if (refData.referralType === 'teacher') {
+                            batch.update(adminDb.collection('referrals').doc(refDoc.id), {
+                                status: 'qualified',
+                                reward: 0,
+                                rewardType: 'banked_token',
+                                qualifiedAt: FieldValue.serverTimestamp()
+                            });
+                            batch.update(adminDb.collection('tutors').doc(referrerId), {
+                                bankedTokens: FieldValue.increment(1)
+                            });
+                        } else {
+                            batch.update(adminDb.collection('referrals').doc(refDoc.id), {
+                                status: 'qualified',
+                                reward: rewardAmount,
+                                qualifiedAt: FieldValue.serverTimestamp()
+                            });
+                            batch.update(adminDb.collection('users').doc(referrerId), {
+                                walletBalance: FieldValue.increment(rewardAmount)
+                            });
+                        }
                     }
                 };
 
@@ -198,8 +181,15 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                      if (docId !== applicationId && docSnap.data().status !== 'declined' && docSnap.data().status !== 'tuition_started') {
                         batch.update(adminDb.collection('applications').doc(docId), {
                             status: 'declined',
-                            updatedAt: Date.now()
+                            updatedAt: FieldValue.serverTimestamp()
                         });
+                        
+                        const d = docSnap.data();
+                        if (d.tutorDocId) {
+                            batch.update(adminDb.collection('tutors').doc(d.tutorDocId), { 
+                                pendingRequests: FieldValue.arrayRemove(docId) 
+                            });
+                        }
                      }
                 }
             }

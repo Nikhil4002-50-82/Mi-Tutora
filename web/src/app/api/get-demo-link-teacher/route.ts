@@ -36,7 +36,11 @@ export async function POST(req: NextRequest) {
     }
 
     const meetingData = meetingSnap.data();
-    return NextResponse.json({ success: true, link: meetingData?.gmeetLink || null });
+    return NextResponse.json({ 
+      success: true, 
+      link: meetingData?.meetingLink || meetingData?.gmeetLink || null,
+      platform: meetingData?.platform || 'gmeet'
+    });
 
   } catch (error: any) {
     console.error('Error retrieving GMeet link for teacher:', error);

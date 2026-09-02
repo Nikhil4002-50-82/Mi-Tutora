@@ -22,16 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
 
-    // SIMULATION MODE
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.warn('RAZORPAY credentials not found. MOCKING verification.');
-      
-      if (razorpay_order_id && String(razorpay_order_id).startsWith('mock_order_sub_')) {
-         await processSubscriptionUpdate(adminDb, userId, razorpay_order_id, 'mock_payment_id');
-         return NextResponse.json({ success: true, mockMode: true });
-      }
-      return NextResponse.json({ error: 'Invalid Mock Order' }, { status: 400 });
-    }
+
 
     // LIVE MODE: Cryptographic Verification
     const secret = process.env.RAZORPAY_KEY_SECRET;

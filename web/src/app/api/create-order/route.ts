@@ -5,7 +5,7 @@ import { getAdminDb } from '@/utils/firebase/admin';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { applicationId, role, useWallet = false } = body;
+    const { applicationId, role, useWallet = false, isRemoval = false } = body;
 
     if (!applicationId || !role) {
       return NextResponse.json({ error: 'Missing applicationId or role' }, { status: 400 });
@@ -49,14 +49,30 @@ export async function POST(req: NextRequest) {
         const { calculateTotalDemoFee } = await import('@/utils/pricing');
         coursePrice = calculateTotalDemoFee(studentsList, pricingData);
     } else {
-        // Student is paying the full tuition fee
+        // Student is paying the full tuition fee or prorated cancellation fee
         if (appData) {
-            coursePrice = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+            const monthlyFee = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+            
+            if (isRemoval && appData.startDate) {
+                const serverCurrentTime = Date.now(); // Authoritative server time
+                const startMillis = appData.startDate.toMillis ? appData.startDate.toMillis() : appData.startDate;
+                const daysElapsed = Math.max(1, Math.ceil((serverCurrentTime - startMillis) / (1000 * 60 * 60 * 24)));
+                
+                if (daysElapsed < 7) {
+                    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                    coursePrice = Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
+                } else {
+                    coursePrice = monthlyFee; // 7 days passed: NO REFUND
+                }
+            } else {
+                coursePrice = monthlyFee;
+            }
         }
     }
 
     // Calculate total including 18% GST
     let totalToPay = coursePrice + Math.round(coursePrice * 0.18);
+    let walletDiscountApplied = 0;
     
     // If the user requested to use their wallet balance, deduct it securely
     if (useWallet) {
@@ -71,6 +87,7 @@ export async function POST(req: NextRequest) {
                 const walletBalance = userSnap.data()?.walletBalance || 0;
                 if (walletBalance > 0) {
                     const discount = Math.min(totalToPay, walletBalance);
+                    walletDiscountApplied = discount;
                     totalToPay -= discount;
                 }
             }
@@ -80,29 +97,7 @@ export async function POST(req: NextRequest) {
     // Razorpay operates in paise (multiply by 100)
     const amountInPaise = totalToPay * 100;
 
-    // SIMULATION MODE: If credentials are missing, instantly return a mock order
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.warn('RAZORPAY credentials not found. Returning MOCK order.');
-      const mockOrderId = `mock_order_${Date.now()}`;
-      
-      await adminDb.collection('payments').add({
-        razorpayOrderId: mockOrderId,
-        applicationDocId: applicationId,
-        userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
-        amount: totalToPay,
-        currency: 'INR',
-        status: 'created',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
 
-      return NextResponse.json({
-        id: mockOrderId,
-        amount: amountInPaise,
-        currency: 'INR',
-        mockMode: true,
-      });
-    }
 
     // LIVE MODE: Create an actual Razorpay order
     const razorpay = new Razorpay({
@@ -124,8 +119,11 @@ export async function POST(req: NextRequest) {
       applicationDocId: applicationId,
       userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
       amount: totalToPay,
+      walletDiscountApplied: walletDiscountApplied,
       currency: 'INR',
       status: 'created',
+      type: role === 'student' ? 'tuition' : 'demo',
+      isRemoval: isRemoval || false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

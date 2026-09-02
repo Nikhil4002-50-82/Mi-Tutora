@@ -155,19 +155,9 @@ export const deriveStudentDashboardState = (baseData: any) => {
     if (currentStatus === 'demo_pending_payment' && (now - (app.updatedAt || app.createdAt || now)) > SEVEN_DAYS) {
       currentStatus = 'declined';
     }
-    // Auto-expire if demo finished and 48 hours passed
-    if (['demo_scheduled', 'waiting_for_parent_decision'].includes(currentStatus) && app.demoDate && app.demoTime) {
-      const demoDateObj = new Date(app.demoDate);
-      const timeParts = app.demoTime.split('||')[0].split(':');
-      if (timeParts.length >= 2) {
-        demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-        const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
-        if (now > demoEndTime + 48 * 60 * 60 * 1000) {
-          currentStatus = 'declined';
-        } else if (now > demoEndTime && currentStatus === 'demo_scheduled') {
-          currentStatus = 'waiting_for_parent_decision';
-        }
-      }
+    // Auto-expire if student hasn't made a decision 48 hours after demo was finished
+    if (currentStatus === 'waiting_for_parent_decision' && (now - (app.updatedAt || app.createdAt || now)) > 48 * 60 * 60 * 1000) {
+      currentStatus = 'declined';
     }
 
     return { 
@@ -498,19 +488,9 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     if (currentStatus === 'demo_pending_payment' && (now - (app.updatedAt || app.createdAt || now)) > SEVEN_DAYS) {
       currentStatus = 'declined';
     }
-    // Auto-expire if demo finished and 48 hours passed
-    if (['demo_scheduled', 'waiting_for_parent_decision'].includes(currentStatus) && app.demoDate && app.demoTime) {
-      const demoDateObj = new Date(app.demoDate);
-      const timeParts = app.demoTime.split('||')[0].split(':');
-      if (timeParts.length >= 2) {
-        demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-        const demoEndTime = demoDateObj.getTime(); // triggers immediately at start time
-        if (now > demoEndTime + 48 * 60 * 60 * 1000) {
-          currentStatus = 'declined';
-        } else if (now > demoEndTime && currentStatus === 'demo_scheduled') {
-          currentStatus = 'waiting_for_parent_decision';
-        }
-      }
+    // Auto-expire if student hasn't made a decision 48 hours after demo was finished
+    if (currentStatus === 'waiting_for_parent_decision' && (now - (app.updatedAt || app.createdAt || now)) > 48 * 60 * 60 * 1000) {
+      currentStatus = 'declined';
     }
 
     const stitchedStudent = student ? { ...student, parentDetails: app.parentDetails } : null;

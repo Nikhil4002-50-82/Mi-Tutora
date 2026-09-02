@@ -20,29 +20,7 @@ export async function POST(req: NextRequest) {
     const subscriptionPrice = 299;
     const amountInPaise = subscriptionPrice * 100;
 
-    // SIMULATION MODE: If credentials are missing, instantly return a mock order
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.warn('RAZORPAY credentials not found. Returning MOCK order.');
-      const mockOrderId = `mock_order_sub_${Date.now()}`;
-      
-      await adminDb.collection('payments').add({
-        razorpayOrderId: mockOrderId,
-        userId: userId,
-        amount: subscriptionPrice,
-        currency: 'INR',
-        type: 'subscription',
-        status: 'created',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
 
-      return NextResponse.json({
-        id: mockOrderId,
-        amount: amountInPaise,
-        currency: 'INR',
-        mockMode: true,
-      });
-    }
 
     // LIVE MODE: Create an actual Razorpay order
     const razorpay = new Razorpay({

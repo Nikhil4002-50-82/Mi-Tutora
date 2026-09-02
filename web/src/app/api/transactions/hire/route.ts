@@ -56,6 +56,16 @@ export async function POST(req: NextRequest) {
       feePaid: false
     });
 
+    const newPendingFeeRef = adminDb.collection('pending_tuition_fees').doc(applicationId);
+    batch.set(newPendingFeeRef, {
+      applicationDocId: applicationId,
+      studentDocId: appData.parentDocId || appData.studentDocId || '',
+      tutorDocId: appData.tutorDocId || '',
+      startDate: FieldValue.serverTimestamp(),
+      status: 'pending',
+      amount: appData.finalPrice || appData.currentOffer || appData.budget || 4000
+    });
+
     if (appData.tutorDocId) {
       batch.update(adminDb.collection('tutors').doc(appData.tutorDocId), {
         pendingRequests: FieldValue.arrayRemove(applicationId)

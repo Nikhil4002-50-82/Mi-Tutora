@@ -65,6 +65,8 @@ service cloud.firestore {
       allow update: if 
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['feePaid', 'demoPaymentPaid']))
         &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) || !(request.resource.data.status in ['tuition_started', 'demo_booking_phase']))
+        &&
         (
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['finalPrice', 'budget', 'currentOffer']))
           || 

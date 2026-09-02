@@ -71,7 +71,10 @@ async function runTruncation() {
         'applications',
         'groups',
         'referrals',
-        'notifications'
+        'notifications',
+        'payments',
+        'pending_tuition_fees',
+        'reviews'
     ];
     
     for (const col of collections) {

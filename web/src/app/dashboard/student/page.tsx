@@ -108,7 +108,7 @@ export default function StudentDashboard() {
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<any>(null);
   const [newlyCreatedGroupId, setNewlyCreatedGroupId] = useState<string | null>(null);
   const [actionLoadingAppId, setActionLoadingAppId] = useState<string | null>(null);
-  const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'hire'|'reject', appId: string, teacherName: string} | null>(null);
+  const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'hire'|'reject'|'remove', appId: string, teacherName: string} | null>(null);
   const [retrievingGmeetAppId, setRetrievingGmeetAppId] = useState<string | null>(null);
   const [nowTime, setNowTime] = useState(Date.now());
   
@@ -902,7 +902,8 @@ export default function StudentDashboard() {
         body: JSON.stringify({
           applicationId: payingClass.id,
           role: 'student',
-          useWallet
+          useWallet,
+          isRemoval: payingClass.isRemoval || false
         })
       });
       const order = await res.json();
@@ -970,15 +971,7 @@ export default function StudentDashboard() {
         }
       };
 
-      // 4. MOCK MODE BYPASS (If no RAZORPAY_KEY_ID in backend, it returned mockMode: true)
-      if (order.mockMode) {
-          options.handler({
-             razorpay_order_id: order.id,
-             razorpay_payment_id: 'mock_payment_id',
-             razorpay_signature: 'mock_signature'
-          });
-          return; // Skip opening real Razorpay widget
-      }
+
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
@@ -1073,7 +1066,55 @@ export default function StudentDashboard() {
       />
 
       {/* MAIN CONTENT */}
-      {showCategoryPopup && !hasProfile && (
+      {(() => {
+        // Calculate Hard Lock State
+        const lockedApplication = data?.applications?.find((app: any) => {
+          if (app.status === 'tuition_started' && app.feePaid === false) {
+            const daysElapsed = Math.max(1, Math.ceil((Date.now() - (app.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+            return daysElapsed >= 10;
+          }
+          return false;
+        });
+
+        if (lockedApplication) {
+          const monthlyFee = lockedApplication.finalPrice || lockedApplication.currentOffer || 0;
+          const displayNames = lockedApplication.studentName || (lockedApplication.studentDocIds?.length > 1 ? 'Group' : 'Student');
+          
+          return (
+            <div className="flex-1 flex items-center justify-center p-6 bg-red-50/50 backdrop-blur-sm z-50">
+              <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl border border-red-100 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-2 bg-red-500"></div>
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-10 h-10 text-red-600" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Account Locked</h2>
+                <p className="text-slate-600 font-medium mb-8 text-lg leading-relaxed">
+                  Your 3-day payment grace period has expired. Please clear your pending tuition fees to unlock your dashboard and continue using MiTutora.
+                </p>
+                <button 
+                  onClick={() => {
+                    setPayingClass({ 
+                      id: lockedApplication.id, 
+                      studentName: displayNames, 
+                      finalPrice: monthlyFee, 
+                      isProrated: false, 
+                      isRemoval: false, 
+                      studentsList: lockedApplication.studentsList || (lockedApplication.studentDetails ? [lockedApplication.studentDetails] : []), 
+                      tutorName: lockedApplication.tutorName || lockedApplication.teacher 
+                    });
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-red-600/20 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                  <CheckCircle2 className="w-6 h-6" /> Pay Monthly Fees Securely
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })() ?? (
+        <>
+          {showCategoryPopup && !hasProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-lg w-full text-center">
             <h2 className="text-3xl font-black text-slate-900 mb-4">What are you looking for?</h2>
@@ -2439,23 +2480,35 @@ export default function StudentDashboard() {
                             return (
                               <div className="mt-2 flex flex-col gap-2">
                                 {!isPaid && daysElapsed >= 7 && (
-                                  <button 
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: false, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
-                                    }} 
-                                    className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 text-white py-3.5 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" /> Pay Monthly Fees
-                                  </button>
+                                  <div className="flex flex-col gap-2">
+                                    {daysElapsed < 10 && (
+                                      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs sm:text-sm p-3 rounded-xl font-bold flex items-start gap-2">
+                                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                        <span>Your 7-day trial has ended. You have a 3-day grace period to pay your monthly fees to continue classes.</span>
+                                      </div>
+                                    )}
+                                    <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: false, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                      }} 
+                                      className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 text-white py-3.5 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" /> Pay Monthly Fees
+                                    </button>
+                                  </div>
                                 )}
                                 <button 
                                   onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    if (daysElapsed < 7) {
-                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: proratedFee, isProrated: true, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                    if (isPaid) {
+                                      setActionConfirmModal({ isOpen: true, type: 'remove', appId: cls.id, teacherName: cls.tutorName || cls.teacher });
                                     } else {
-                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                      if (daysElapsed < 7) {
+                                        setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: proratedFee, isProrated: true, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                      } else {
+                                        setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                      }
                                     }
                                   }} 
                                   className="w-full bg-red-50/50 text-red-600 border border-transparent hover:border-red-100 hover:bg-red-50 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
@@ -2737,7 +2790,14 @@ export default function StudentDashboard() {
                         Permanently delete your account and all associated data. This action cannot be undone.
                       </p>
                       <button 
-                        onClick={() => setShowDeleteAccountModal(true)}
+                        onClick={() => {
+                          const hasPendingFees = data?.applications?.some((app: any) => app.status === 'tuition_started' && app.feePaid === false);
+                          if (hasPendingFees) {
+                            toast.error("You cannot delete your account while you have pending tuition fees. Please clear your dues first.");
+                            return;
+                          }
+                          setShowDeleteAccountModal(true);
+                        }}
                         className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-red-600/20 hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto"
                       >
                         Delete Account
@@ -2995,10 +3055,10 @@ export default function StudentDashboard() {
       <TransactionConfirmModal
         isOpen={!!actionConfirmModal?.isOpen}
         type={actionConfirmModal?.type === 'hire' ? 'success' : 'warning'}
-        title={actionConfirmModal?.type === 'hire' ? 'Confirm Hiring' : 'Confirm Rejection'}
+        title={actionConfirmModal?.type === 'hire' ? 'Confirm Hiring' : (actionConfirmModal?.type === 'remove' ? 'Remove Teacher' : 'Confirm Rejection')}
         description={actionConfirmModal?.type === 'hire' 
           ? `Are you sure you want to hire ${actionConfirmModal.teacherName}? Your 1-week trial will begin today.`
-          : `Are you sure you want to decline or withdraw your request with ${actionConfirmModal?.teacherName}?`}
+          : (actionConfirmModal?.type === 'remove' ? `Are you sure you want to instantly remove ${actionConfirmModal.teacherName}? This will stop future classes.` : `Are you sure you want to decline or withdraw your request with ${actionConfirmModal?.teacherName}?`)}
         onCancel={() => setActionConfirmModal(null)}
         onConfirm={async () => {
           let success: boolean | void = true;
@@ -3249,6 +3309,8 @@ export default function StudentDashboard() {
       )}
 
       <WhatsAppButton />
+        </>
+      )}
     </div>
   );
 }

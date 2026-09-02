@@ -4,16 +4,31 @@ import { getAdminDb } from '@/utils/firebase/admin';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { applicationId, tutorDocId, gmeetLink } = body;
+    const { applicationId, tutorDocId, gmeetLink, platform = 'gmeet' } = body;
 
     if (!applicationId || !tutorDocId || !gmeetLink) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Strict regex validation for Google Meet link
-    const gmeetRegex = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/;
-    if (!gmeetRegex.test(gmeetLink)) {
-      return NextResponse.json({ error: 'Invalid Google Meet link format' }, { status: 400 });
+    // Dynamic regex validation based on platform
+    let isValid = false;
+    let errorMessage = 'Invalid meeting link format';
+
+    if (platform === 'gmeet') {
+      isValid = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/.test(gmeetLink);
+      errorMessage = 'Invalid Google Meet link format. Must be https://meet.google.com/...';
+    } else if (platform === 'zoom') {
+      isValid = /^https:\/\/(?:[\w-]+\.)?zoom\.us\/(?:j|my)\/\d+(?:\?pwd=[\w.-]+)?$/.test(gmeetLink);
+      errorMessage = 'Invalid Zoom link format. Must be https://zoom.us/j/...';
+    } else if (platform === 'teams') {
+      isValid = /^https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[\w%.-]+\/[\w.-]+\?context=[\w%.-]+$/.test(gmeetLink);
+      errorMessage = 'Invalid MS Teams link format.';
+    } else {
+      return NextResponse.json({ error: 'Unsupported meeting platform' }, { status: 400 });
+    }
+
+    if (!isValid) {
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     const adminDb = getAdminDb();
@@ -44,11 +59,13 @@ export async function POST(req: NextRequest) {
 
     // Save to the privateData vault (using a subcollection so the student cannot read it directly)
     await appRef.collection('privateData').doc('meeting').set({
-      gmeetLink,
+      gmeetLink, // Kept for backward compatibility
+      meetingLink: gmeetLink, // The new standard field
+      platform,
       updatedAt: new Date()
     }, { merge: true });
 
-    return NextResponse.json({ success: true, message: 'Google Meet link securely saved.' });
+    return NextResponse.json({ success: true, message: 'Meeting link securely saved.' });
   } catch (error: any) {
     console.error('Error saving GMeet link:', error);
     return NextResponse.json({ error: error.message || 'Failed to save link' }, { status: 500 });
