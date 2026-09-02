@@ -24,7 +24,7 @@ To maximize paid upgrades, the platform uses an industry-standard "Strict Quota"
 - **Quota:** 15 Tokens (Requests) per week.
 - **Perks:** 
   - 3x more bidding power.
-  - Priority matchmaking algorithm (e.g., visual "Pro" badge or minor score boost).
+  - Priority matchmaking algorithm (+20 points matchmaking score boost).
 
 ---
 
