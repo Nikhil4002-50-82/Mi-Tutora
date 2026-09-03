@@ -51,7 +51,8 @@ test.describe('Referral System Logic', () => {
 
   test.describe('Reward Distribution on First Month Tuition Payment', () => {
     function calculateReferralReward(finalPrice: number, referralType: 'student' | 'teacher') {
-      const rewardAmount = Math.round(finalPrice * 0.25);
+      const platformFee = Math.round(finalPrice * 0.40);
+      const rewardAmount = Math.round(platformFee * 0.25);
       if (referralType === 'teacher') {
         return {
           status: 'qualified',
@@ -69,13 +70,13 @@ test.describe('Referral System Logic', () => {
       }
     }
 
-    test('Awards 25% cash wallet credit to student referrer', () => {
+    test('Awards 25% of 40% platform fee (10% of gross tuition) as cash wallet credit to student referrer', () => {
       const tuitionFee = 4000;
       const result = calculateReferralReward(tuitionFee, 'student');
       expect(result.status).toBe('qualified');
-      expect(result.reward).toBe(1000); // 25% of 4000
+      expect(result.reward).toBe(400); // 25% of (4000 * 0.40 = 1600) = 400
       expect(result.rewardType).toBe('wallet_cash');
-      expect(result.walletCashIncrement).toBe(1000);
+      expect(result.walletCashIncrement).toBe(400);
     });
 
     test('Awards 1 banked token to teacher referrer instead of cash', () => {
@@ -89,7 +90,74 @@ test.describe('Referral System Logic', () => {
     test('Rounds decimal rewards properly', () => {
       const tuitionFee = 3555;
       const result = calculateReferralReward(tuitionFee, 'student');
-      expect(result.reward).toBe(889); // Math.round(3555 * 0.25) = 888.75 -> 889
+      // platformFee = Math.round(3555 * 0.40) = 1422
+      // reward = Math.round(1422 * 0.25) = 355.5 -> 356
+      expect(result.reward).toBe(356);
+    });
+  });
+
+  test.describe('Automated Day 30 Direct Referral Payout (Zero-Threshold)', () => {
+    function processDay30ReferralPayout(referral: {
+      status: string;
+      reward: number;
+      rewardType: string;
+      payoutStatus: string;
+      releaseEligibleAt: number;
+      payoutVpa?: string;
+    }, currentTimestamp: number) {
+      if (referral.status !== 'qualified' || referral.rewardType !== 'wallet_cash') {
+        return referral.payoutStatus;
+      }
+
+      // If before Day 30, remains locked in escrow
+      if (currentTimestamp < referral.releaseEligibleAt) {
+        return 'escrow_held';
+      }
+
+      // If UPI is missing, request action
+      if (!referral.payoutVpa || !referral.payoutVpa.trim()) {
+        return 'action_required_missing_upi';
+      }
+
+      // Disburses automatically regardless of balance (no ₹1,000 threshold!)
+      return 'paid';
+    }
+
+    test('Locks reward in escrow from Day 7 until Day 30', () => {
+      const hireDate = new Date('2026-09-01T10:00:00Z').getTime();
+      const day30Timestamp = hireDate + (30 * 24 * 60 * 60 * 1000);
+      const day15Timestamp = hireDate + (15 * 24 * 60 * 60 * 1000);
+
+      const referral = {
+        status: 'qualified',
+        reward: 600,
+        rewardType: 'wallet_cash',
+        payoutStatus: 'escrow_held',
+        releaseEligibleAt: day30Timestamp,
+        payoutVpa: 'student@okhdfcbank'
+      };
+
+      // On Day 15, still in escrow
+      expect(processDay30ReferralPayout(referral, day15Timestamp)).toBe('escrow_held');
+
+      // On Day 30, executes payout without needing ₹1,000 threshold
+      expect(processDay30ReferralPayout(referral, day30Timestamp)).toBe('paid');
+    });
+
+    test('Transitions to action_required_missing_upi if student has no UPI on Day 30', () => {
+      const hireDate = new Date('2026-09-01T10:00:00Z').getTime();
+      const day30Timestamp = hireDate + (30 * 24 * 60 * 60 * 1000);
+
+      const referral = {
+        status: 'qualified',
+        reward: 600,
+        rewardType: 'wallet_cash',
+        payoutStatus: 'escrow_held',
+        releaseEligibleAt: day30Timestamp,
+        payoutVpa: '' // Missing UPI
+      };
+
+      expect(processDay30ReferralPayout(referral, day30Timestamp)).toBe('action_required_missing_upi');
     });
   });
 });

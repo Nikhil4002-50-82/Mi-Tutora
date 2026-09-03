@@ -46,6 +46,7 @@ erDiagram
 | `referralCode` | `string` | Regex: `^[A-Z]{4}-[A-Z0-9]{6}$` | User's unique personal referral code generated via `generateReferralCode()`. | `web/src/utils/referral.ts`, `web/src/context/AuthContext.tsx` |
 | `referredBy` | `string` | Referral code or empty string `""` | Referral code entered during registration. Used to link referrals. | `web/src/context/AuthContext.tsx` |
 | `referrerName` | `string` | Referrer's name or empty string `""` | Denormalized display name of user who referred this account. | `web/src/context/AuthContext.tsx` |
+| `upiId` | `string` | Valid UPI ID (e.g. `user@okhdfcbank`) | Destination UPI address for automated referral cash payouts. | `web/src/app/dashboard/student/page.tsx` |
 
 ---
 
@@ -249,9 +250,18 @@ erDiagram
 | `referredUserId` | `string` | User Auth UID of referee | The new user who signed up. | `web/src/context/AuthContext.tsx` |
 | `referredUserName`| `string` | Referee full name | Denormalized referee name. | `web/src/context/AuthContext.tsx` |
 | `referralType` | `string` | `'student'` \| `'teacher'` | Role of referred user governing reward type. | `web/src/tests/referral.spec.ts` |
-| `estimatedReward`| `number` | Numeric amount in INR | Projected 25% reward from tuition fee. | `web/src/tests/referral.spec.ts` |
+| `estimatedReward`| `number` | Numeric amount in INR | Projected reward from tuition fee. | `web/src/tests/referral.spec.ts` |
 | `status` | `string` | `'pending'` \| `'qualified'` | Moves to `'qualified'` on first tuition settlement. | `web/src/tests/referral.spec.ts` |
+| `reward` | `number` | Positive integer (e.g. `600`) | Finalized reward amount ($P \times 0.25$). | `web/src/app/api/verify-payment/route.ts` |
+| `rewardType` | `string` | `'wallet_cash'` \| `'banked_token'` | Cash reward for students vs. banked tokens for teachers. | `web/src/app/api/verify-payment/route.ts` |
+| `payoutStatus` | `string` | `'escrow_held'`, `'ready_for_payout'`, `'processing'`, `'paid'`, `'action_required_missing_upi'` | Escrow and payout lifecycle state machine. | `web/src/app/api/verify-payment/route.ts` |
+| `releaseEligibleAt`| `number` | Epoch milliseconds | Timestamp when funds unlock on Day 30 (`startDate + 30 days`). | `web/src/app/api/verify-payment/route.ts` |
+| `payoutVpa` | `string` | Valid UPI ID | Target UPI address for automated disbursement. | `web/src/app/api/verify-payment/route.ts` |
+| `razorpayPayoutId`| `string` | `pout_` + alphanumeric or `""` | Razorpay Payout transaction identifier. | `web/src/app/api/payouts/process/route.ts` |
+| `utrNumber` | `string` | Bank UTR string or `""` | Bank transaction reference number for audit. | `web/src/app/api/payouts/process/route.ts` |
 | `createdAt` | `number` | Epoch timestamp in milliseconds | Date referred user signed up. | `web/src/context/AuthContext.tsx` |
+| `qualifiedAt` | `Timestamp` | Firestore Timestamp | Settlement timestamp when referee pays Day 7 tuition. | `web/src/app/api/verify-payment/route.ts` |
+| `paidAt` | `Timestamp` | Firestore Timestamp or `null` | Date when funds successfully reached referrer's bank. | `web/src/app/api/payouts/process/route.ts` |
 
 ---
 
@@ -322,7 +332,87 @@ erDiagram
 
 ---
 
-## 3. Foreign Key & Entity Reference Matrix
+### 2.15 Collection: `withdrawals` *(Discovered in Codebase)*
+- **Purpose**: Payout requests submitted by students or teachers to redeem their accumulated referral wallet balances (`walletBalance >= 1000`).
+- **Document ID (`doc.id`)**: Auto-generated Firestore ID (`addDoc(collection(db, 'withdrawals'))`).
+- **Status in Live Dump**: Empty / not yet triggered in the sample database.
+- **Security Rule**: Read/write restricted to authenticated owner.
+
+| Field Name | Type | Expected Values / Format | Description & Business Rules | Codebase Reference |
+| :--- | :--- | :--- | :--- | :--- |
+| `userId` | `string` | User Auth UID | Requester requesting the withdrawal. | `web/src/app/dashboard/student/page.tsx:L1028` |
+| `amount` | `number` | Numeric amount in INR (minimum `1000`) | Amount to be paid out from user's `walletBalance`. | `web/src/app/dashboard/student/page.tsx:L1029` |
+| `upiId` | `string` | UPI address (e.g. `user@okhdfcbank`) | Destination payout address. | `web/src/app/dashboard/student/page.tsx:L1030` |
+| `status` | `string` | `'pending'` \| `'processed'` \| `'rejected'` | Processing status of the cash disbursement. | `web/src/app/dashboard/student/page.tsx:L1031` |
+| `createdAt` | `number` | Epoch millisecond timestamp | Timestamp when withdrawal request was logged. | `web/src/app/dashboard/student/page.tsx:L1032` |
+
+> [!NOTE]
+> **Referral Disbursement Modernization:** Referral cash rewards are now automatically disbursed on Day 30 directly to the student's saved UPI ID (`users.upiId`) via Razorpay Payouts. The manual WhatsApp withdrawal flow and ₹1,000 threshold have been superseded by this automated Day 30 direct payout engine.
+
+---
+
+### 2.16 Collection: `tutor_payouts`
+- **Purpose**: Escrow tracking and disbursement ledger for the 60% tutor share of the first-month tuition fee, unlocked on Day 30 and paid via Razorpay Payouts.
+- **Document ID (`doc.id`)**: Auto-generated Firestore ID (`collection('tutor_payouts').doc()`).
+- **Security Rule**: Read allowed for authenticated users (`request.auth != null`); writes strictly backend-only via Firebase Admin SDK.
+
+| Field Name | Type | Expected Values / Format | Description & Business Rules | Codebase Reference |
+| :--- | :--- | :--- | :--- | :--- |
+| `payoutDocId` | `string` | Auto-generated Firestore ID | Primary document key. | `web/src/app/api/verify-payment/route.ts` |
+| `applicationDocId`| `string` | `app_` + alphanumeric | Foreign key to the tuition agreement in `applications`. | `web/src/app/api/verify-payment/route.ts` |
+| `studentPaymentId`| `string` | `pay_` + alphanumeric | Razorpay payment confirmation receipt ID from Day 7. | `web/src/app/api/verify-payment/route.ts` |
+| `tutorDocId` | `string` | User Auth UID | The educator entitled to the funds. | `web/src/app/api/verify-payment/route.ts` |
+| `tutorName` | `string` | Full name string | Denormalized display name. | `web/src/app/api/verify-payment/route.ts` |
+| `parentDocId` | `string` | User Auth UID | The parent who paid the tuition fee. | `web/src/app/api/verify-payment/route.ts` |
+| `grossAmount` | `number` | Positive integer (e.g. `6000`) | Total tuition fee collected from student. | `web/src/app/api/verify-payment/route.ts` |
+| `platformFeeRate` | `number` | `0.40` | Platform commission percentage (40%). | `web/src/app/api/verify-payment/route.ts` |
+| `platformFeeAmount`| `number` | Positive integer (e.g. `2400`) | Platform fee deducted ($G \times 0.40$). | `web/src/app/api/verify-payment/route.ts` |
+| `tutorShareRate` | `number` | `0.60` | Educator net percentage (60%). | `web/src/app/api/verify-payment/route.ts` |
+| `tutorShareAmount`| `number` | Positive integer (e.g. `3600`) | Net funds payable to the tutor ($G \times 0.60$). | `web/src/app/api/verify-payment/route.ts` |
+| `referralReward` | `number` | Positive integer (e.g. `600`) | Referral incentive paid from platform cut ($P \times 0.25$). | `web/src/app/api/verify-payment/route.ts` |
+| `monthNumber` | `number` | `1` | Strictly denotes Month 1 trial settlement. | `web/src/app/api/verify-payment/route.ts` |
+| `status` | `string` | `'escrow_held'`, `'ready_for_payout'`, `'processing'`, `'paid'`, `'action_required_missing_upi'` | Lifecycle state machine. | `web/src/app/api/verify-payment/route.ts` |
+| `startDate` | `Timestamp` | Firestore Timestamp | Day 0 hire date. | `web/src/app/api/verify-payment/route.ts` |
+| `paidByStudentAt` | `Timestamp` | Firestore Timestamp | Timestamp when student paid on Day 7. | `web/src/app/api/verify-payment/route.ts` |
+| `releaseEligibleAt`| `number` | Epoch milliseconds | Timestamp when funds unlock (`startDate + 30 days`). | `web/src/app/api/verify-payment/route.ts` |
+| `payoutMethod` | `string` | `'upi'` \| `'bank_transfer'` | Transfer rail used by Razorpay Payouts. | `web/src/app/api/verify-payment/route.ts` |
+| `payoutVpa` | `string` | Valid UPI ID (e.g. `user@okhdfcbank`) | Target VPA address of the teacher. | `web/src/app/api/verify-payment/route.ts` |
+| `razorpayPayoutId`| `string` | `pout_` + alphanumeric or `""` | Razorpay Payout transaction identifier. | `web/src/app/api/payouts/process/route.ts` |
+| `utrNumber` | `string` | Bank UTR string or `""` | Bank transaction reference number for audit. | `web/src/app/api/payouts/process/route.ts` |
+| `createdAt` | `Timestamp` | Firestore Timestamp | Escrow creation date. | `web/src/app/api/verify-payment/route.ts` |
+| `paidAt` | `Timestamp` | Firestore Timestamp or `null` | Date when funds successfully reached tutor's bank. | `web/src/app/api/payouts/process/route.ts` |
+
+---
+
+## 3. Codebase vs. Live Dump Discrepancy & Latent Fields Analysis
+
+When comparing the static documents dumped by `load_data.js` against the full production TypeScript codebase, several **latent fields and edge-case collections** exist in the code that were absent from the live database dump because specific user actions (e.g. withdrawals, cancellations, or referral payouts) had not yet occurred in that test environment.
+
+### 3.1 Discovered Conditional / Latent Fields
+
+| Collection | Field Name | Type | Why It Was Absent in DB Dump | Business Logic & Code Location |
+| :--- | :--- | :--- | :--- | :--- |
+| **`users`** | `walletBalance` | `number` | Absent when user has never earned referral cash rewards. | Incremented by 25% of first tuition fee upon referral qualification (`verify-payment/route.ts:L198`). Decremented on checkout discount (`verify-payment/route.ts:L135`) or withdrawal (`student/page.tsx:L1035`). |
+| **`users`** | `dismissedNotifications`| `string[]` | Absent until user clicks to dismiss an in-app toast. | Stored via `arrayUnion` when a user clears notification toasts (`student/page.tsx:L837`, `teacher/page.tsx:L385`). |
+| **`parents`** | `dailyUsage` | `map` | Absent until parent sends their first tuition request on the current day. | Enforces the 5-requests/day limit: `{ date: 'YYYY-MM-DD', count: 1..5, lastUpdated: Timestamp }` (`request/route.ts:L86-L117`). |
+| **`tutors`** | `bankedTokens` | `number` | Absent until teacher referrer qualifies for a reward. | Teachers receive +1 banked token instead of cash upon successful referral (`verify-payment/route.ts:L189`). Decremented when used to unlock proposals (`teacher/page.tsx:L367`). |
+| **`applications`**| `reason` | `string` | Only present when an application is rejected or cancelled. | Contains rejection rationale, e.g. `'student_hired_another_tutor'` during mutual exclusion auto-decline (`hire/route.ts:L116`, `verify-payment/route.ts:L227`). |
+| **`applications`**| `declinedAt` | `Timestamp` | Only present on declined applications. | Timestamp used to enforce the 7-day post-decline lockout rule (`queue.spec.ts:L116`, `hire/route.ts:L117`). |
+| **`applications`**| `gmeetLink` | `string` | Absent until tutor inputs a Google Meet, Zoom, or Teams URL. | Stored via `/api/save-demo-link` and locked until 5 minutes before scheduled demo time. |
+| **`referrals`** | `reward` | `number` | Only set after referee's first tuition payment is settled. | Contains the finalized reward amount (`Math.round(fee * 0.25)`) (`verify-payment/route.ts:L194`). |
+| **`referrals`** | `rewardType` | `string` | Only set after settlement. | Evaluates to `'wallet_cash'` (for student referrer) or `'banked_token'` (for teacher referrer) (`verify-payment/route.ts:L185`). |
+| **`referrals`** | `qualifiedAt` | `Timestamp` | Only set after settlement. | Settlement timestamp when reward moves from `'pending'` to `'qualified'` (`verify-payment/route.ts:L186`). |
+| **`pending_tuition_fees`** | `paidAt` | `Timestamp` | Only set after first month tuition payment succeeds. | Set during Razorpay tuition settlement (`verify-payment/route.ts:L159`). |
+| **`payments`** | `walletDiscountApplied`| `number` | `0` unless user chose to redeem wallet credit. | Amount deducted from gross tuition/demo bill (`create-order/route.ts:L143`). |
+
+### 3.2 Discovered Unseeded & Legacy Collections in Codebase
+1. **`withdrawals`**: Dedicated collection instantiated in `student/page.tsx` and `teacher/page.tsx` for UPI cash payouts. Was not present in the dump because no withdrawal had been filed.
+2. **`tutor_payouts`**: Dedicated escrow and payout ledger instantiated in `/api/verify-payment` and `/api/payouts/process` for Month 1 60% tutor disbursements.
+3. **`tutor_requests` & `direct_requests`**: Legacy Firestore collections from prior platform versions. In the current codebase, they are only queried in `student/page.tsx:L3154-L3161` during full account deletion cascade to ensure zero orphaned records remain in Firestore.
+
+---
+
+## 4. Foreign Key & Entity Reference Matrix
 
 | Source Collection | Foreign Key Field | Target Collection | Cardinality | Purpose |
 | :--- | :--- | :--- | :---: | :--- |
@@ -341,10 +431,13 @@ erDiagram
 | `referrals` | `referredUserId` | `users` | 1:1 | The newly onboarded user. |
 | `reviews` | `tutorDocId` | `tutors` | N:1 | The educator receiving feedback. |
 | `reviews` | `applicationDocId` | `applications` | 1:1 | Proof of completed tuition. |
+| `withdrawals` | `userId` | `users` | N:1 | The user requesting UPI withdrawal of referral cash. |
+| `tutor_payouts` | `applicationDocId` | `applications` | 1:1 | The tuition agreement this escrow settles. |
+| `tutor_payouts` | `tutorDocId` | `tutors` | N:1 | The educator receiving the 60% disbursement. |
 
 ---
 
-## 4. Security Rules Summary (`firestore.rules`)
+## 5. Security Rules Summary (`firestore.rules`)
 
 1. **`users`**: Only authenticated users where `request.auth.uid == userId` can read or write their own identity document.
 2. **`parents`**: Requires authentication (`request.auth != null`) for read and write to prevent directory scraping.
@@ -353,4 +446,6 @@ erDiagram
 5. **`groups` & `tuition_requests`**: Managed by parents; readable by authenticated tutors for discovering tuition requests.
 6. **`applications`**: Read and write restricted strictly to `tutorDocId == request.auth.uid` OR `parentDocId == request.auth.uid`.
 7. **`payments`**: Client can read own payments; mutations strictly guarded via backend Next.js API routes with Firebase Admin token verification.
-8. **`global_config` & `marketplace_pricing`**: Publicly readable; administrative write only.
+8. **`withdrawals`**: Read/write restricted to authenticated owner.
+9. **`tutor_payouts`**: Read allowed for authenticated users (`request.auth != null`); mutations strictly guarded via backend Firebase Admin SDK.
+10. **`global_config` & `marketplace_pricing`**: Publicly readable; administrative write only.

@@ -52,7 +52,7 @@ When a student initiates a payment, the frontend passes `role: 'student'` and an
 When Razorpay successfully charges the card, it pings this secure webhook.
 *   The system cross-references the `razorpayOrderId` with the `payments` ledger.
 *   **Referral Engine Trigger:** If the payment is a full tuition fee, the system automatically checks for a `pending` referral. 
-    *   If a student referred them, they earn 25% wallet cash.
+    *   If a student referred them, they earn **25% of the platform's 40% margin** (approx. 10% of total course value) as wallet cash.
     *   If a teacher referred them, they earn 1 Banked Token (Free Request).
 *   **Auto-Decline:** Finally, all competing tuition requests for that specific student are automatically marked as `declined` so the queue stays clean.
 
@@ -85,10 +85,13 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 *   **Student View:** The student's entire dashboard is overlaid with a fullscreen, non-dismissible modal. They are completely locked out of the platform until they click "Pay Securely" to clear their dues.
 *   **Teacher View:** The teacher sees a red "STOP CLASSES" alert on their dashboard instructing them to halt tuitions until the student pays the platform.
 
-### Phase 4: Post-Payment (No Refunds)
+### Phase 4: Post-Payment (Escrow Holding & Strict Zero Refund)
 **Trigger:** The student has successfully paid the full monthly fee via Razorpay (`feePaid: true`).
 
 *   **Status:** The transaction for the month is finalized and secure. The `pending_tuition_fees` tracking document is resolved.
+*   **Financial Split & Escrow Custody:** The platform retains its **40% commission**, and atomically logs an escrow record in `tutor_payouts` for the remaining **60% tutor share**. The funds are safely held until Day 30 (`startDate + 30 days`).
+*   **Automated Day 30 Payout:** Upon reaching Day 30, the platform triggers the Razorpay Payouts API to transfer the 60% balance directly to the teacher's UPI ID.
+*   **First-Month Only Intermediation:** The platform fee and escrow process occur strictly for Month 1. For Month 2 onwards, parent and teacher coordinate classes and tuition fees directly offline without platform cuts.
 *   **Cancellation Policy (Zero Refund):** 
     *   If the student clicks "Remove Teacher" at any point **after** paying the monthly fees, the teacher is immediately removed from the group, stopping future classes.
     *   The student receives **NO REFUND** for the remainder of the month. The platform policy is strict: once the post-trial monthly fee is submitted, it is locked in.

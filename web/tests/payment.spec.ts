@@ -103,26 +103,39 @@ test.describe('Payment Architecture & Financial Integrity (Payment_Architecture.
     });
   });
 
-  test.describe('7-Day Post-Trial Billing Cycle Calculation', () => {
-    function calculateBillingSchedule(hireDateMs: number) {
+  test.describe('7-Day Payment & 30-Day Escrow Disbursement Schedule', () => {
+    function calculatePaymentAndEscrowSchedule(hireDateMs: number, grossTuition: number) {
       const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
       const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
       
-      const firstPaymentDue = hireDateMs + SEVEN_DAYS_MS;
-      const secondPaymentDue = firstPaymentDue + THIRTY_DAYS_MS;
+      const paymentDueAt = hireDateMs + SEVEN_DAYS_MS;
+      const escrowReleaseAt = hireDateMs + THIRTY_DAYS_MS;
+      
+      const platformFee = Math.round(grossTuition * 0.40);
+      const tutorShare = Math.round(grossTuition * 0.60);
+      const referralReward = Math.round(platformFee * 0.25);
 
-      return { firstPaymentDue, secondPaymentDue };
+      return { 
+        paymentDueAt, 
+        escrowReleaseAt,
+        platformFee,
+        tutorShare,
+        referralReward
+      };
     }
 
-    test('First payment is due exactly 7 days after hire, second payment is 30 days after that', () => {
+    test('Payment is due on Day 7, and tutor 60% share unlocks on Day 30', () => {
       const hireDate = new Date('2026-09-01T10:00:00Z').getTime();
-      const schedule = calculateBillingSchedule(hireDate);
+      const schedule = calculatePaymentAndEscrowSchedule(hireDate, 6000);
 
-      const expectedFirstPayment = new Date('2026-09-08T10:00:00Z').getTime();
-      const expectedSecondPayment = new Date('2026-10-08T10:00:00Z').getTime();
+      const expectedPaymentDate = new Date('2026-09-08T10:00:00Z').getTime();
+      const expectedReleaseDate = new Date('2026-10-01T10:00:00Z').getTime();
 
-      expect(schedule.firstPaymentDue).toBe(expectedFirstPayment);
-      expect(schedule.secondPaymentDue).toBe(expectedSecondPayment);
+      expect(schedule.paymentDueAt).toBe(expectedPaymentDate);
+      expect(schedule.escrowReleaseAt).toBe(expectedReleaseDate);
+      expect(schedule.platformFee).toBe(2400);
+      expect(schedule.tutorShare).toBe(3600);
+      expect(schedule.referralReward).toBe(600);
     });
   });
 

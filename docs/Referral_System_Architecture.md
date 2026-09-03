@@ -1,105 +1,105 @@
-# Referral & Wallet Architecture
+# Referral & Rewards Architecture
 
-Welcome! This document explains how the Referral and Rewards system works. We've made this guide so simple that anyone can understand it, while also giving developers the exact database fields used behind the scenes.
-
----
-
-## The Big Picture: How It Works
-
-Imagine you are a player in a game. 
-1. **The Code:** After completing your formal Profile Setup, the system generates a unique secret code (your Referral Code) using your professional identity.
-2. **The Link:** You share a link with your friend.
-3. **The Cookie:** When your friend clicks the link, the website "remembers" your code in their browser cookie.
-4. **The Signup:** When your friend signs up, the website permanently links your account to theirs.
-5. **The Reward:** When your friend finally hires a teacher (or gets hired), the system calculates 25% of the tuition fee and drops it into your Wallet!
-6. **The Cash Out:** Once you hit Rs 1,000, you hit "Withdraw" and text the Admin to get your real money.
+This document explains the referral and rewards system on the Mi-Tutora platform, covering the attribution tracking, the mathematical incentive calculation, role-based rewards, and the secure backend qualification engine.
 
 ---
 
-## 1. The Database Fields (Where does data live?)
+## 1. Executive Summary & The Referral Lifecycle
 
-Here is exactly where all the referral data is stored in the Firebase Database:
+1. **The Referral Code:** Upon registration, every user is assigned a unique personal referral code (e.g. `RAMA-MABTMF`) generated via `generateReferralCode()`.
+2. **The Link & Cookie:** The user shares their invite link (`mitutora.com?ref=CODE`). A global listener (`ReferralTracker.tsx`) caches this code in `localStorage`.
+3. **Account Attribution:** When the referee registers, a permanent record is established in the `users` collection (`referredBy: CODE`) and a tracking ticket is created in the `referrals` collection with `status: 'pending'`.
+4. **The Settlement Trigger (Day 7 Payment):** When the referred user completes their 7-day trial and pays their first-month tuition fee via Razorpay (`/api/verify-payment`), the referral status advances from `'pending'` to `'qualified'`. The reward amount is calculated and placed in **escrow** (`payoutStatus: 'escrow_held'`).
+5. **Role-Based Reward Distribution:**
+   - **If Referrer is a Student/Parent:** Receives **Cash** ($25\%$ of platform commission) held in escrow until Day 30, then deposited automatically via UPI.
+   - **If Referrer is a Teacher:** Receives **1 Banked Token** credited to `tutors.bankedTokens` to unlock extra weekly proposals.
+6. **Synchronized Day 30 Automated UPI Payout:** On Day 30 (`startDate + 30 days`), the platform's automated payout engine disburses the referral cash directly to the student referrer's saved UPI ID via Razorpay Payouts simultaneously alongside the tutor's 60% fee. There is **zero minimum threshold** (no waiting for ₹1,000) and no manual WhatsApp messaging required.
+
+---
+
+## 2. The Referral Reward Math Formula
+
+The platform operates on a **40% first-month commission model**. The referral reward is strictly funded out of the platform's commission margin:
+
+$$\text{Gross Tuition Fee } (G) = \text{Amount paid by student on Day 7}$$
+$$\text{Platform Commission } (P) = G \times 0.40 \quad (40\% \text{ of gross})$$
+$$\text{Referral Reward } (R) = P \times 0.25 = G \times 0.10 \quad (25\% \text{ of platform margin} = 10\% \text{ of gross})$$
+$$\text{Platform Retained Margin } = P - R = G \times 0.30 \quad (30\% \text{ net retained revenue})$$
+
+### Concrete Calculation Examples
+
+| Monthly Tuition Fee | Platform Fee (40%) | Student Referrer Reward (Cash) | Teacher Referrer Reward (Tokens) | Platform Net Margin |
+| :---: | :---: | :---: | :---: | :---: |
+| **₹4,000** | ₹1,600 | **₹400** | +1 Banked Token | ₹1,200 |
+| **₹6,000** | ₹2,400 | **₹600** | +1 Banked Token | ₹1,800 |
+| **₹8,000** | ₹3,200 | **₹800** | +1 Banked Token | ₹2,400 |
+| **₹10,000** | ₹4,000 | **₹1,000** | +1 Banked Token | ₹3,000 |
+
+> **Dashboard Transparency:**  
+> This formula matches the exact guarantee displayed on the student dashboard ([`student/page.tsx:L2611`](../web/src/app/dashboard/student/page.tsx#L2611)):  
+> *"Earn 25% of the initial company margin (approx. 10% of total course value) when your friend books their first class!"*
+
+---
+
+## 3. Database Schema & State Transitions
+
+### Database Collections Involved
 
 | Step | What happens? | Collection | Fields Used |
 | :--- | :--- | :--- | :--- |
-| **Identity** | A user's total money, code, and formal name. | `users` | `referralCode` (String), `walletBalance` (Number), `name` (Formal Profile Name) |
-| **Signup** | When a new user joins using a link. | `users` | `referredBy` (UID of referrer), `referrerName` (Formal Name of referrer) |
-| **Tracking** | A ticket proving the referral happened. | `referrals` | `referrerId`, `referredId`, `status` ("pending" or "qualified"), `rewardAmount` |
-| **Trigger** | The moment the 25% reward is calculated. | `applications` | `finalPrice` or `budget` (Number), `status` (changes to "tuition_started") |
+| **Identity** | User's unique code & payout UPI | `users` | `referralCode`, `upiId`, `name` |
+| **Attribution** | Link between referee and referrer | `referrals` | `referrerId`, `referrerName`, `referredUserId`, `referredUserName`, `referralType`, `status` (`'pending'` \| `'qualified'`), `reward`, `rewardType`, `payoutStatus` (`'escrow_held'` \| `'ready_for_payout'` \| `'processing'` \| `'paid'` \| `'action_required_missing_upi'`), `releaseEligibleAt`, `payoutVpa`, `utrNumber`, `paidAt` |
+| **Trigger** | Day 7 tuition payment settlement | `payments` | `applicationDocId`, `status` (`'paid'`), `type` (`'tuition'`) |
+| **Automated Payout** | Direct Day 30 transfer to referrer's UPI | `referrals` + Razorpay Payouts API | `payoutVpa`, `utrNumber`, `paidAt` (Disbursed via `/api/payouts/process`) |
 
 ---
 
-## 2. The Link & Cookie (How we never lose a referral)
-
-When someone clicks `mitutora.com?ref=JOHN123`:
-- A global tracker (`ReferralTracker.tsx`) instantly catches the `JOHN123` code and hides it inside the browser's `localStorage` (like a cookie).
-- Even if the user closes the website and comes back a week later to sign up, the website checks `localStorage`, finds `JOHN123`, and automatically gives John the credit!
-
----
-
-## 3. Real-Time Tracking (How it feels like magic)
-
-When a friend signs up using your link, they appear on your dashboard **instantly**. 
-- The dashboards use a Firebase `onSnapshot` websocket listener to continuously monitor the `referrals` collection.
-- You do not need to refresh the page. The moment their account is created, your "Your Referrals" list updates in real-time.
-
----
-
-## 4. The 25% Magic Math (How you get paid)
-
-Because we run on a free database, we don't use expensive background servers to calculate money. Instead, the magic happens exactly when a Student clicks **"Hire Teacher"**.
-
-1. The Student and Teacher agree on a price (e.g., Rs 2,000).
-2. The Student clicks "Hire".
-3. The app (`executeAppointTutor` in `useDashboardActions.ts`) calculates 25% of Rs 2,000 = Rs 500.
-4. The app checks if the Student or Teacher were referred by anyone.
-5. In one lightning-fast, secure database move (a "Batch Write"), it marks the referral as "Qualified" and adds Rs 500 to the referrer's `walletBalance`.
-
----
-
-## 5. The WhatsApp Security Firewall
-
-Because the math happens in the browser, a hacker could theoretically try to trick the system into giving them Rs 1,000,000. 
-
-**How do we stop them?** By using a human firewall!
-- The system does **not** have an automatic bank payout button.
-- You can only withdraw when you reach Rs 1,000.
-- When you click "Withdraw", it simply opens a **WhatsApp chat** with the platform Admin.
-- If a hacker changes their balance to 1 Million, all they can do is send a WhatsApp text. The Admin will check the database history, see they lied, and block them!
-
----
-
-## The Data Flow (Mermaid Diagram)
-
-Here is a visual map of how a referral travels from a Link to a Wallet:
+## 4. End-to-End Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Friend as Friend
-    participant Browser as Web Browser
-    participant DB as Firebase Database
-    participant Admin as Human Admin
+    autonumber
+    actor Referrer
+    actor Referee
+    participant WebApp
+    participant Razorpay
+    participant Backend as Backend (/api/verify-payment)
+    participant PayoutEngine as Payouts Engine (/api/payouts/process)
+    participant DB as Cloud Firestore
 
-    %% Flow
-    Friend->>Browser: Clicks mitutora.com?ref=JOHN123
-    Browser-->>Browser: Saves JOHN123 to localStorage
+    Referrer->>Referee: Shares link (mitutora.com?ref=RAMA-MABTMF)
+    Referee->>WebApp: Opens website (stores code in localStorage)
+    Referee->>WebApp: Registers new account
+    WebApp->>DB: Creates user (referredBy: RAMA-MABTMF)
+    WebApp->>DB: Creates ticket in 'referrals' (status: 'pending')
+
+    Note over Referee, Backend: Days 0 to 7: Live Trial Completed
+    Referee->>Razorpay: Pays Month 1 Tuition Fee (₹6,000)
+    Razorpay->>Backend: Webhook confirms payment signature
     
-    Friend->>Browser: Creates an Account
-    Browser->>DB: Saves User with referredBy = JOHN123
-    Browser->>DB: Creates Pending ticket in referrals collection
+    Note over Backend: Server computes: Platform Fee = ₹2,400 | Referrer Reward = ₹600 | Tutor Share = ₹3,600
+    Backend->>DB: Updates 'referrals' ticket: status = 'qualified', reward = 600, payoutStatus = 'escrow_held'
+    Backend->>DB: Creates 'tutor_payouts' record: status = 'escrow_held', amount = 3600
     
-    Note over Friend,DB: ...Days Later...
-    
-    Friend->>Browser: Hires a Teacher for Rs 2000
-    Browser->>Browser: Calculates 25% (Rs 500)
-    
-    Browser->>DB: (Atomic Batch) Marks ticket Qualified
-    Browser->>DB: (Atomic Batch) Adds Rs 500 to John's walletBalance
-    
-    Note over Friend,DB: ...Weeks Later...
-    
-    Browser->>Browser: John reaches Rs 1000 limit
-    Browser->>Admin: John clicks Withdraw (Opens WhatsApp)
-    Admin->>DB: Admin manually verifies referrals history
-    Admin->>Admin: Admin sends real money via UPI/Bank
+    alt Referrer is a Teacher
+        Backend->>DB: Increments tutors.bankedTokens by 1
+    end
+
+    Note over PayoutEngine, DB: Day 30 Arrives (startDate + 30 days)
+    PayoutEngine->>DB: Queries eligible payouts (status: 'escrow_held' & releaseEligibleAt <= now)
+    PayoutEngine->>Razorpay: Disburses ₹3,600 to Tutor's UPI
+    PayoutEngine->>Razorpay: Disburses ₹600 to Referrer's UPI
+    Razorpay-->>PayoutEngine: Returns UTR numbers
+    PayoutEngine->>DB: Updates 'tutor_payouts' & 'referrals' status = 'paid'
 ```
+
+---
+
+## 5. Security & Anti-Fraud Locks
+
+1. **Server-Side Authorization:** Referral rewards are never calculated on the frontend. The math is strictly executed inside the atomic database transaction in `/api/verify-payment` after validating cryptographic Razorpay HMAC signatures.
+2. **Self-Referral Prevention:** Users cannot enter their own referral code during registration.
+3. **Single Qualification Lock:** The backend query explicitly filters for `status == 'pending'`. Once marked `'qualified'`, a referral can never trigger a second reward.
+4. **Escrow Safety Lock:** Funds are held in escrow until Day 30 (`startDate + 30 days`), preventing any payout leakage if a class is discontinued during the 7-day trial.
+5. **Direct UPI Validation:** Referrer UPI IDs are validated via regex format check (`/^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/`) before disbursement. If missing, the status safely transitions to `'action_required_missing_upi'` without failing.
+

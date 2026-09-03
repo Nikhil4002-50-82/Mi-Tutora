@@ -11,6 +11,7 @@ The system operates dynamically based on environment variables provided in `.env
 To ensure absolute financial integrity and auditing, we do not store payment transaction histories inside the `applications` document. Instead, we use a dedicated `payments` collection.
 
 *   **The Ledger (`payments` collection):** Every time a user clicks "Pay", a permanent record is created here containing the `razorpayOrderId`, `amount`, `walletDiscountApplied`, `userId`, `status`, `type` (e.g., 'application' or 'subscription') and strictly the raw Firestore Document references. 
+*   **The Outgoing Escrow Ledger (`tutor_payouts` collection):** Outgoing disbursements to educators are strictly segregated from incoming student payments into `tutor_payouts`. When a student pays the Day 7 tuition fee, the platform retains its 40% commission and creates an escrow record for the 60% tutor share, locked until Day 30 (`startDate + 30 days`).
 *   **Wallet Deduction Security:** `/api/create-order` calculates the wallet discount and securely stores the exact `walletDiscountApplied` in the `payments` document. `/api/verify-payment` *strictly* reads this backend database field to deduct the wallet balance, rendering it 100% immune to frontend payload manipulation.
 *   **The Application (`applications` collection):** Once a tuition or demo payment is securely verified, the backend simply flips `feePaid: true` or `demoPaymentPaid: true` on the application so the frontend UI can update instantly.
 *   **The Tutor Profile (`tutors` collection):** Once a subscription payment is securely verified, the backend upgrades the tutor's profile to `pro` and sets a strict 30-day server timestamp for `subscriptionExpiry`.
@@ -29,6 +30,7 @@ All payment calculations and verifications happen securely on the backend.
 *   **Security Check:** The backend hashes the data using the Razorpay Secret Key. If the hash matches the signature, the payment is authentic. It strictly uses `walletDiscountApplied` from the database to deduct wallets securely.
 *   **Database Execution:** The backend uses the `firebase-admin` SDK (which bypasses frontend rules) to update the application status and mark it as paid.
 *   **Auto-Decline Cleanup:** When a student successfully pays, competing applications for the same group are automatically declined. The backend also securely removes these declined application IDs from the respective teachers' `pendingRequests` arrays to prevent ghost notifications.
+*   **Escrow Creation:** Atomically splits the tuition into 40% platform fee and 60% tutor share, logging an escrow record in `tutor_payouts` with a Day 30 unlock timestamp.
 
 ### C. Subscription Order Creation (`/api/create-subscription-order`)
 *   **Purpose:** Securely generates a Razorpay Order ID specifically for Pro Plan upgrades.
@@ -42,7 +44,14 @@ All payment calculations and verifications happen securely on the backend.
 *   **Time-Tamper Proofing:** It strictly calculates the 30-day `subscriptionExpiry` lock on the backend using the Admin SDK's `Timestamp.now()`. This makes it 100% immune to client-side clock tampering.
 
 ### E. Referral Reward Distribution (Backend Embedded)
-*   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It securely calculates the 25% reward from the `finalPrice` and updates the referrer's `walletBalance`. By embedding this in the backend, the platform is protected from 7-day cancellation refund leakage.
+*   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It securely calculates the 25% reward strictly from the platform's 40% margin (10% of total tuition) and updates the referrer's `walletBalance` (or grants 1 banked token if teacher). By embedding this in the backend, the platform is protected from 7-day cancellation refund leakage.
+
+### F. Automated Day 30 Payout Engine (`/api/payouts/process`)
+*   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions reaching Day 30.
+*   **Mechanism:** Queries `tutor_payouts` where `status == 'escrow_held'` and `releaseEligibleAt <= Date.now()`. Calls Razorpay Payouts API (`POST /v1/payouts`) with `"queue_if_low_balance": true` to disburse the 60% share directly to the teacher's UPI.
+
+### G. Admin Manual Fallback Mode (`/api/admin/payouts/export-csv`)
+*   **Purpose:** Allows platform administrators to export a corporate netbanking CSV file of pending payouts if RazorpayX account balance is low or undergoing maintenance.
 
 ## 4. Frontend Integration Points
 

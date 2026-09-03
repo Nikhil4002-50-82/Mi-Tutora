@@ -99,6 +99,14 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // TUTOR PAYOUTS & ESCROW: Strictly backend only writes
+    // -------------------------------------------------------------------------
+    match /tutor_payouts/{payoutId} {
+      allow read: if request.auth != null; 
+      allow write: if false; 
+    }
+
+    // -------------------------------------------------------------------------
     // REVIEW SYSTEM: Secure the reviews collection
     // -------------------------------------------------------------------------
     match /reviews/{reviewId} {
@@ -108,8 +116,8 @@ service cloud.firestore {
 
     // Prevent anonymous mass-deletion on the rest of the DB while keeping it open for logic
     match /{collection}/{document=**} {
-      allow read, create, update: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
-      allow delete: if request.auth != null && collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'reviews';
+      allow read, create, update: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews';
+      allow delete: if request.auth != null && collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews';
     }
   }
 }

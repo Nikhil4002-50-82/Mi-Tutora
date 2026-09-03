@@ -159,10 +159,61 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                 paidAt: FieldValue.serverTimestamp()
             });
 
-            // Process Referrals on full payment
+            // Financial Split Math: 40% Platform Commission, 60% Tutor Share, 25% of Cut for Referrals
+            const rewardBase = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
+            const platformFee = Math.round(rewardBase * 0.40);
+            const tutorShare = Math.round(rewardBase * 0.60);
+            const rewardAmount = Math.round(platformFee * 0.25);
+
+            // Fetch Tutor UPI if saved on profile
+            let tutorUpi = '';
+            if (appData.tutorDocId) {
+                try {
+                    const tutorDocSnap = await adminDb.collection('tutors').doc(appData.tutorDocId).get();
+                    if (tutorDocSnap.exists) {
+                        tutorUpi = tutorDocSnap.data()?.upiId || '';
+                    }
+                } catch (tutorErr) {
+                    console.error('Could not fetch tutor UPI during escrow creation:', tutorErr);
+                }
+            }
+
+            // Calculate Day 30 release timestamp
+            const startMs = appData.startDate 
+                ? (typeof appData.startDate.toMillis === 'function' ? appData.startDate.toMillis() : (typeof appData.startDate === 'number' ? appData.startDate : Date.now())) 
+                : Date.now();
+            const releaseEligibleAt = startMs + (30 * 24 * 60 * 60 * 1000);
+
+            // Create Escrow Record in 'tutor_payouts'
+            const payoutRef = adminDb.collection('tutor_payouts').doc();
+            batch.set(payoutRef, {
+                payoutDocId: payoutRef.id,
+                applicationDocId: applicationId,
+                studentPaymentId: paymentId,
+                tutorDocId: appData.tutorDocId || '',
+                tutorName: appData.tutorName || '',
+                parentDocId: appData.parentDocId || '',
+                grossAmount: rewardBase,
+                platformFeeRate: 0.40,
+                platformFeeAmount: platformFee,
+                tutorShareRate: 0.60,
+                tutorShareAmount: tutorShare,
+                referralReward: rewardAmount,
+                monthNumber: 1,
+                status: 'escrow_held',
+                startDate: appData.startDate || FieldValue.serverTimestamp(),
+                paidByStudentAt: FieldValue.serverTimestamp(),
+                releaseEligibleAt: releaseEligibleAt,
+                payoutMethod: 'upi',
+                payoutVpa: tutorUpi,
+                razorpayPayoutId: '',
+                utrNumber: '',
+                createdAt: FieldValue.serverTimestamp(),
+                paidAt: null
+            });
+
+            // Process Referrals on full payment (funded out of 40% platform cut)
             try {
-                const rewardBase = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
-                const rewardAmount = Math.round(rewardBase * 0.25);
                 const studentUid = appData.parentDocId;
                 const teacherUid = appData.tutorDocId;
 
@@ -189,10 +240,34 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                                 bankedTokens: FieldValue.increment(1)
                             });
                         } else {
+                            // Referrer Reward (Student or Teacher referring a student): Lock into Day 30 automated escrow
+                            let referrerUpi = '';
+                            try {
+                                const userSnap = await adminDb.collection('users').doc(referrerId).get();
+                                if (userSnap.exists) {
+                                    referrerUpi = userSnap.data()?.upiId || '';
+                                }
+                                if (!referrerUpi) {
+                                    const tutorSnap = await adminDb.collection('tutors').doc(referrerId).get();
+                                    if (tutorSnap.exists) {
+                                        referrerUpi = tutorSnap.data()?.upiId || '';
+                                    }
+                                }
+                            } catch (uErr) {
+                                console.error('Could not fetch referrer UPI:', uErr);
+                            }
+
                             batch.update(adminDb.collection('referrals').doc(refDoc.id), {
                                 status: 'qualified',
                                 reward: rewardAmount,
-                                qualifiedAt: FieldValue.serverTimestamp()
+                                rewardType: 'wallet_cash',
+                                qualifiedAt: FieldValue.serverTimestamp(),
+                                payoutStatus: 'escrow_held',
+                                releaseEligibleAt: releaseEligibleAt,
+                                payoutVpa: referrerUpi,
+                                razorpayPayoutId: '',
+                                utrNumber: '',
+                                paidAt: null
                             });
                             batch.update(adminDb.collection('users').doc(referrerId), {
                                 walletBalance: FieldValue.increment(rewardAmount)

@@ -82,9 +82,11 @@ export default function StudentDashboard() {
   const [editingStudentId, setEditingStudentId] = useState<string>('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('all');
   const [isSwitchingTab, setIsSwitchingTab] = useState(false);
-  const [subTab, setSubTab] = useState<string>('');
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [referralUpi, setReferralUpi] = useState('');
+  const [isEditingReferralUpi, setIsEditingReferralUpi] = useState(false);
+  const [savingReferralUpi, setSavingReferralUpi] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [reviewModalConfig, setReviewModalConfig] = useState({ isOpen: false, applicationId: '', tutorName: '', parentDocId: '' });
@@ -120,6 +122,38 @@ export default function StudentDashboard() {
 
   const { data, error: swrError, isLoading: loading, mutate } = useStudentData();
 
+  useEffect(() => {
+    if (data?.userData?.upiId && !isEditingReferralUpi) {
+      setReferralUpi(data.userData.upiId);
+    }
+  }, [data?.userData?.upiId, isEditingReferralUpi]);
+
+  const handleSaveReferralUpi = async () => {
+    const cleanUpi = referralUpi.trim();
+    if (!cleanUpi) {
+      toast.error('Please enter a UPI ID');
+      return;
+    }
+    if (!/^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(cleanUpi)) {
+      toast.error('Invalid UPI format (e.g. yourname@okhdfcbank)');
+      return;
+    }
+    setSavingReferralUpi(true);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'users', data?.user?.uid as string), {
+        upiId: cleanUpi
+      });
+      toast.success('Referral Payout UPI updated successfully!');
+      setIsEditingReferralUpi(false);
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update UPI');
+    } finally {
+      setSavingReferralUpi(false);
+    }
+  };
 
   const allStudents = data?.students || (data?.myStudent ? [data.myStudent] : []);
   
@@ -2637,38 +2671,82 @@ export default function StudentDashboard() {
                     </div>
                   </div>
 
-                  {/* Wallet Card */}
+                  {/* Direct Referral Payout UPI Card */}
                   <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between group hover:shadow-2xl transition-all duration-300">
                     <div>
-                      <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center mb-6 text-teal-600 group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                        <Wallet className="w-6 h-6" />
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                          <CreditCard className="w-6 h-6" />
+                        </div>
+                        {data?.userData?.upiId ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Missing UPI
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Wallet Balance</p>
-                      <h4 className="text-5xl font-black text-gray-900 mb-4 tracking-tight flex items-baseline gap-1">
-                        <span className="text-2xl text-slate-400">₹</span>{data?.userData?.walletBalance || data?.userData?.walletbalance || 0}
+
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Direct Referral Payout UPI</p>
+                      <h4 className="text-xl font-black text-gray-900 mb-2 tracking-tight">
+                        Automatic Day 30 Deposits
                       </h4>
-                      <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2 overflow-hidden">
-                        <div 
-                          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(((data?.userData?.walletBalance || data?.userData?.walletbalance || 0) / 1000) * 100, 100)}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8 flex justify-between">
-                        <span>Min Withdrawal: ₹1000</span>
-                        <span className="font-bold text-emerald-600">{Math.min(((data?.userData?.walletBalance || data?.userData?.walletbalance || 0) / 1000) * 100, 100).toFixed(0)}%</span>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed mb-6">
+                        No minimum threshold! Your 25% company margin cash reward (₹600) is deposited directly to this UPI address on Day 30 when your referred friend completes their 1st month.
                       </p>
+
+                      {!isEditingReferralUpi && (
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saved UPI ID</p>
+                            <p className="font-mono text-sm font-bold text-gray-800 mt-0.5">
+                              {data?.userData?.upiId || 'No UPI ID saved'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setReferralUpi(data?.userData?.upiId || '');
+                              setIsEditingReferralUpi(true);
+                            }}
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0"
+                          >
+                            {data?.userData?.upiId ? 'Edit' : 'Add UPI'}
+                          </button>
+                        </div>
+                      )}
+
+                      {isEditingReferralUpi && (
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 mb-2">
+                          <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Enter your UPI ID</label>
+                          <input
+                            type="text"
+                            value={referralUpi}
+                            onChange={(e) => setReferralUpi(e.target.value)}
+                            placeholder="e.g. yourname@okhdfcbank"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              disabled={savingReferralUpi}
+                              onClick={handleSaveReferralUpi}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 justify-center"
+                            >
+                              {savingReferralUpi && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              Save UPI
+                            </button>
+                            <button
+                              disabled={savingReferralUpi}
+                              onClick={() => setIsEditingReferralUpi(false)}
+                              className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <button 
-                      onClick={() => {
-                        const bal = data?.userData?.walletBalance || data?.userData?.walletbalance || 0;
-                        const msg = `Hello Admin, I would like to request a referral withdrawal.\n\nMy User ID is: ${data?.user?.uid}\nMy current Wallet Balance is: ₹${bal}`;
-                        window.open(`https://api.whatsapp.com/send?phone=+917483034168&text=${encodeURIComponent(msg)}`, '_blank');
-                      }}
-                      disabled={(data?.userData?.walletBalance || data?.userData?.walletbalance || 0) < 1000}
-                      className="w-full py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 shadow-lg shadow-gray-900/20 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                      <ArrowRight className="w-4 h-4" /> Withdraw via WhatsApp
-                    </button>
                   </div>
                 </div>
 
