@@ -1,30 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminDb = getAdminDb();
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { 
       razorpay_order_id, 
       razorpay_payment_id, 
       razorpay_signature, 
-      applicationId, 
-      role, 
-      isRemoval,
       useWallet = false
     } = body;
 
-    const adminDb = getAdminDb();
-    if (!adminDb) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return NextResponse.json({ error: 'Missing payment verification parameters' }, { status: 400 });
     }
-
-    const appRef = adminDb.collection('applications').doc(applicationId);
-    
-
 
     // LIVE MODE: Cryptographic Verification
     const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -39,19 +50,47 @@ export async function POST(req: NextRequest) {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
+    const paymentsRef = adminDb.collection('payments');
+    const q = paymentsRef.where('razorpayOrderId', '==', razorpay_order_id).limit(1);
+    const snap = await q.get();
+
     if (generated_signature !== razorpay_signature) {
       // Log failed attempt
-      const paymentsRef = adminDb.collection('payments');
-      const q = paymentsRef.where('razorpayOrderId', '==', razorpay_order_id).limit(1);
-      const snap = await q.get();
       if (!snap.empty) {
         await snap.docs[0].ref.update({ status: 'failed', updatedAt: new Date() });
       }
       return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 });
     }
 
+    if (snap.empty) {
+      return NextResponse.json({ error: 'Order ID not found in secure ledger.' }, { status: 404 });
+    }
+
+    const paymentDoc = snap.docs[0];
+    const paymentData = paymentDoc.data();
+
+    // Prevent Replay Attacks: If already processed and marked paid, return success immediately
+    if (paymentData.status === 'paid') {
+      return NextResponse.json({ success: true, message: 'Payment already verified' });
+    }
+
+    // Secure ownership: Ensure the user verifying the payment owns the ledger record
+    if (paymentData.userId && paymentData.userId !== decodedToken.uid) {
+      return NextResponse.json({ error: 'Unauthorized: Payment does not belong to this user' }, { status: 403 });
+    }
+
+    // SECURE: Strictly derive application ID, role, and removal flag from ledger record
+    const verifiedApplicationId = paymentData.applicationDocId;
+    if (!verifiedApplicationId) {
+      return NextResponse.json({ error: 'No application associated with this payment order.' }, { status: 400 });
+    }
+
+    const verifiedRole = paymentData.type === 'demo' ? 'teacher' : 'student';
+    const verifiedIsRemoval = Boolean(paymentData.isRemoval);
+    const appRef = adminDb.collection('applications').doc(verifiedApplicationId);
+
     // Payment is 100% authentic. Perform secure backend database update.
-    await processDatabaseUpdate(adminDb, appRef, applicationId, role, isRemoval, razorpay_order_id, razorpay_payment_id, useWallet);
+    await processDatabaseUpdate(adminDb, appRef, verifiedApplicationId, verifiedRole, verifiedIsRemoval, razorpay_order_id, razorpay_payment_id, useWallet);
 
     return NextResponse.json({ success: true });
 

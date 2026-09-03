@@ -87,7 +87,45 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       expect(score).toBe(0);
     });
 
-    test('Combined perfect match awards maximum score', () => {
+    test('Awards +20 points for Aadhar Verification badge', () => {
+      const student = { category: 'school' };
+      const teacher = { category: 'school', aadharVerified: true };
+      const score = calculateSuitabilityScore(student, teacher);
+      expect(score).toBe(20);
+    });
+
+    test('Awards +20 points for Pro Subscription badge', () => {
+      const student = { category: 'school' };
+      const teacherPro = { 
+        category: 'school', 
+        subscriptionPlan: 'pro',
+        subscriptionExpiry: Date.now() + 86400000 // Valid future expiry
+      };
+      const teacherSubscribed = { 
+        category: 'school', 
+        isSubscribed: true,
+        subscriptionExpiry: Date.now() + 86400000 // Valid future expiry
+      };
+      
+      expect(calculateSuitabilityScore(student, teacherPro)).toBe(20);
+      expect(calculateSuitabilityScore(student, teacherSubscribed)).toBe(20);
+    });
+
+    test('Calculates scores for Programming category', () => {
+      const student = { category: 'programming', technologies: ['Python', 'React'] };
+      const teacher = { category: 'programming', technologies: ['Python', 'Node.js', 'React'] };
+      // 2 matches: Python (+50), React (+50) = 100
+      expect(calculateSuitabilityScore(student, teacher)).toBe(100);
+    });
+
+    test('Calculates scores for Languages category', () => {
+      const student = { category: 'languages', languages: ['French', 'Spanish'] };
+      const teacher = { category: 'languages', languagesTaught: ['French', 'German'] };
+      // 1 match: French (+50) = 50
+      expect(calculateSuitabilityScore(student, teacher)).toBe(50);
+    });
+
+    test('Combined perfect match awards maximum score including Aadhar and Pro boosts', () => {
       const student = { 
         category: 'school',
         subjects: ['Mathematics', 'Science'], 
@@ -100,11 +138,14 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
         subjects: ['Mathematics', 'Science'], 
         classes: ['Class 10'], 
         boards: ['CBSE'],
-        feeRange: 1000
+        feeRange: 1000,
+        aadharVerified: true,
+        subscriptionPlan: 'pro',
+        subscriptionExpiry: Date.now() + 86400000
       };
-      // 100 (2 Subjects) + 30 (Class) + 20 (Board) + 30 (Budget) = 180 points
+      // 100 (2 Subjects) + 30 (Class) + 20 (Board) + 30 (Budget) + 20 (Aadhar) + 20 (Pro) = 220 points
       const score = calculateSuitabilityScore(student, teacher);
-      expect(score).toBe(180);
+      expect(score).toBe(220);
     });
   });
 });

@@ -1,28 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 import * as admin from 'firebase-admin';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminDb = getAdminDb();
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { 
       razorpay_order_id, 
       razorpay_payment_id, 
-      razorpay_signature, 
-      userId
+      razorpay_signature
     } = body;
 
-    if (!userId || !razorpay_order_id || !razorpay_payment_id) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
-
-    const adminDb = getAdminDb();
-    if (!adminDb) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
-    }
-
-
 
     // LIVE MODE: Cryptographic Verification
     const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -37,19 +48,38 @@ export async function POST(req: NextRequest) {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
+    const paymentsRef = adminDb.collection('payments');
+    const q = paymentsRef.where('razorpayOrderId', '==', razorpay_order_id).limit(1);
+    const snap = await q.get();
+
     if (generated_signature !== razorpay_signature) {
       // Log failed attempt
-      const paymentsRef = adminDb.collection('payments');
-      const q = paymentsRef.where('razorpayOrderId', '==', razorpay_order_id).limit(1);
-      const snap = await q.get();
       if (!snap.empty) {
         await snap.docs[0].ref.update({ status: 'failed', updatedAt: new Date() });
       }
       return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 });
     }
 
+    if (snap.empty) {
+      return NextResponse.json({ error: 'Order ID not found in secure ledger.' }, { status: 404 });
+    }
+
+    const paymentDoc = snap.docs[0];
+    const paymentData = paymentDoc.data();
+
+    // Prevent Replay Attacks
+    if (paymentData.status === 'paid') {
+      return NextResponse.json({ success: true, message: 'Subscription already verified' });
+    }
+
+    // Secure ownership: Ensure the user verifying the payment is the intended subscriber
+    const verifiedUserId = paymentData.userId;
+    if (verifiedUserId !== decodedToken.uid) {
+      return NextResponse.json({ error: 'Unauthorized: Subscription does not belong to this user' }, { status: 403 });
+    }
+
     // Payment is 100% authentic. Perform secure backend database update.
-    await processSubscriptionUpdate(adminDb, userId, razorpay_order_id, razorpay_payment_id);
+    await processSubscriptionUpdate(adminDb, verifiedUserId, razorpay_order_id, razorpay_payment_id);
 
     return NextResponse.json({ success: true });
 

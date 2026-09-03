@@ -29,3 +29,11 @@ export const getAdminDb = () => {
   }
   return null;
 };
+
+export const getAdminAuth = async () => {
+  if (getApps().length > 0) {
+    const { getAuth } = await import('firebase-admin/auth');
+    return getAuth();
+  }
+  return null;
+};

@@ -48,4 +48,48 @@ test.describe('Referral System Logic', () => {
     expect(code.startsWith('SARA-')).toBe(true);
     expect(code.length).toBeGreaterThan(8); // Fallback generates a random 4-6 char suffix
   });
+
+  test.describe('Reward Distribution on First Month Tuition Payment', () => {
+    function calculateReferralReward(finalPrice: number, referralType: 'student' | 'teacher') {
+      const rewardAmount = Math.round(finalPrice * 0.25);
+      if (referralType === 'teacher') {
+        return {
+          status: 'qualified',
+          reward: 0,
+          rewardType: 'banked_token',
+          bankedTokensIncrement: 1
+        };
+      } else {
+        return {
+          status: 'qualified',
+          reward: rewardAmount,
+          rewardType: 'wallet_cash',
+          walletCashIncrement: rewardAmount
+        };
+      }
+    }
+
+    test('Awards 25% cash wallet credit to student referrer', () => {
+      const tuitionFee = 4000;
+      const result = calculateReferralReward(tuitionFee, 'student');
+      expect(result.status).toBe('qualified');
+      expect(result.reward).toBe(1000); // 25% of 4000
+      expect(result.rewardType).toBe('wallet_cash');
+      expect(result.walletCashIncrement).toBe(1000);
+    });
+
+    test('Awards 1 banked token to teacher referrer instead of cash', () => {
+      const tuitionFee = 6000;
+      const result = calculateReferralReward(tuitionFee, 'teacher');
+      expect(result.status).toBe('qualified');
+      expect(result.rewardType).toBe('banked_token');
+      expect(result.bankedTokensIncrement).toBe(1);
+    });
+
+    test('Rounds decimal rewards properly', () => {
+      const tuitionFee = 3555;
+      const result = calculateReferralReward(tuitionFee, 'student');
+      expect(result.reward).toBe(889); // Math.round(3555 * 0.25) = 888.75 -> 889
+    });
+  });
 });

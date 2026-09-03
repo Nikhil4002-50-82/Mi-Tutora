@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { APP_STATUS_PENDING } from '../src/utils/constants';
 
 // These tests validate the architectural limits defined in docs/Student_Queue_Architecture.md
 // In production, these filters run via SWR caching on the frontend and Firestore Security Rules on the backend.
 
 function checkConcurrentLimit(applications: any[], groupId: string) {
-  const pendingStatuses = ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked'];
-  const pendingCount = applications.filter((app: any) => app.groupDocId === groupId && pendingStatuses.includes(app.status)).length;
+  const pendingCount = applications.filter((app: any) => app.groupDocId === groupId && APP_STATUS_PENDING.includes(app.status)).length;
   return pendingCount < 5;
 }
 
@@ -104,6 +104,25 @@ test.describe('Student Queue Architecture', () => {
       ]; 
       
       expect(checkDemoLimit(apps, 'group1', nowMs)).toBe(true);
+    });
+  });
+
+  test.describe('Layer 4: 7-Day Post-Decline Lockout', () => {
+    function isTutorLockedAfterDecline(declinedAtMs: number, nowMs: number) {
+      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+      return (nowMs - declinedAtMs) < SEVEN_DAYS;
+    }
+
+    test('Blocks sending offer to student if declined 3 days ago', () => {
+      const nowMs = Date.now();
+      const THREE_DAYS_AGO = nowMs - (3 * 24 * 60 * 60 * 1000);
+      expect(isTutorLockedAfterDecline(THREE_DAYS_AGO, nowMs)).toBe(true);
+    });
+
+    test('Allows sending offer to student once 7 days have elapsed', () => {
+      const nowMs = Date.now();
+      const EIGHT_DAYS_AGO = nowMs - (8 * 24 * 60 * 60 * 1000);
+      expect(isTutorLockedAfterDecline(EIGHT_DAYS_AGO, nowMs)).toBe(false);
     });
   });
 });

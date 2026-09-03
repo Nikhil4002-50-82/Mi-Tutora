@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAdminAuth } from '@/utils/firebase/admin';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminAuth = await getAdminAuth();
+    if (!adminAuth) {
+      return NextResponse.json({ error: 'Auth service unavailable' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    try {
+      await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { aadharNumber } = body;
 

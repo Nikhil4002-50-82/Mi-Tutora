@@ -18,9 +18,9 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Secure the "tutors" collection against Quota Hackers and mass deletion
+    // Secure the "tutors" collection against Quota Hackers, scraping, and mass deletion
     match /tutors/{tutorId} {
-      allow read, create: if true;
+      allow read, create: if request.auth != null;
       allow delete: if request.auth != null && request.auth.uid == tutorId;
       
       // Enforce the Weekly Token limits
@@ -34,9 +34,9 @@ service cloud.firestore {
         );
     }
 
-    // Secure the "parents" collection to enforce daily usage quotas securely and prevent mass deletion
+    // Secure the "parents" collection to enforce daily usage quotas securely, prevent scraping, and mass deletion
     match /parents/{parentId} {
-      allow read, create: if true;
+      allow read, create: if request.auth != null;
       allow delete: if request.auth != null && request.auth.uid == parentId;
       
       allow update: if 

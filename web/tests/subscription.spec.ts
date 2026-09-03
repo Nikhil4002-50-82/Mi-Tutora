@@ -36,4 +36,59 @@ test.describe('Subscription & Token Architecture', () => {
       expect(canTeacherSendOffer('legacy_plan', true, 15)).toBe(false);
     });
   });
+
+  test.describe('Weekly Quota Rollover (Monday Reset)', () => {
+    function getWeekStartDate(date: Date) {
+      const d = new Date(date);
+      d.setHours(12, 0, 0, 0);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${dayStr}`;
+    }
+
+    test('Identifies Monday as the start of the current week', () => {
+      // 2026-09-03 is a Thursday
+      const thursday = new Date('2026-09-03T12:00:00Z');
+      const monday = getWeekStartDate(thursday);
+      expect(monday).toBe('2026-08-31');
+
+      // 2026-09-06 is a Sunday
+      const sunday = new Date('2026-09-06T12:00:00Z');
+      expect(getWeekStartDate(sunday)).toBe('2026-08-31');
+
+      // 2026-09-07 is the next Monday
+      const nextMonday = new Date('2026-09-07T00:00:00Z');
+      expect(getWeekStartDate(nextMonday)).toBe('2026-09-07');
+    });
+  });
+
+  test.describe('Subscription Duration & Clock-Rewind Anti-Spoofing', () => {
+    test('Calculates 30-day expiry from payment timestamp', () => {
+      const paymentTime = 1756800000000; // arbitrary timestamp
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const expiry = paymentTime + THIRTY_DAYS_MS;
+      expect(expiry - paymentTime).toBe(2592000000);
+    });
+
+    test('Neutralizes local clock rewind using latestServerTime', () => {
+      const latestServerTime = 1756800000000;
+      const expiredSubExpiry = latestServerTime - 1000; // Expired 1 second ago on server
+      
+      // User rewinds their clock backward by 1 year (365 days)
+      const tamperedClientClock = latestServerTime - (365 * 24 * 60 * 60 * 1000);
+      
+      // Vulnerable check: would wrongly think user is active
+      const naiveIsActive = tamperedClientClock < expiredSubExpiry;
+      expect(naiveIsActive).toBe(true);
+
+      // Secure check: forces clock forward to latestServerTime
+      const effectiveTime = Math.max(tamperedClientClock, latestServerTime);
+      const secureIsActive = effectiveTime < expiredSubExpiry;
+      expect(secureIsActive).toBe(false); // Pro badge correctly blocked!
+    });
+  });
 });

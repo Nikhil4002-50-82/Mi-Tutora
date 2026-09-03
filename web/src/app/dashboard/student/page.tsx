@@ -33,7 +33,7 @@ const logo = '/imports/logo.png';
 import { useStudentData } from '@/hooks/useDashboardData';
 import { executeDeclineOffer, executeAppointTutor } from '@/hooks/useDashboardActions';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
-
+import { auth } from '@/utils/firebase/client';
 import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function StudentDashboard() {
@@ -495,9 +495,13 @@ export default function StudentDashboard() {
   });
   const handleReviewSubmit = async (rating: number, comment: string) => {
     try {
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/submit-review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           applicationId: reviewModalConfig.applicationId,
           parentDocId: reviewModalConfig.parentDocId,
@@ -574,9 +578,13 @@ export default function StudentDashboard() {
         return false;
       }
 
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/transactions/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           role: 'student',
           userId: data?.user?.uid,
@@ -653,9 +661,13 @@ export default function StudentDashboard() {
 
       const tutorPrice = getTutorBasePrice(tutor);
 
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/transactions/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           role: 'student',
           userId: data?.user?.uid,
@@ -852,12 +864,15 @@ export default function StudentDashboard() {
     if (retrievingGmeetAppId) return;
     setRetrievingGmeetAppId(appId);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/get-demo-link', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
-          applicationId: appId,
-          parentDocId: data?.profile?.id || data?.user?.uid
+          applicationId: appId
         })
       });
       const resData = await res.json();
@@ -895,10 +910,14 @@ export default function StudentDashboard() {
   const handlePaymentSubmit = async () => {
     setPaymentLoading(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       // 1. Fetch Order from our secure backend
       const res = await fetch('/api/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           applicationId: payingClass.id,
           role: 'student',
@@ -932,9 +951,13 @@ export default function StudentDashboard() {
         order_id: order.id,
         handler: async function (response: any) {
            // 4. Verify Payment securely on the backend
+           const vToken = await auth.currentUser?.getIdToken();
            const verifyRes = await fetch('/api/verify-payment', {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
+             headers: { 
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${vToken}`
+             },
              body: JSON.stringify({
                razorpay_order_id: response.razorpay_order_id || order.id,
                razorpay_payment_id: response.razorpay_payment_id || 'mock_payment_id',

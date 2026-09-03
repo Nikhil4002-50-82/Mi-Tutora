@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { userId } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
-    }
-
     const adminDb = getAdminDb();
-    if (!adminDb) {
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
+    const userId = decodedToken.uid; // SECURE: Ignore body and use verified token UID
 
     // Price is fixed for the Pro plan subscription (₹299)
     const subscriptionPrice = 299;

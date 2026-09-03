@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 import { executeDeclineOffer } from '@/hooks/useDashboardActions';
 import { useTeacherData } from '@/hooks/useDashboardData';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
-
+import { auth } from '@/utils/firebase/client';
 import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function TeacherDashboard() {
@@ -125,14 +125,17 @@ export default function TeacherDashboard() {
           (app: any) => app.status === 'demo_scheduled' && (app.mode || 'Online').toLowerCase() === 'online'
         );
         
+        const token = await auth.currentUser?.getIdToken();
         for (const app of scheduledOnlineApps) {
           try {
             const res = await fetch('/api/get-demo-link-teacher', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
               body: JSON.stringify({
-                applicationId: app.id,
-                tutorDocId: data.profile.id || data.user?.uid
+                applicationId: app.id
               })
             });
             const resData = await res.json();
@@ -164,9 +167,13 @@ export default function TeacherDashboard() {
     }
     setKycLoading(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/kyc/generate-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ aadharNumber: aadharInput })
       });
       const resData = await res.json();
@@ -192,13 +199,16 @@ export default function TeacherDashboard() {
     }
     setKycLoading(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/kyc/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           reference_id: kycRefId, 
           otp: otpInput, 
-          tutorDocId: data?.profile?.id || data?.user?.uid || '', 
           _mockAadhar: mockAadhar 
         })
       });
@@ -409,9 +419,13 @@ export default function TeacherDashboard() {
       }
 
       // 1. Fetch Order from our secure backend
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           applicationId: payingClass.id,
           role: 'teacher'
@@ -443,9 +457,13 @@ export default function TeacherDashboard() {
         order_id: order.id,
         handler: async function (response: any) {
            // 4. Verify Payment securely on the backend
+           const vToken = await auth.currentUser?.getIdToken();
            const verifyRes = await fetch('/api/verify-payment', {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
+             headers: { 
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${vToken}`
+             },
              body: JSON.stringify({
                razorpay_order_id: response.razorpay_order_id || order.id,
                razorpay_payment_id: response.razorpay_payment_id || 'mock_payment_id',
@@ -627,9 +645,13 @@ export default function TeacherDashboard() {
       const { collection, doc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } = await import('firebase/firestore');
       const { generateCustomId } = await import('@/utils/idGenerator');
       
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/transactions/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           role: 'teacher',
           userId: data?.user?.uid,
@@ -689,9 +711,13 @@ export default function TeacherDashboard() {
 
       const offerPrice = student.budget || 500;
 
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/transactions/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           role: 'teacher',
           userId: data?.user?.uid,
@@ -880,9 +906,13 @@ export default function TeacherDashboard() {
     const loadingToast = toast.loading("Initiating secure checkout...");
     try {
       // 1. Create Subscription Order
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/create-subscription-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ userId: data?.user?.uid })
       });
       
@@ -918,14 +948,17 @@ export default function TeacherDashboard() {
         handler: async function (response: any) {
            const verifyToast = toast.loading("Verifying payment...");
            try {
+               const vToken = await auth.currentUser?.getIdToken();
                const verifyRes = await fetch('/api/verify-subscription-payment', {
                    method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
+                   headers: { 
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${vToken}`
+                   },
                    body: JSON.stringify({
                        razorpay_order_id: response.razorpay_order_id || order.id,
                        razorpay_payment_id: response.razorpay_payment_id || 'mock_payment_id',
-                       razorpay_signature: response.razorpay_signature || 'mock_signature',
-                       userId: data?.user?.uid
+                       razorpay_signature: response.razorpay_signature || 'mock_signature'
                    })
                });
                
@@ -1029,12 +1062,15 @@ export default function TeacherDashboard() {
 
     setSavingGmeetAppId(appId);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/save-demo-link', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           applicationId: appId,
-          tutorDocId: data?.profile?.id || data?.user?.uid,
           gmeetLink: link,
           platform
         })

@@ -38,4 +38,58 @@ test.describe('Negotiation Boundary Rules (negotiation_plan.md)', () => {
     expect(bounds.absoluteMin).toBe(1000);
     expect(bounds.absoluteMax).toBe(1400); // 140% of 1000
   });
+
+  test.describe('Counter-Offer Validation', () => {
+    function isCounterOfferAllowed(counterOffer: number, min: number, max: number) {
+      return counterOffer >= min && counterOffer <= max;
+    }
+
+    test('Accepts counter-offer strictly within [absoluteMin, absoluteMax]', () => {
+      const min = 600;
+      const max = 1000;
+      expect(isCounterOfferAllowed(600, min, max)).toBe(true);
+      expect(isCounterOfferAllowed(800, min, max)).toBe(true);
+      expect(isCounterOfferAllowed(1000, min, max)).toBe(true);
+    });
+
+    test('Rejects counter-offer below absoluteMin (less than 60%)', () => {
+      const min = 600;
+      const max = 1000;
+      expect(isCounterOfferAllowed(599, min, max)).toBe(false);
+      expect(isCounterOfferAllowed(400, min, max)).toBe(false);
+    });
+
+    test('Rejects counter-offer above absoluteMax (more than 140%)', () => {
+      const min = 1000;
+      const max = 1400;
+      expect(isCounterOfferAllowed(1401, min, max)).toBe(false);
+      expect(isCounterOfferAllowed(1600, min, max)).toBe(false);
+    });
+  });
+
+  test.describe('Negotiation Status Progression', () => {
+    const IMMUTABLE_STATUSES = [
+      'accepted',
+      'tuition_started',
+      'demo_booking_phase',
+      'demo_scheduled',
+      'waiting_for_parent_decision'
+    ];
+
+    function canModifyPrice(status: string) {
+      return !IMMUTABLE_STATUSES.includes(status);
+    }
+
+    test('Allows price updates during active negotiation', () => {
+      expect(canModifyPrice('negotiating')).toBe(true);
+      expect(canModifyPrice('pending')).toBe(true);
+    });
+
+    test('Locks price updates once negotiation reaches booking, scheduling, or tuition', () => {
+      expect(canModifyPrice('accepted')).toBe(false);
+      expect(canModifyPrice('demo_booking_phase')).toBe(false);
+      expect(canModifyPrice('demo_scheduled')).toBe(false);
+      expect(canModifyPrice('tuition_started')).toBe(false);
+    });
+  });
 });

@@ -1,18 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminDb = getAdminDb();
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { reference_id, otp, tutorDocId, _mockAadhar } = body;
+    const { reference_id, otp, _mockAadhar } = body;
+    const tutorDocId = decodedToken.uid; // SECURE: Override with verified token UID
 
     if (!reference_id || !otp || !tutorDocId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const adminDb = getAdminDb();
-    if (!adminDb) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
 
     const POWERAPI_KEY = process.env.POWERAPI_KEY;

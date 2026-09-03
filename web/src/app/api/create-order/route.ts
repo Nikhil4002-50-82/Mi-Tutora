@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminDb = getAdminDb();
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { applicationId, role, useWallet = false, isRemoval = false } = body;
 
     if (!applicationId || !role) {
       return NextResponse.json({ error: 'Missing applicationId or role' }, { status: 400 });
-    }
-
-    const adminDb = getAdminDb();
-    if (!adminDb) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
 
     // Securely fetch the true cost from the database
@@ -25,6 +39,14 @@ export async function POST(req: NextRequest) {
     }
 
     const appData = appSnap.data();
+
+    // Verify ownership of the application
+    if (role === 'teacher' && appData?.tutorDocId !== decodedToken.uid) {
+      return NextResponse.json({ error: 'Unauthorized: Not the tutor for this application' }, { status: 403 });
+    }
+    if (role === 'student' && appData?.parentDocId !== decodedToken.uid) {
+      return NextResponse.json({ error: 'Unauthorized: Not the parent for this application' }, { status: 403 });
+    }
     
     // Determine the base price based on role and what exists in the document
     let coursePrice = 4000; // Fallback
@@ -117,7 +139,7 @@ export async function POST(req: NextRequest) {
     await adminDb.collection('payments').add({
       razorpayOrderId: order.id,
       applicationDocId: applicationId,
-      userId: role === 'student' ? appData?.parentDocId : appData?.tutorDocId,
+      userId: decodedToken.uid,
       amount: totalToPay,
       walletDiscountApplied: walletDiscountApplied,
       currency: 'INR',

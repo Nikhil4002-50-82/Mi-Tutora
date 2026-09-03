@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateCustomId } from '@/utils/idGenerator';
 export async function POST(req: NextRequest) {
   try {
     const adminDb = getAdminDb();
-    if (!adminDb) {
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
       return NextResponse.json({ success: false, error: 'Firebase Admin not initialized' }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
     const body = await req.json();
     const { 
         role, 
-        userId, 
         tutor, 
         groupToUse, 
         tutorPrice, 
@@ -22,10 +35,8 @@ export async function POST(req: NextRequest) {
         studentData,
         actionType
     } = body;
-
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
-    }
+    
+    const userId = decodedToken.uid; // SECURE: Override the body userId with the verified token UID
 
     // 1. Verify 7-day Lock
     let qGroupId = '';

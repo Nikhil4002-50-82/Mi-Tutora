@@ -1,4 +1,4 @@
-import { db } from '@/utils/firebase/client';
+import { db, auth } from '@/utils/firebase/client';
 import { doc, runTransaction, arrayRemove, collection, getDocs, query, where, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { syncStudentAvailability } from '@/utils/studentAvailability';
 
@@ -46,10 +46,14 @@ export const executeAppointTutor = async (appId: string, data?: any) => {
   const parentDocId = data?.user?.uid;
   if (!parentDocId) throw new Error("Unauthorized");
 
+  const token = await auth.currentUser?.getIdToken();
   const response = await fetch('/api/transactions/hire', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ applicationId: appId, parentDocId })
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ applicationId: appId })
   });
 
   const result = await response.json();

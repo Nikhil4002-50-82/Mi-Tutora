@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(req: NextRequest) {
   try {
     const adminDb = getAdminDb();
-    if (!adminDb) {
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
       return NextResponse.json({ success: false, error: 'Firebase Admin not initialized' }, { status: 500 });
     }
 
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { applicationId, parentDocId } = body;
+    const { applicationId } = body;
+    const parentDocId = decodedToken.uid; // SECURE: Override the body parentDocId with the verified token UID
 
     if (!applicationId || !parentDocId) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
