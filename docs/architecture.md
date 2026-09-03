@@ -244,20 +244,20 @@ erDiagram
 
 | # | Collection Name | Purpose & Security Scope | Primary Key (`doc.id`) | Full Documentation Link |
 | :-: | :--- | :--- | :--- | :--- |
-| 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`docs/Database_Architecture.md#21`](./Database_Architecture.md) |
-| 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`docs/Database_Architecture.md#22`](./Database_Architecture.md) |
-| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC. | Auth UID | [`docs/Database_Architecture.md#23`](./Database_Architecture.md) |
-| 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`docs/Database_Architecture.md#24`](./Database_Architecture.md) |
-| 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`docs/Database_Architecture.md#25`](./Database_Architecture.md) |
-| 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`docs/Database_Architecture.md#26`](./Database_Architecture.md) |
-| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states. | Auto ID | [`docs/Database_Architecture.md#27`](./Database_Architecture.md) |
-| 8 | `payments` | Incoming payment records (demo fees, tuition, pro plans). | Auto ID | [`docs/Database_Architecture.md#28`](./Database_Architecture.md) |
-| 9 | `tutor_payouts` | Month 1 60% tuition escrow holding & Day 30 disbursements. | Auto ID | [`docs/Database_Architecture.md#216`](./Database_Architecture.md) |
-| 10 | `referrals` | Referral tracking, Day 30 cash escrow, banked tokens. | Auto ID | [`docs/Database_Architecture.md#211`](./Database_Architecture.md) |
-| 11 | `reviews` | Star ratings and student feedback on completed tuitions. | Auto ID | [`docs/Database_Architecture.md#210`](./Database_Architecture.md) |
-| 12 | `notifications` | In-app alerts for bids, demos, payments, and hires. | Auto ID | [`docs/Database_Architecture.md#29`](./Database_Architecture.md) |
-| 13 | `chats` / `messages`| Real-time encrypted student-tutor direct messaging. | Auto ID | [`docs/Database_Architecture.md#212`](./Database_Architecture.md) |
-| 14 | `pending_tuition_fees` | Fallback ledger for pending Day 7 trial completions. | Auto ID | [`docs/Database_Architecture.md#214`](./Database_Architecture.md) |
+| 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`Database_Architecture.md#21-collection-users`](./Database_Architecture.md) |
+| 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`Database_Architecture.md#22-collection-parents`](./Database_Architecture.md) |
+| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC. | Auth UID | [`Database_Architecture.md#23-collection-tutors`](./Database_Architecture.md) |
+| 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`Database_Architecture.md#24-collection-students`](./Database_Architecture.md) |
+| 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`Database_Architecture.md#25-collection-groups`](./Database_Architecture.md) |
+| 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`Database_Architecture.md#26-collection-tuition_requests`](./Database_Architecture.md) |
+| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states. | Auto ID | [`Database_Architecture.md#27-collection-applications`](./Database_Architecture.md) |
+| 8 | `payments` | Incoming payment records (demo fees, tuition, pro plans). | Auto ID | [`Database_Architecture.md#28-collection-payments`](./Database_Architecture.md) |
+| 9 | `pending_tuition_fees` | Fallback ledger for pending Day 7 trial completions. | Auto ID | [`Database_Architecture.md#29-collection-pending_tuition_fees`](./Database_Architecture.md) |
+| 10 | `referrals` | Referral tracking, Day 30 cash escrow, banked tokens. | Auto ID | [`Database_Architecture.md#210-collection-referrals`](./Database_Architecture.md) |
+| 11 | `reviews` | Star ratings and student feedback on completed tuitions. | Auto ID | [`Database_Architecture.md#211-collection-reviews`](./Database_Architecture.md) |
+| 12 | `marketplace_pricing` | Dynamic demo fee pricing rules by category. | Auto ID | [`Database_Architecture.md#212-collection-marketplace_pricing`](./Database_Architecture.md) |
+| 13 | `global_config` | Platform maintenance flags and global settings. | Fixed Doc | [`Database_Architecture.md#213-collection-global_config`](./Database_Architecture.md) |
+| 14 | `tutor_payouts` | Month 1 60% tuition escrow holding & Day 30 disbursements. | Auto ID | [`Database_Architecture.md#216-collection-tutor_payouts`](./Database_Architecture.md) |
 
 ---
 
