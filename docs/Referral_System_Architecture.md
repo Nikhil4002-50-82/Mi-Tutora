@@ -10,10 +10,10 @@ This document explains the referral and rewards system on the Mi-Tutora platform
 2. **The Link & Cookie:** The user shares their invite link (`mitutora.com?ref=CODE`). A global listener (`ReferralTracker.tsx`) caches this code in `localStorage`.
 3. **Account Attribution:** When the referee registers, a permanent record is established in the `users` collection (`referredBy: CODE`) and a tracking ticket is created in the `referrals` collection with `status: 'pending'`.
 4. **The Settlement Trigger (Day 7 Payment):** When the referred user completes their 7-day trial and pays their first-month tuition fee via Razorpay (`/api/verify-payment`), the referral status advances from `'pending'` to `'qualified'`. The reward amount is calculated and placed in **escrow** (`payoutStatus: 'escrow_held'`).
-5. **Role-Based Reward Distribution:**
-   - **If Referrer is a Student/Parent:** Receives **Cash** ($25\%$ of platform commission) held in escrow until Day 30, then deposited automatically via UPI.
-   - **If Referrer is a Teacher:** Receives **1 Banked Token** credited to `tutors.bankedTokens` to unlock extra weekly proposals.
-6. **Synchronized Day 30 Automated UPI Payout:** On Day 30 (`startDate + 30 days`), the platform's automated payout engine disburses the referral cash directly to the student referrer's saved UPI ID via Razorpay Payouts simultaneously alongside the tutor's 60% fee. There is **zero minimum threshold** (no waiting for ₹1,000) and no manual WhatsApp messaging required.
+5. **Role-Based Reward Distribution (Based on Who Joins):**
+   - **When a Student Joins via Referral:** The referrer (whether a Student or a Teacher) receives **Cash** ($25\%$ of platform commission, e.g. ₹600 on ₹6,000 tuition) held in escrow until Day 30, then deposited automatically via UPI.
+   - **When a Teacher Joins via Referral:** The referrer receives **1 Banked Token** credited to `tutors.bankedTokens` to unlock an extra weekly proposal.
+6. **Synchronized Day 30 Automated UPI Payout:** On Day 30 (`startDate + 30 days`), the platform's automated payout engine disburses the referral cash directly to the referrer's saved UPI ID via Razorpay Payouts simultaneously alongside the tutor's 60% fee. There is **zero minimum threshold** (no waiting for ₹1,000) and no manual WhatsApp messaging required.
 
 ---
 
@@ -28,7 +28,7 @@ $$\text{Platform Retained Margin } = P - R = G \times 0.30 \quad (30\% \text{ ne
 
 ### Concrete Calculation Examples
 
-| Monthly Tuition Fee | Platform Fee (40%) | Student Referrer Reward (Cash) | Teacher Referrer Reward (Tokens) | Platform Net Margin |
+| Monthly Tuition Fee | Platform Fee (40%) | Referrer Cash Reward (Student Joined) | Referrer Token Reward (Teacher Joined) | Platform Net Margin |
 | :---: | :---: | :---: | :---: | :---: |
 | **₹4,000** | ₹1,600 | **₹400** | +1 Banked Token | ₹1,200 |
 | **₹6,000** | ₹2,400 | **₹600** | +1 Banked Token | ₹1,800 |
@@ -81,8 +81,8 @@ sequenceDiagram
     Backend->>DB: Updates 'referrals' ticket: status = 'qualified', reward = 600, payoutStatus = 'escrow_held'
     Backend->>DB: Creates 'tutor_payouts' record: status = 'escrow_held', amount = 3600
     
-    alt Referrer is a Teacher
-        Backend->>DB: Increments tutors.bankedTokens by 1
+    alt Referred User is a Teacher
+        Backend->>DB: Increments tutors.bankedTokens by 1 (Token Award)
     end
 
     Note over PayoutEngine, DB: Day 30 Arrives (startDate + 30 days)

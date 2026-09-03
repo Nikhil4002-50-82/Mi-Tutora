@@ -44,14 +44,14 @@ All payment calculations and verifications happen securely on the backend.
 *   **Time-Tamper Proofing:** It strictly calculates the 30-day `subscriptionExpiry` lock on the backend using the Admin SDK's `Timestamp.now()`. This makes it 100% immune to client-side clock tampering.
 
 ### E. Referral Reward Distribution (Backend Embedded)
-*   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It securely calculates the 25% reward strictly from the platform's 40% margin (10% of total tuition) and updates the referrer's `walletBalance` (or grants 1 banked token if teacher). By embedding this in the backend, the platform is protected from 7-day cancellation refund leakage.
+*   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It securely calculates the 25% reward strictly from the platform's 40% margin (10% of total tuition). If a student was referred, the reward is locked in `referrals` escrow (`payoutStatus: 'escrow_held'`) with a Day 30 release timestamp and target UPI address. If a teacher was referred, 1 banked token is immediately credited to `tutors.bankedTokens`.
 
-### F. Automated Day 30 Payout Engine (`/api/payouts/process`)
-*   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions reaching Day 30.
-*   **Mechanism:** Queries `tutor_payouts` where `status == 'escrow_held'` and `releaseEligibleAt <= Date.now()`. Calls Razorpay Payouts API (`POST /v1/payouts`) with `"queue_if_low_balance": true` to disburse the 60% share directly to the teacher's UPI.
+### F. Automated Day 30 Dual-Payout Engine (`/api/payouts/process`)
+*   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions and qualified referral rewards reaching Day 30 (`releaseEligibleAt <= Date.now()`).
+*   **Mechanism:** Queries both `tutor_payouts` (60% tuition share) and `referrals` (25% margin reward). Disburses funds simultaneously to both beneficiaries via Razorpay Payouts API (`POST /v1/payouts`) with `"queue_if_low_balance": true`. If UPI is missing, marks status as `'action_required_missing_upi'` independently.
 
 ### G. Admin Manual Fallback Mode (`/api/admin/payouts/export-csv`)
-*   **Purpose:** Allows platform administrators to export a corporate netbanking CSV file of pending payouts if RazorpayX account balance is low or undergoing maintenance.
+*   **Purpose:** Allows platform administrators to export a corporate netbanking CSV file of all pending payouts (both Tutors and Student Referrers) for manual bulk bank transfers if RazorpayX is undergoing maintenance.
 
 ## 4. Frontend Integration Points
 

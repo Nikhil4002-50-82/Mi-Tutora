@@ -126,8 +126,8 @@ When a Parent signs up, they create a profile and add their children (Students).
 - **Auto-Rejection Automation:** The moment the student hired the teacher, the system automatically found every *other* teacher who was negotiating with this group, and changed their status to `declined` with the reason `student_hired_another_tutor`. This keeps the database clean.
 
 **Scenario D: Month 1 Completion & Automated Payout**
-- **Day 7 Fee Split:** When the student pays the full monthly fee on Day 7, the platform retains its **40% commission** and atomically logs an escrow record in `tutor_payouts` for the **60% tutor share**.
-- **Day 30 Disbursement:** Upon reaching Day 30 (`startDate + 30 days`), the platform automatically disburses the 60% net share directly to the teacher's UPI via Razorpay Payouts.
+- **Day 7 Fee Split:** When the student pays the full monthly fee on Day 7, the platform retains its **40% commission**, logs an escrow record in `tutor_payouts` for the **60% tutor share**, and locks the **25% margin referral reward** in `referrals` escrow.
+- **Day 30 Disbursement:** Upon reaching Day 30 (`startDate + 30 days`), the platform automatically disburses both the 60% tutor share and the 25% margin referral reward directly to their respective UPI IDs simultaneously via Razorpay Payouts.
 - **Month 2+ Model:** Platform fee and intermediation apply strictly to Month 1. From Month 2 onwards, parents and teachers coordinate classes and tuition fees directly offline without platform deductions.
 
 ---

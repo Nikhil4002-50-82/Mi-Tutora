@@ -98,6 +98,7 @@ erDiagram
 | `maskedAadhar` | `string` | `XXXX-XXXX-` + 4 digits (`XXXX-XXXX-5661`) | Safe display format of verified Aadhar ID. | `web/src/app/api/kyc/verify-otp/route.ts` |
 | `rating` | `number` | Float (1.0 to 5.0) | Weighted average star rating computed from `reviews`. | `web/src/app/api/submit-review/route.ts` |
 | `reviewCount` | `number` | Non-negative integer | Total count of submitted reviews. | `web/src/app/api/submit-review/route.ts` |
+| `upiId` | `string` | Valid UPI ID (e.g. `teacher@okhdfcbank`) | Destination UPI address for automated 60% first-month tuition fee disbursements on Day 30 and student referral cash rewards. | `web/src/app/dashboard/teacher/page.tsx` |
 
 ---
 

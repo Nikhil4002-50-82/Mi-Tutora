@@ -1046,7 +1046,6 @@ export default function TeacherDashboard() {
     { id: 'my_students', label: 'My Students', icon: BookOpen },
     { id: 'earnings', label: 'Earnings', icon: IndianRupee },
     { id: 'referrals', label: 'Referrals', icon: Gift },
-    { id: 'profile', label: 'Profile Settings', icon: User },
   ];
 
   const activeTeacher = (data?.profile || data?.user || null) as any;
