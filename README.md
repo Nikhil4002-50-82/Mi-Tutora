@@ -2,7 +2,7 @@
 
 Welcome to the **Mi-Tutora** codebase. Mi-Tutora is an advanced ed-tech marketplace connecting **Students/Parents** with verified **Home & Online Tutors** across School Academics, Competitive Exams, Programming, and Spoken Languages.
 
-This master documentation serves as the comprehensive architectural overview of the entire platform, consolidating the core principles, state machines, financial mathematics, anti-spam protections, and database models defined across the specification documents in the [`docs/`](./) directory.
+This master documentation serves as the comprehensive architectural overview of the entire platform, consolidating the core principles, state machines, financial mathematics, anti-spam protections, and database models defined across the specification documents in the [`docs/`](./docs) directory.
 
 ---
 
@@ -72,7 +72,7 @@ stateDiagram-v2
 ---
 
 ## 2. Student Onboarding & 1:N Grouping Architecture
-*Full Specification: [`docs/Student_Grouping_Architecture.md`](./Student_Grouping_Architecture.md)*
+*Full Specification: [`docs/Student_Grouping_Architecture.md`](./docs/Student_Grouping_Architecture.md)*
 
 *   **The Group Concept:** Every student registered under a parent account belongs to a **Group** (`groups` collection).
     *   **Single Learner:** Created in an individual group (`isGroup: false`).
@@ -82,7 +82,7 @@ stateDiagram-v2
 ---
 
 ## 3. Matchmaking & Ranking Engine
-*Full Specification: [`docs/Ranking_System_Architecture.md`](./Ranking_System_Architecture.md)*
+*Full Specification: [`docs/Ranking_System_Architecture.md`](./docs/Ranking_System_Architecture.md)*
 
 When a student group is posted, teachers are sorted using a rigorous two-layer matchmaking algorithm:
 
@@ -106,7 +106,7 @@ Eligible teachers are ranked dynamically based on weighted parameters:
 ---
 
 ## 4. Discovery, Token Quotas & Pro Subscriptions
-*Full Specification: [`docs/Subscription_Architecture.md`](./Subscription_Architecture.md)*
+*Full Specification: [`docs/Subscription_Architecture.md`](./docs/Subscription_Architecture.md)*
 
 To prevent lead exhaustion and maintain high application quality, teachers operate under a weekly proposal token quota:
 *   **Free Tier:** 5 tokens per week.
@@ -117,7 +117,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 ---
 
 ## 5. Trust & Safety: Aadhar KYC Verification
-*Full Specification: [`docs/Aadhar_Verification_Badge.md`](./Aadhar_Verification_Badge.md)*
+*Full Specification: [`docs/Aadhar_Verification_Badge.md`](./docs/Aadhar_Verification_Badge.md)*
 
 *   **Live Gov API Integration:** Integrates with Sandbox.co.in OTP verification API.
 *   **Secure Masking:** Only the last 4 digits (`XXXX-XXXX-1234`) are retained in Firestore for display; full Aadhar numbers are never permanently stored.
@@ -126,7 +126,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 ---
 
 ## 6. Real-time 2-Way Negotiation
-*Full Specification: [`docs/Negotiation_Architecture.md`](./Negotiation_Architecture.md)*
+*Full Specification: [`docs/Negotiation_Architecture.md`](./docs/Negotiation_Architecture.md)*
 
 *   **Unified Counter-Offer Ledger:** Both Student and Teacher dashboards synchronize on a single `applications.currentOffer` field.
 *   **2-Way Haggling:** Either party can submit counter-offers with price bounds (₹100 to ₹100,000) or propose alternate class timing slots.
@@ -135,7 +135,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 ---
 
 ## 7. Demo Class Scheduling & 48-Hour Decision Window
-*Full Specification: [`docs/Demo_Completion_Hiring_Architecture.md`](./Demo_Completion_Hiring_Architecture.md), [`docs/Link_Validation_Demo_Architecture.md`](./Link_Validation_Demo_Architecture.md)*
+*Full Specification: [`docs/Demo_Completion_Hiring_Architecture.md`](./docs/Demo_Completion_Hiring_Architecture.md), [`docs/Link_Validation_Demo_Architecture.md`](./docs/Link_Validation_Demo_Architecture.md)*
 
 1. **Commitment Demo Fee:** To eliminate frivolous applications, the teacher pays a nominal demo platform fee (₹99 to ₹299 based on category) to schedule the trial class.
 2. **Link Validation:** Video links (Google Meet, Zoom) are strictly sanitized and validated against official regex patterns before saving.
@@ -145,7 +145,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 ---
 
 ## 8. The 7-Day Trial & Mandatory Fee Settlement
-*Full Specification: [`docs/Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md), [`docs/Payment_Architecture.md`](./Payment_Architecture.md)*
+*Full Specification: [`docs/Student_Fee_Payment_Architectrue.md`](./docs/Student_Fee_Payment_Architectrue.md), [`docs/Payment_Architecture.md`](./docs/Payment_Architecture.md)*
 
 When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 7-day live trial countdown begins:
 *   **Cancellation on Days 1 to 6 (Prorated Fee):** If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
@@ -156,7 +156,7 @@ When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 
 ---
 
 ## 9. First-Month Tuition Escrow & Automated Day 30 Payouts
-*Full Specification: [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./First_Month_Tuition_Escrow_Payout_Architecture.md)*
+*Full Specification: [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./docs/First_Month_Tuition_Escrow_Payout_Architecture.md)*
 
 On Day 7, the full tuition payment is atomically split and placed in custody:
 $$\text{Gross Tuition Fee } (G) = \text{100\% Paid on Day 7 (e.g. ₹6,000)}$$
@@ -182,7 +182,7 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 ---
 
 ## 10. Referral & Rewards Engine (Automated UPI Deposition)
-*Full Specification: [`docs/Referral_System_Architecture.md`](./Referral_System_Architecture.md)*
+*Full Specification: [`docs/Referral_System_Architecture.md`](./docs/Referral_System_Architecture.md)*
 
 *   **Attribution:** Every user receives an alphanumeric referral code (e.g. `KRIS-XT3GNB`).
 *   **Role-Based Rewards (Based on who joins):**
@@ -193,7 +193,7 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 ---
 
 ## 11. Review & Rating Engine
-*Full Specification: [`docs/Review_Architecture.md`](./Review_Architecture.md)*
+*Full Specification: [`docs/Review_Architecture.md`](./docs/Review_Architecture.md)*
 
 *   **Eligibility:** Only parents who have an active or completed tuition agreement with a tutor can submit reviews.
 *   **Weighted Historical Average:** Ratings (1 to 5 stars) are computed server-side via atomic transactions:
@@ -203,7 +203,7 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 ---
 
 ## 12. Anti-Spam & Rate Limiting Rules
-*Full Specification: [`docs/Student_Queue_Architecture.md`](./Student_Queue_Architecture.md)*
+*Full Specification: [`docs/Student_Queue_Architecture.md`](./docs/Student_Queue_Architecture.md)*
 
 To ensure a fair marketplace and prevent spam, strict architectural limits are enforced:
 1. **Concurrent Request Limit:** A student group can have a maximum of **5 concurrent pending requests/offers** at any one time.
@@ -214,7 +214,7 @@ To ensure a fair marketplace and prevent spam, strict architectural limits are e
 ---
 
 ## 13. Database Architecture & Entity-Relationship Model
-*Full Specification: [`docs/Database_Architecture.md`](./Database_Architecture.md)*
+*Full Specification: [`docs/Database_Architecture.md`](./docs/Database_Architecture.md)*
 
 The platform is backed by **Google Cloud Firestore**. The high-level entity relationships connecting users, learners, applications, payments, and payouts are modeled below:
 
@@ -244,51 +244,51 @@ erDiagram
 
 | # | Collection Name | Purpose & Security Scope | Primary Key (`doc.id`) | Full Documentation Link |
 | :-: | :--- | :--- | :--- | :--- |
-| 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`docs/Database_Architecture.md#21`](./Database_Architecture.md) |
-| 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`docs/Database_Architecture.md#22`](./Database_Architecture.md) |
-| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC. | Auth UID | [`docs/Database_Architecture.md#23`](./Database_Architecture.md) |
-| 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`docs/Database_Architecture.md#24`](./Database_Architecture.md) |
-| 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`docs/Database_Architecture.md#25`](./Database_Architecture.md) |
-| 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`docs/Database_Architecture.md#26`](./Database_Architecture.md) |
-| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states. | Auto ID | [`docs/Database_Architecture.md#27`](./Database_Architecture.md) |
-| 8 | `payments` | Incoming payment records (demo fees, tuition, pro plans). | Auto ID | [`docs/Database_Architecture.md#28`](./Database_Architecture.md) |
-| 9 | `tutor_payouts` | Month 1 60% tuition escrow holding & Day 30 disbursements. | Auto ID | [`docs/Database_Architecture.md#216`](./Database_Architecture.md) |
-| 10 | `referrals` | Referral tracking, Day 30 cash escrow, banked tokens. | Auto ID | [`docs/Database_Architecture.md#211`](./Database_Architecture.md) |
-| 11 | `reviews` | Star ratings and student feedback on completed tuitions. | Auto ID | [`docs/Database_Architecture.md#210`](./Database_Architecture.md) |
-| 12 | `notifications` | In-app alerts for bids, demos, payments, and hires. | Auto ID | [`docs/Database_Architecture.md#29`](./Database_Architecture.md) |
-| 13 | `chats` / `messages`| Real-time encrypted student-tutor direct messaging. | Auto ID | [`docs/Database_Architecture.md#212`](./Database_Architecture.md) |
-| 14 | `pending_tuition_fees` | Fallback ledger for pending Day 7 trial completions. | Auto ID | [`docs/Database_Architecture.md#214`](./Database_Architecture.md) |
+| 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`docs/Database_Architecture.md#21`](./docs/Database_Architecture.md) |
+| 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`docs/Database_Architecture.md#22`](./docs/Database_Architecture.md) |
+| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC. | Auth UID | [`docs/Database_Architecture.md#23`](./docs/Database_Architecture.md) |
+| 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`docs/Database_Architecture.md#24`](./docs/Database_Architecture.md) |
+| 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`docs/Database_Architecture.md#25`](./docs/Database_Architecture.md) |
+| 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`docs/Database_Architecture.md#26`](./docs/Database_Architecture.md) |
+| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states. | Auto ID | [`docs/Database_Architecture.md#27`](./docs/Database_Architecture.md) |
+| 8 | `payments` | Incoming payment records (demo fees, tuition, pro plans). | Auto ID | [`docs/Database_Architecture.md#28`](./docs/Database_Architecture.md) |
+| 9 | `tutor_payouts` | Month 1 60% tuition escrow holding & Day 30 disbursements. | Auto ID | [`docs/Database_Architecture.md#216`](./docs/Database_Architecture.md) |
+| 10 | `referrals` | Referral tracking, Day 30 cash escrow, banked tokens. | Auto ID | [`docs/Database_Architecture.md#211`](./docs/Database_Architecture.md) |
+| 11 | `reviews` | Star ratings and student feedback on completed tuitions. | Auto ID | [`docs/Database_Architecture.md#210`](./docs/Database_Architecture.md) |
+| 12 | `notifications` | In-app alerts for bids, demos, payments, and hires. | Auto ID | [`docs/Database_Architecture.md#29`](./docs/Database_Architecture.md) |
+| 13 | `chats` / `messages`| Real-time encrypted student-tutor direct messaging. | Auto ID | [`docs/Database_Architecture.md#212`](./docs/Database_Architecture.md) |
+| 14 | `pending_tuition_fees` | Fallback ledger for pending Day 7 trial completions. | Auto ID | [`docs/Database_Architecture.md#214`](./docs/Database_Architecture.md) |
 
 ---
 
 ## 14. Master Documentation Index
 
-For detailed deep-dives into specific platform subsystems, refer to the corresponding documents in the [`docs/`](./) folder:
+For detailed deep-dives into specific platform subsystems, refer to the corresponding documents in the [`docs/`](./docs) folder:
 
 | Subsystem / Feature Area | Detailed Architecture Specification |
 | :--- | :--- |
-| **Complete Database Schema & ER Model** | 👉 [`docs/Database_Architecture.md`](./Database_Architecture.md) |
-| **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./First_Month_Tuition_Escrow_Payout_Architecture.md) |
-| **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./Referral_System_Architecture.md) |
-| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md) |
-| **Payment Gateway & Webhook Verification** | 👉 [`docs/Payment_Architecture.md`](./Payment_Architecture.md) |
-| **Matchmaking & Ranking Algorithm** | 👉 [`docs/Ranking_System_Architecture.md`](./Ranking_System_Architecture.md) |
-| **Subscriptions, Pro Plan & Weekly Quota Rollover** | 👉 [`docs/Subscription_Architecture.md`](./Subscription_Architecture.md) |
-| **Anti-Spam Limits & Student Queue Management** | 👉 [`docs/Student_Queue_Architecture.md`](./Student_Queue_Architecture.md) |
-| **Demo Class Completion & 48-Hour Decision Window** | 👉 [`docs/Demo_Completion_Hiring_Architecture.md`](./Demo_Completion_Hiring_Architecture.md) |
-| **Two-Way Price & Time Negotiation** | 👉 [`docs/Negotiation_Architecture.md`](./Negotiation_Architecture.md) |
-| **Student Grouping & Batch Clustering** | 👉 [`docs/Student_Grouping_Architecture.md`](./Student_Grouping_Architecture.md) |
-| **Aadhar KYC OTP Verification & Masking** | 👉 [`docs/Aadhar_Verification_Badge.md`](./Aadhar_Verification_Badge.md) |
-| **Tutor Ratings & Reviews Calculation** | 👉 [`docs/Review_Architecture.md`](./Review_Architecture.md) |
-| **Video Meeting Link Validation** | 👉 [`docs/Link_Validation_Demo_Architecture.md`](./Link_Validation_Demo_Architecture.md) |
-| **Authentication & RBAC Routing** | 👉 [`docs/Authentication.md`](./Authentication.md) |
-| **Custom ID Generation (`MTT`, `MTP`, `MTS`, `MTG`)** | 👉 [`docs/Document_ID.md`](./Document_ID.md) |
+| **Complete Database Schema & ER Model** | 👉 [`docs/Database_Architecture.md`](./docs/Database_Architecture.md) |
+| **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./docs/First_Month_Tuition_Escrow_Payout_Architecture.md) |
+| **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./docs/Referral_System_Architecture.md) |
+| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architectrue.md`](./docs/Student_Fee_Payment_Architectrue.md) |
+| **Payment Gateway & Webhook Verification** | 👉 [`docs/Payment_Architecture.md`](./docs/Payment_Architecture.md) |
+| **Matchmaking & Ranking Algorithm** | 👉 [`docs/Ranking_System_Architecture.md`](./docs/Ranking_System_Architecture.md) |
+| **Subscriptions, Pro Plan & Weekly Quota Rollover** | 👉 [`docs/Subscription_Architecture.md`](./docs/Subscription_Architecture.md) |
+| **Anti-Spam Limits & Student Queue Management** | 👉 [`docs/Student_Queue_Architecture.md`](./docs/Student_Queue_Architecture.md) |
+| **Demo Class Completion & 48-Hour Decision Window** | 👉 [`docs/Demo_Completion_Hiring_Architecture.md`](./docs/Demo_Completion_Hiring_Architecture.md) |
+| **Two-Way Price & Time Negotiation** | 👉 [`docs/Negotiation_Architecture.md`](./docs/Negotiation_Architecture.md) |
+| **Student Grouping & Batch Clustering** | 👉 [`docs/Student_Grouping_Architecture.md`](./docs/Student_Grouping_Architecture.md) |
+| **Aadhar KYC OTP Verification & Masking** | 👉 [`docs/Aadhar_Verification_Badge.md`](./docs/Aadhar_Verification_Badge.md) |
+| **Tutor Ratings & Reviews Calculation** | 👉 [`docs/Review_Architecture.md`](./docs/Review_Architecture.md) |
+| **Video Meeting Link Validation** | 👉 [`docs/Link_Validation_Demo_Architecture.md`](./docs/Link_Validation_Demo_Architecture.md) |
+| **Authentication & RBAC Routing** | 👉 [`docs/Authentication.md`](./docs/Authentication.md) |
+| **Custom ID Generation (`MTT`, `MTP`, `MTS`, `MTG`)** | 👉 [`docs/Document_ID.md`](./docs/Document_ID.md) |
 
 ---
 
 ## Test Suite & Verification
 
-The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](../web/tests):
+The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests):
 
 ```bash
 # Run all 13 test suites (99 unit & integration tests)
