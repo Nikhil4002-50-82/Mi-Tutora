@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateReferralCode } from '../src/utils/referral';
 
-test.describe('Phase 3 Event-Driven Database Triggers', () => {
+test.describe('Event-Driven Database Triggers Architecture', () => {
 
   test.describe('Application Lifecycle & Auto-Decline Trigger (onApplicationWritten)', () => {
     function processApplicationStatusTransition(

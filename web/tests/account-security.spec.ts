@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Phase 1 Cloud Functions & Security Hardening', () => {
+test.describe('Account Security & Banked Token Redemption', () => {
 
   test.describe('Teacher Banked Token Redemption Logic (redeemBankedToken)', () => {
     function processTokenRedemption(tutor: { bankedTokens?: number; weeklyQuota?: { tokensUsed: number } }) {

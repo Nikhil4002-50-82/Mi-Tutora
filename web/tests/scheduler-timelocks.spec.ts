@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Phase 2 Cloud Scheduler & Time-Lock Architecture', () => {
+test.describe('Cloud Scheduler & Time-Lock Architecture', () => {
 
   test.describe('Demo Meeting Link Time-Lock & IST Parsing', () => {
     function evaluateDemoLinkAccess(demoDate: string, demoTime: string, mockNowTimestamp: number) {

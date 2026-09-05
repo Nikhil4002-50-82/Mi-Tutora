@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import crypto from 'crypto';
 
-test.describe('Phase 4: Payment Security & Webhooks Verification', () => {
+test.describe('Payment Security & Webhooks Verification', () => {
 
   test.describe('Razorpay Server-to-Server Webhook Signature Validation', () => {
     function verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
