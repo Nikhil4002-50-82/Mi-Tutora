@@ -19,7 +19,7 @@ To maximize paid upgrades, the platform uses an industry-standard "Strict Quota"
 - **Limits:** Once 5 requests are sent, all "Send Offer" buttons are locked until the following Monday (or a rolling 7-day window).
 - **Matchmaking:** Standard visibility in the Student's "All" tab.
 
-### Pro Plan (Paid Tier - e.g., Rs 499/month)
+### Pro Plan (Paid Tier - ₹299/month)
 - **Target Audience:** Serious teachers scaling their tuition business.
 - **Quota:** 15 Tokens (Requests) per week.
 - **Perks:** 
@@ -56,7 +56,7 @@ The `tutors` collection maintains the following quota and subscription fields:
   - Returns updated token counts, allowing the teacher to send proposals immediately.
 
 ### Secure Payment Integration (Razorpay)
-- **Order Creation (`/api/create-subscription-order`):** Generates a server-locked Razorpay order for ₹399.
+- **Order Creation (`/api/create-subscription-order`):** Generates a server-locked Razorpay order for ₹299.
 - **Verification (`/api/verify-subscription-payment`):** Verifies HMAC signature, upgrades `subscriptionPlan: 'pro'`, adds +10 tokens, and calculates `subscriptionExpiresAt = now + 30 days` using server-side timestamps.
 
 ---
@@ -65,4 +65,4 @@ The `tutors` collection maintains the following quota and subscription fields:
 
 - **The Progress Bar:** The Subscription tab will feature a clean progress bar showing `X / 5 Requests Used This Week`.
 - **The Lockout:** If a Basic teacher hits 5 requests, the "Send Offer" button in the Student modal will turn gray. Clicking it will open a "Quota Exceeded" modal with a direct link to pay for the Pro plan. 
-- **The Upsell:** The Pro tier card will clearly highlight the ROI: *"Upgrade for Rs 499 to unlock 10 more students this week!"*
+- **The Upsell:** The Pro tier card will clearly highlight the ROI: *"Upgrade for ₹299 to unlock 10 more students this week!"*

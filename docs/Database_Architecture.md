@@ -20,6 +20,7 @@ erDiagram
     GROUPS ||--o{ APPLICATIONS : "groupDocId"
     
     APPLICATIONS ||--o{ PAYMENTS : "applicationDocId"
+    APPLICATIONS ||--o| TUTOR_PAYOUTS : "applicationDocId (60% escrow)"
     APPLICATIONS ||--o| PENDING_TUITION_FEES : "applicationDocId"
     APPLICATIONS ||--o{ REVIEWS : "applicationDocId"
     
@@ -357,12 +358,12 @@ erDiagram
 
 ### 2.16 Collection: `tutor_payouts`
 - **Purpose**: Escrow tracking and disbursement ledger for the 60% tutor share of the first-month tuition fee, unlocked on Day 30 and paid via Razorpay Payouts.
-- **Document ID (`doc.id`)**: Auto-generated Firestore ID (`collection('tutor_payouts').doc()`).
+- **Document ID (`doc.id`)**: Deterministic Firestore ID format `payout_${applicationId}` (to prevent duplicate escrow disbursements on retry or concurrency).
 - **Security Rule**: Read allowed for authenticated users (`request.auth != null`); writes strictly backend-only via Firebase Admin SDK.
 
 | Field Name | Type | Expected Values / Format | Description & Business Rules | Codebase Reference |
 | :--- | :--- | :--- | :--- | :--- |
-| `payoutDocId` | `string` | Auto-generated Firestore ID | Primary document key. | `web/src/app/api/verify-payment/route.ts` |
+| `payoutDocId` | `string` | Deterministic `payout_${appId}` | Primary document key. | `web/src/app/api/verify-payment/route.ts`, `functions/src/webhooks/razorpayWebhook.ts` |
 | `applicationDocId`| `string` | `app_` + alphanumeric | Foreign key to the tuition agreement in `applications`. | `web/src/app/api/verify-payment/route.ts` |
 | `studentPaymentId`| `string` | `pay_` + alphanumeric | Razorpay payment confirmation receipt ID from Day 7. | `web/src/app/api/verify-payment/route.ts` |
 | `tutorDocId` | `string` | User Auth UID | The educator entitled to the funds. | `web/src/app/api/verify-payment/route.ts` |

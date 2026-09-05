@@ -117,7 +117,7 @@ To ensure instantaneous page loads and eliminate browser lag without exposing pr
 
 To prevent lead exhaustion and maintain high application quality, teachers operate under a weekly proposal token quota:
 *   **Free Tier:** 5 tokens per week.
-*   **Pro Tier (₹399 / month):** 15 tokens per week, +20 ranking algorithm boost, and a Pro badge.
+*   **Pro Tier (₹299 / month):** 15 tokens per week, +20 ranking algorithm boost, and a Pro badge.
 *   **Weekly Rollover Cron (`weeklyQuotaReset`):** Quotas reset every **Monday at 00:00 IST** via a dedicated Cloud Scheduler function, executing batched writes with 400-op safety limits.
 *   **Banked Token Redemption (`redeemBankedToken`):** Tutors can redeem referral-earned banked tokens into their active proposal quota via a dedicated 2nd Gen callable Cloud Function protected by atomic transaction checks.
 *   **Anti-Clock Spoofing:** Expiry timestamps are strictly enforced server-side via Firebase Admin SDK `Timestamp.now()`, rendering client clock manipulation ineffective.

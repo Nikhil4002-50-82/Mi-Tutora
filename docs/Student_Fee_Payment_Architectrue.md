@@ -100,4 +100,4 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 
 ## 4. Platform Security Rules
 
-**Account Deletion Lock:** To prevent bad actors from evading payment dues by deleting their account, the platform enforces a strict frontend rule. If a student attempts to click "Delete Account", the system scans their applications for any `status === 'tuition_started'` where `feePaid === false`. If found, the deletion is blocked, and an error is displayed forcing them to clear their pending tuition fees first.
+**Account Deletion Lock:** To prevent bad actors from evading payment dues or destroying active tuition agreements by deleting their account, the platform enforces a strict **server-side barrier** via the `deleteUserAccount` Cloud Function (`functions/src/callable/deleteAccount.ts`) and `/api/auth/delete-account`. If a user attempts to delete their account while any active tuition exists (`status === 'tuition_started'`), the server strictly rejects the request with a `FAILED_PRECONDITION` error, protecting both unpaid fees and Day 30 escrow custody.

@@ -79,12 +79,12 @@ Mixing outgoing disbursement lifecycles into the incoming payment ledger creates
 ### Schema Specification: `tutor_payouts`
 
 - **Collection Name**: `tutor_payouts`
-- **Document ID (`doc.id`)**: Auto-generated Firestore ID
+- **Document ID (`doc.id`)**: Deterministic format `payout_${applicationId}` (to prevent duplicate escrow disbursements on retry or concurrency)
 - **Security Rule**: Read accessible only to target tutor (`tutorDocId == request.auth.uid`) or platform admin; writes strictly restricted to backend API routes (`/api/verify-payment`, `/api/payouts/*`).
 
 | Field Name | Type | Expected Values / Format | Description & Business Rules |
 | :--- | :--- | :--- | :--- |
-| `payoutDocId` | `string` | Auto-generated Firestore ID | Primary document key. |
+| `payoutDocId` | `string` | Deterministic `payout_${applicationId}` | Primary document key. |
 | `applicationDocId` | `string` | Foreign key to `applications` | The tuition contract this payout settles. |
 | `studentPaymentId` | `string` | `pay_` + alphanumeric | Razorpay payment confirmation receipt ID from Day 7. |
 | `tutorDocId` | `string` | Tutor's Auth UID | The educator entitled to the funds. |
