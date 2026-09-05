@@ -9,7 +9,7 @@ This master documentation serves as the comprehensive architectural overview of 
 ## Table of Contents
 1. [The Big Picture: 5-Phase Lifecycle](#1-the-big-picture-5-phase-lifecycle)
 2. [Student Onboarding & 1:N Grouping Architecture](#2-student-onboarding--1n-grouping-architecture)
-3. [Matchmaking & Ranking Engine](#3-matchmaking--ranking-engine)
+3. [Matchmaking & Ranking Engine (Server-Side + 20-Card Lazy Loading)](#3-matchmaking--ranking-engine)
 4. [Discovery, Token Quotas & Pro Subscriptions](#4-discovery-token-quotas--pro-subscriptions)
 5. [Trust & Safety: Aadhar KYC Verification](#5-trust--safety-aadhar-kyc-verification)
 6. [Real-time 2-Way Negotiation](#6-real-time-2-way-negotiation)
@@ -20,7 +20,8 @@ This master documentation serves as the comprehensive architectural overview of 
 11. [Review & Rating Engine](#11-review--rating-engine)
 12. [Anti-Spam & Rate Limiting Rules](#12-anti-spam--rate-limiting-rules)
 13. [Database Architecture & Entity-Relationship Model](#13-database-architecture--entity-relationship-model)
-14. [Master Documentation Index](#14-master-documentation-index)
+14. [Firebase Cloud Functions (2nd Gen) & Cloud Scheduler Architecture](#14-firebase-cloud-functions-2nd-gen--cloud-scheduler-architecture)
+15. [Master Documentation Index](#15-master-documentation-index)
 
 ---
 
@@ -103,6 +104,12 @@ Eligible teachers are ranked dynamically based on weighted parameters:
 *   **+20 points Trust Boost for Verified Aadhar KYC**
 *   **+20 points Visibility Boost for Active Pro Subscription**
 
+### Server-Side Ranking Engine & 20-Card Lazy Loading
+To ensure instantaneous page loads and eliminate browser lag without exposing proprietary ranking algorithms:
+*   **Server-Side Execution (`getRankedTutors` & `getRankedStudents`):** 100% of scoring and filtering runs in Firebase Cloud Functions (2nd Gen) / Next.js Server API endpoints.
+*   **Global Rank #1 Guarantee:** All candidate profiles are evaluated and sorted in descending order of total score *before* pagination. Rank #1 is always the highest-scoring candidate globally, never missed due to shallow querying.
+*   **20-Card Paginated Chunks (`page`, `pageSize: 20`):** The client requests `page=1` initially (20 cards) and retrieves subsequent 20-card slices via the **"Load More"** trigger as the user scrolls, saving bandwidth and Firestore read quotas.
+
 ---
 
 ## 4. Discovery, Token Quotas & Pro Subscriptions
@@ -111,7 +118,8 @@ Eligible teachers are ranked dynamically based on weighted parameters:
 To prevent lead exhaustion and maintain high application quality, teachers operate under a weekly proposal token quota:
 *   **Free Tier:** 5 tokens per week.
 *   **Pro Tier (₹399 / month):** 15 tokens per week, +20 ranking algorithm boost, and a Pro badge.
-*   **Weekly Rollover:** Quotas reset every **Monday at 00:00 UTC**.
+*   **Weekly Rollover Cron (`weeklyQuotaReset`):** Quotas reset every **Monday at 00:00 IST** via a dedicated Cloud Scheduler function, executing batched writes with 400-op safety limits.
+*   **Banked Token Redemption (`redeemBankedToken`):** Tutors can redeem referral-earned banked tokens into their active proposal quota via a dedicated 2nd Gen callable Cloud Function protected by atomic transaction checks.
 *   **Anti-Clock Spoofing:** Expiry timestamps are strictly enforced server-side via Firebase Admin SDK `Timestamp.now()`, rendering client clock manipulation ineffective.
 
 ---
@@ -147,7 +155,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 1. **Commitment Demo Fee:** To eliminate frivolous applications, the teacher pays a nominal demo platform fee (₹99 to ₹299 based on category) to schedule the trial class.
 2. **Link Validation:** Video links (Google Meet, Zoom) are strictly sanitized and validated against official regex patterns before saving.
 3. **Explicit Completion:** After the trial class occurs, the teacher explicitly clicks "Mark Demo as Finished", setting `status: 'waiting_for_parent_decision'`.
-4. **The 48-Hour Decision Clock:** The parent has exactly **48 hours** to click **"Hire"** or **"Decline"**. If inactive for 48 hours, the system auto-declines to free the teacher's schedule.
+4. **Hourly Automated Expiry (`expireDemosAndDecisions`):** Running hourly (`0 * * * *`, IST), this Cloud Scheduler job automatically marks scheduled demos whose meeting window expired 24h ago as `completed`, and auto-declines applications where parents took no hiring decision within the 48-hour window.
 
 ---
 
@@ -182,7 +190,8 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
                                                                └────────────────────────────────┘
 ```
 
-*   **Automated Day 30 Dual-Payout Engine (`/api/payouts/process`):** On Day 30 (`startDate + 30 days`), a scheduled runner automatically transfers both the **60% Tutor Share** and the **25% Referral Cash** directly to their respective UPI IDs via the Razorpay Payouts API.
+*   **Automated Day 30 Dual-Payout Scheduler (`dailyPayouts`):** Triggered every night at **00:00 IST**, this Cloud Scheduler job processes all matured Day 30 tuitions (`startDate + 30 days`), transferring tutor and referral earnings via the Razorpay Payouts API.
+*   **Batch & Concurrency Safety:** Uses a custom `BatchManager` strictly capping Firestore writes at 400 operations per batch, with deterministic document IDs (`payout_${applicationId}`) to prevent duplicate disbursements.
 *   **Missing UPI Safety Fallback:** If either party has not configured their UPI ID, the system flags `action_required_missing_upi` independently without blocking the other disbursement.
 *   **Admin Bulk CSV Fallback (`/api/admin/payouts/export-csv`):** Enables admins to download a banking-ready CSV listing all pending tutor and referrer payouts for manual corporate netbanking.
 
@@ -191,9 +200,9 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 ## 10. Referral & Rewards Engine (Automated UPI Deposition)
 *Full Specification: [`docs/Referral_System_Architecture.md`](./docs/Referral_System_Architecture.md)*
 
-*   **Attribution:** Every user receives an alphanumeric referral code (e.g. `KRIS-XT3GNB`).
+*   **Attribution & Auth Trigger (`onUserCreated`):** Every user receives an alphanumeric referral code. When a new user signs up, the 2nd Gen Auth trigger validates the referral code, rejects self-referrals, and creates the tracking record in Firestore.
 *   **Role-Based Rewards (Based on who joins):**
-    *   **When a Student Joins:** Referrer (Student or Teacher) earns **25% of company margin (₹600 on ₹6,000 tuition)**.
+    *   **When a Student Joins:** Referrer (Student or Teacher) earns **25% of company margin (₹600 on ₹6,000 tuition)** deposited automatically on Day 30.
     *   **When a Teacher Joins:** Referrer earns **+1 Banked Token** to unlock proposals.
 *   **Zero Threshold & No WhatsApp:** The legacy manual WhatsApp withdrawal and ₹1,000 threshold have been abolished. Referral cash is automatically deposited directly to the user's UPI on Day 30.
 
@@ -203,7 +212,7 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 *Full Specification: [`docs/Review_Architecture.md`](./docs/Review_Architecture.md)*
 
 *   **Eligibility:** Only parents who have an active or completed tuition agreement with a tutor can submit reviews.
-*   **Weighted Historical Average:** Ratings (1 to 5 stars) are computed server-side via atomic transactions:
+*   **Serverless Reactive Trigger (`onReviewCreated`):** Upon review document creation in Firestore, a 2nd Gen trigger executes an atomic transaction calculating the weighted rolling average and updating `rating` and `reviewCount` on the tutor document:
     $$\text{New Average} = \frac{(\text{Current Average} \times \text{Review Count}) + \text{New Rating}}{\text{Review Count} + 1}$$
 *   **Trust Display:** The resulting rating and review count are publicly showcased across discovery cards and tutor profiles.
 
@@ -268,13 +277,58 @@ erDiagram
 
 ---
 
-## 14. Master Documentation Index
+---
+
+## 14. Firebase Cloud Functions (2nd Gen) & Cloud Scheduler Architecture
+*Full Specification: [`docs/Cloud_Functions_Migration_Plan.md`](./docs/Cloud_Functions_Migration_Plan.md)*
+
+Critical platform automation, ranking computation, escrow payouts, and asynchronous triggers are decoupled from the browser and executed in secure, isolated serverless containers using **Firebase Cloud Functions (2nd Gen)** deployed to the **Mumbai region (`asia-south1`)**.
+
+```
+                           ┌────────────────────────────────────────────────────────┐
+                           │            Firebase Cloud Functions (2nd Gen)           │
+                           └────────────────────────────────────────────────────────┘
+                                     │                        │              │
+                     ┌───────────────┴───────────────┐        │              │
+                     ▼                               ▼        │              ▼
+          ┌─────────────────────┐        ┌──────────────────┐ │   ┌────────────────────┐
+          │   Cloud Scheduler   │        │ Callable & HTTP  │ │   │ Firestore Triggers │
+          │   (Cron Runners)    │        │   API Handlers   │ │   │  & Auth Triggers   │
+          └─────────────────────┘        └──────────────────┘ │   └────────────────────┘
+                     │                            │           │              │
+         ┌───────────┼────────────┐               │           │    ┌─────────┼──────────┐
+         ▼           ▼            ▼               ▼           ▼    ▼         ▼          ▼
+     Weekly       Daily        Hourly          Banked      Ranked  Queue    Rating   Referral
+      Quota      Payouts     Demo Expiry       Tokens      Match   Purge     Sync      Auth
+     00:00 IST  00:00 IST     0 * * * *       Callable    Callable Write   OnCreate  OnCreate
+```
+
+### Complete Cloud Functions Catalog
+
+| Category | Function Name | Trigger / Schedule | Primary Responsibility | Security & Concurrency Boundary |
+| :--- | :--- | :--- | :--- | :--- |
+| **Scheduled Runner** | `weeklyQuotaReset` | Every Monday `00:00 IST` (`0 0 * * 1`) | Resets tutor weekly proposal quotas (Free: 5, Pro: 15). | `BatchManager` (400-op chunks), Server-side Admin SDK |
+| **Scheduled Runner** | `dailyPayouts` | Every Night `00:00 IST` (`0 0 * * *`) | Processes Day 30 matured escrow payouts (Tutor 60%, Referrer 25%) via RazorpayX. | Deterministic doc ID `payout_${appId}`, idempotency guards |
+| **Scheduled Runner** | `expireDemosAndDecisions` | Hourly (`0 * * * *`, IST) | Auto-completes expired demo sessions and auto-declines 48h inactive hiring decisions. | Batch transaction limits, strict IST timezone offset |
+| **Callable API** | `redeemBankedToken` | `onCall` (Auth required) | Converts 1 referral banked token into an active weekly proposal credit. | Atomic Firestore transaction, zero-credit lock |
+| **Callable API** | `deleteUserAccount` | `onCall` (Auth required) | Safely anonymizes account, blocks deletion if active tuition exists. | Atomic multi-document checks, auth revocation |
+| **Callable API** | `getRankedTutors` | `onCall` (Public/Auth) | Evaluates 100% of tutors, applies strict filters & suitability scoring, returns 20-card slices. | Server-side IP rate limiting, algorithmic concealment |
+| **Callable API** | `getRankedStudents` | `onCall` (Tutor Auth) | Evaluates 100% of student posts, applies subject/board/budget scoring, returns 20-card slices. | Proposal quota checks, token balance verification |
+| **Reactive Trigger** | `onUserCreated` | `auth.user().onCreate` | Validates referral code, prevents self-referrals, establishes referral ledger record. | Cloud Functions Gen 2 Auth event |
+| **Reactive Trigger** | `onReviewCreated` | `firestore.onDocumentCreated` | Recalculates rolling star average on tutor profile when a review is submitted. | Atomic transaction on `tutors/{tutorId}` |
+| **Reactive Trigger** | `onApplicationWritten` | `firestore.onDocumentWritten` | Auto-declines competing applications when a tutor is hired; decrements active queues. | Event-driven idempotent queue pruning |
+| **Secure Webhook** | `handleRazorpayWebhook` | `onRequest` (HTTPS POST) | Ingests payment captures, validates HMAC SHA-256 signatures, activates tuitions/escrow. | Optimistic concurrency lock on `payments/{orderId}` |
+
+---
+
+## 15. Master Documentation Index
 
 For detailed deep-dives into specific platform subsystems, refer to the corresponding documents in the [`docs/`](./docs) folder:
 
 | Subsystem / Feature Area | Detailed Architecture Specification |
 | :--- | :--- |
 | **Complete Database Schema & ER Model** | 👉 [`docs/Database_Architecture.md`](./docs/Database_Architecture.md) |
+| **Cloud Functions (2nd Gen) & Serverless Migration** | 👉 [`docs/Cloud_Functions_Migration_Plan.md`](./docs/Cloud_Functions_Migration_Plan.md) |
 | **Educational Document Verification Architecture** | 👉 [`docs/Document_Verification.md`](./docs/Document_Verification.md) |
 | **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./docs/First_Month_Tuition_Escrow_Payout_Architecture.md) |
 | **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./docs/Referral_System_Architecture.md) |
@@ -296,15 +350,20 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 
 ## Test Suite & Verification
 
-The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests):
+The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 14 test suites (123 unit & integration tests)
+# Run all 19 test suites (160 unit, integration & ranking pagination tests)
 cd web
 npx playwright test
 
-# Check TypeScript type safety
+# Check TypeScript type safety across web
 npx tsc --noEmit
+
+# Build and verify Firebase Cloud Functions (2nd Gen)
+cd ../functions
+npm run build
 ```
 
-*All 123 automated tests pass with 0 errors, validating the mathematical split, escrow lifecycle, matching logic, and anti-fraud protections.*
+*All 160 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+

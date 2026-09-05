@@ -46,11 +46,19 @@ All payment calculations and verifications happen securely on the backend.
 ### E. Referral Reward Distribution (Backend Embedded)
 *   **Mechanism:** When a student successfully pays for the first month of tuition (Day 7 payment), the `/api/verify-payment` route automatically intercepts this success state. It securely calculates the 25% reward strictly from the platform's 40% margin (10% of total tuition). If a student was referred, the reward is locked in `referrals` escrow (`payoutStatus: 'escrow_held'`) with a Day 30 release timestamp and target UPI address. If a teacher was referred, 1 banked token is immediately credited to `tutors.bankedTokens`.
 
-### F. Automated Day 30 Dual-Payout Engine (`/api/payouts/process`)
-*   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions and qualified referral rewards reaching Day 30 (`releaseEligibleAt <= Date.now()`).
+### F. Automated Day 30 Dual-Payout Engine (`dailyPayouts` Cloud Scheduler & `/api/payouts/process`)
+*   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions and qualified referral rewards reaching Day 30 (`releaseEligibleAt <= Date.now()`). Runs nightly at **00:00 IST** via Cloud Scheduler.
 *   **Mechanism:** Queries both `tutor_payouts` (60% tuition share) and `referrals` (25% margin reward). Disburses funds simultaneously to both beneficiaries via Razorpay Payouts API (`POST /v1/payouts`) with `"queue_if_low_balance": true`. If UPI is missing, marks status as `'action_required_missing_upi'` independently.
+*   **Batch & Idempotency Safeguards:** Employs `BatchManager` (400-op chunks) and deterministic payout IDs (`payout_${applicationId}`).
 
-### G. Admin Manual Fallback Mode (`/api/admin/payouts/export-csv`)
+### G. Razorpay Webhook Cloud Function (`handleRazorpayWebhook`)
+*   **File:** `functions/src/webhooks/razorpayWebhook.ts`
+*   **Purpose:** Asynchronous payment ingestion and confirmation directly from Razorpay servers (`order.paid`, `payment.captured`), ensuring transactions are settled even if a user closes their browser before redirect.
+*   **HMAC SHA-256 Signature Verification:** Validates raw webhook body against `x-razorpay-signature` using the Razorpay Webhook Secret.
+*   **Optimistic Concurrency Lock:** Queries `payments/{orderId}` inside a transaction. If already marked `completed`, the webhook safely exits without re-processing.
+*   **Deterministic Escrow Creation:** Creates escrow records in `tutor_payouts` with deterministic IDs (`payout_${applicationId}`) to prevent duplicate disbursements on webhook re-delivery.
+
+### H. Admin Manual Fallback Mode (`/api/admin/payouts/export-csv`)
 *   **Purpose:** Allows platform administrators to export a corporate netbanking CSV file of all pending payouts (both Tutors and Student Referrers) for manual bulk bank transfers if RazorpayX is undergoing maintenance.
 
 ## 4. Frontend Integration Points

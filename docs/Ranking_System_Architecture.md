@@ -63,7 +63,7 @@ Once everyone has a score, the UI sorts the cards from top to bottom. The priori
 
 ## The Data Flow (Mermaid Diagram)
 
-Here is a visual map of how data moves from the Firebase Database to the User's Screen:
+Here is a visual map of how data is scored server-side and delivered in 20-card paginated slices:
 
 ```mermaid
 graph TD
@@ -72,69 +72,79 @@ graph TD
     DB_S[Students Collection]
     DB_G[Groups Collection]
     
-    %% API Layer
-    subgraph API [Backend API dashboardApi.ts]
-        API_T[Fetch Tutors]
-        API_S[Fetch Students]
-        API_G[Fetch Parent Groups]
+    %% Server-Side Engine
+    subgraph ServerSide [Server-Side Ranking Engine (Cloud Functions / Next.js API)]
+        FETCH[Fetch All Candidate Profiles]
         STITCH[Stitch Group Preferences into Student Data]
-    end
-    
-    %% Frontend Processing
-    subgraph Frontend [React CPU]
         FILTER{Passes isStrictMatch?}
         SCORE[Calculate Suitability Score]
-        SORT[Sort by Score & Status]
+        GLOBAL_SORT[Global Sort by Score Descending (Rank #1 Guaranteed)]
+        PAGINATE[Slice by page & pageSize=20]
     end
     
-    %% Output Tabs
-    TAB_ALL((ALL TAB))
-    TAB_REC((RECOMMENDED TAB))
+    %% Frontend Client
+    subgraph Frontend [Client Browser / React UI]
+        STATE[Append 20 Cards to Infinite Feed]
+        LOAD_MORE[User Clicks 'Load More' or Infinite Scroll]
+        TAB_ALL((ALL TAB))
+        TAB_REC((RECOMMENDED TAB))
+    end
     
     %% Flow
-    DB_T --> API_T
-    DB_S --> API_S
-    DB_G --> API_G
+    DB_T --> FETCH
+    DB_S --> FETCH
+    DB_G --> STITCH
     
-    API_S --> STITCH
-    API_G --> STITCH
-    
+    FETCH --> STITCH
     STITCH --> FILTER
-    API_T --> FILTER
-    
     FILTER -- Yes --> SCORE
     FILTER -- No --> SCORE_ZERO[Score = 0]
     
-    SCORE --> SORT
-    SCORE_ZERO --> SORT
+    SCORE --> GLOBAL_SORT
+    SCORE_ZERO --> GLOBAL_SORT
+    GLOBAL_SORT --> PAGINATE
     
-    SORT --> TAB_ALL
-    SORT -- "Only profiles that passed Yes" --> TAB_REC
+    PAGINATE -->|20 Cards per Page| STATE
+    STATE --> TAB_ALL
+    STATE --> TAB_REC
+    LOAD_MORE -->|Fetch page + 1| PAGINATE
 
     classDef database fill:#f9dbbd,stroke:#d98324,stroke-width:2px,color:#000;
-    classDef api fill:#b5eaea,stroke:#2b9eb3,stroke-width:2px,color:#000;
+    classDef server fill:#b5eaea,stroke:#2b9eb3,stroke-width:2px,color:#000;
     classDef react fill:#cceabb,stroke:#3f8832,stroke-width:2px,color:#000;
     classDef tab fill:#fcdab7,stroke:#c45b14,stroke-width:4px,color:#000;
     
     class DB_T,DB_S,DB_G database;
-    class API_T,API_S,API_G,STITCH api;
-    class FILTER,SCORE,SCORE_ZERO,SORT react;
+    class FETCH,STITCH,FILTER,SCORE,SCORE_ZERO,GLOBAL_SORT,PAGINATE server;
+    class STATE,LOAD_MORE react;
     class TAB_ALL,TAB_REC tab;
 ```
 
 ---
 
-## Developer Architecture Notes (Portal Differences)
+## 4. Server-Side Execution & 20-Card Lazy Loading
 
-Because Teachers and Students browse differently, the data pipelines are slightly mirrored:
+To eliminate mobile browser lag and protect proprietary matchmaking formulas, 100% of candidate filtering, score calculation, and sorting occurs **server-side** (via Cloud Functions `getRankedTutors` / `getRankedStudents` and Next.js server routes `/api/tutors/ranked` / `/api/students/ranked`):
 
-### Teacher Portal Pipeline
-- The API (`dashboardApi.ts`) fetches paginated **Students**.
-- **The Stitching Magic:** Because `teacherGenderPreference` lives in the `groups` collection (not the student document), the API extracts the `groupDocId` of every student, does a secondary fetch for those groups, and stitches the group data directly into the student payload (`requestDoc`).
-- The frontend then evaluates `isStrictMatch(studentGroup, activeTeacher)`.
+1. **Global Rank #1 Guarantee:** 
+   The server-side engine queries all candidate profiles, runs `isStrictMatch` and score calculations across every profile, and sorts the complete array in descending order of score. This guarantees that Rank #1 is always the highest-matching candidate globally.
+2. **20-Card Paginated Delivery:**
+   The server slices the globally sorted results into chunks of 20 (`page`, `pageSize: 20`, `total`, `hasMore`).
+3. **Frontend Lazy Loading:**
+   The client receives the initial 20 cards (`page: 1`). When the user scrolls down or clicks **"Load More"**, the client requests `page: 2` and appends the next 20 items to state without re-rendering or re-evaluating the entire market.
 
-### Student Portal Pipeline
-- The API fetches all available **Tutors**.
-- The frontend already has the logged-in Student's `activeGroup` data in memory.
-- The frontend dynamically builds a `scoringContext` that merges the student's personal info with their group's `requestDoc` (which holds the gender preference).
-- The frontend then evaluates `isStrictMatch(scoringContext, tutor)`.
+---
+
+## Developer Architecture Notes (Portal Pipelines)
+
+### Teacher Portal Pipeline (`getRankedStudents` / `/api/students/ranked`)
+- The server engine fetches **Students** and their associated **Groups**.
+- **The Stitching Magic:** Because `teacherGenderPreference` lives in the `groups` collection, the backend engine stitches the parent group preferences into the student payload (`requestDoc`).
+- The backend evaluates `isStrictMatch(studentGroup, activeTeacher)` and scores candidates against the authenticated teacher's qualifications, boards, and budget.
+- Returns 20 students per page with `hasMore` indicator.
+
+### Student Portal Pipeline (`getRankedTutors` / `/api/tutors/ranked`)
+- The server engine receives the student's active group context (`studentId`, `groupDocId`, `category`, `subjects`, `board`, `classLevel`, `budget`, `genderPreference`).
+- The engine fetches candidate **Tutors**, evaluates `isStrictMatch(context, tutor)`, and calculates suitability scores including verification bonuses (+20 KYC, +20 Pro).
+- Sorts globally and returns the top 20 tutors for the active page.
+

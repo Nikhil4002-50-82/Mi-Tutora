@@ -33,21 +33,31 @@ To maximize paid upgrades, the platform uses an industry-standard "Strict Quota"
 To ensure the system is 100% hacker-proof, the quota limit will be strictly enforced at the database level using Firestore Security Rules, preventing malicious users from bypassing frontend limits.
 
 ### Database Schema Updates
-We will add the following fields to the `tutors` collection:
+The `tutors` collection maintains the following quota and subscription fields:
 - `subscriptionPlan`: String (`'basic'` or `'pro'`)
-- `subscriptionExpiresAt`: Timestamp *(Note: Currently omitted in the mock upgrade frontend logic for testing. Must be injected via Webhook when real payment gateway like Razorpay/Stripe is integrated so the Pro plan eventually expires.)*
+- `subscriptionExpiresAt`: Timestamp (Enforced server-side via `verify-subscription-payment`)
+- `tokens`: Number of active proposal tokens available for the current week
+- `bankedTokens`: Number of banked tokens accumulated via successful tutor referrals
 - `weeklyQuota`: Object tracking current usage
   - `weekStartDate`: String (e.g., `'2026-08-17'`)
   - `tokensUsed`: Number
 
-### The Quota Calculation & Security Logic
-1. **The Transaction:** When a teacher sends an offer, a single Firestore transaction will execute:
-   - Create the new application document.
-   - Check the teacher's `weeklyQuota.weekStartDate`. If it's a new week, reset `tokensUsed` to `1` and update the date. If it's the same week, increment `tokensUsed` by `1`.
-2. **Firestore Security Rules:** We will write a rule that validates this transaction on the backend:
-   - "Allow write IF `tokensUsed` <= 5 (for basic) OR <= 15 (for pro)."
-   - If a hacker attempts to bypass the UI and create an application via the console, Firebase will block the request because the counter validation is handled securely on the server.
-3. **UI Reflection:** The frontend will simply read `weeklyQuota.tokensUsed` to instantly display progress bars and lock UI buttons without needing to filter arrays.
+### Weekly Quota Rollover via Cloud Scheduler (`weeklyQuotaReset`)
+- **Schedule:** Triggers every **Monday at 00:00 IST** (`0 0 * * 1`) via `functions/src/scheduled/weeklyQuotaReset.ts`.
+- **Batch Processing:** Utilizes `BatchManager` capping writes at 400 operations per batch to handle thousands of tutors safely without Firestore limits.
+- **Reset Logic:** Resets active `tokens` to `5` for Basic tutors and `15` for active Pro tutors (evaluating `subscriptionExpiresAt > now()`).
+
+### Banked Token Redemption (`redeemBankedToken`)
+- **Callable Cloud Function:** `functions/src/callable/redeemToken.ts` (`onCall`, authenticated tutor).
+- **Atomic Transaction:** Executes an atomic read-modify-write on `tutors/{tutorId}`:
+  - Validates that `bankedTokens >= 1`.
+  - Decrements `bankedTokens` by 1.
+  - Increments active proposal `tokens` by 1.
+  - Returns updated token counts, allowing the teacher to send proposals immediately.
+
+### Secure Payment Integration (Razorpay)
+- **Order Creation (`/api/create-subscription-order`):** Generates a server-locked Razorpay order for ₹399.
+- **Verification (`/api/verify-subscription-payment`):** Verifies HMAC signature, upgrades `subscriptionPlan: 'pro'`, adds +10 tokens, and calculates `subscriptionExpiresAt = now + 30 days` using server-side timestamps.
 
 ---
 

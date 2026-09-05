@@ -42,8 +42,19 @@ export async function POST(req: NextRequest) {
       .get();
 
     const results: any[] = [];
-    const batch = adminDb.batch();
+    let batch = adminDb.batch();
     let batchCount = 0;
+    let totalProcessed = 0;
+
+    const commitBatchIfNeeded = async () => {
+      batchCount++;
+      totalProcessed++;
+      if (batchCount >= 400) {
+        await batch.commit();
+        batch = adminDb.batch();
+        batchCount = 0;
+      }
+    };
 
     const razorpayKey = process.env.RAZORPAY_KEY_ID;
     const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -75,7 +86,7 @@ export async function POST(req: NextRequest) {
           status: 'action_required_missing_upi',
           updatedAt: FieldValue.serverTimestamp()
         });
-        batchCount++;
+        await commitBatchIfNeeded();
         results.push({ id: docSnap.id, type: 'tutor', status: 'action_required_missing_upi' });
         continue;
       }
@@ -119,7 +130,7 @@ export async function POST(req: NextRequest) {
               paidAt: rpData.status === 'processed' ? FieldValue.serverTimestamp() : null,
               updatedAt: FieldValue.serverTimestamp()
             });
-            batchCount++;
+            await commitBatchIfNeeded();
             results.push({ id: docSnap.id, type: 'tutor', status: 'disbursed_via_api', payoutId: rpData.id });
           } else {
             console.error('RazorpayX Tutor Payout Error:', rpData);
@@ -128,7 +139,7 @@ export async function POST(req: NextRequest) {
               payoutVpa: targetVpa,
               updatedAt: FieldValue.serverTimestamp()
             });
-            batchCount++;
+            await commitBatchIfNeeded();
             results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout_queued' });
           }
         } catch (apiErr) {
@@ -138,7 +149,7 @@ export async function POST(req: NextRequest) {
             payoutVpa: targetVpa,
             updatedAt: FieldValue.serverTimestamp()
           });
-          batchCount++;
+          await commitBatchIfNeeded();
           results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout_api_fallback' });
         }
       } else {
@@ -147,7 +158,7 @@ export async function POST(req: NextRequest) {
           payoutVpa: targetVpa,
           updatedAt: FieldValue.serverTimestamp()
         });
-        batchCount++;
+        await commitBatchIfNeeded();
         results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout' });
       }
     }
@@ -193,7 +204,7 @@ export async function POST(req: NextRequest) {
         batch.update(refSnap.ref, {
           payoutStatus: 'action_required_missing_upi'
         });
-        batchCount++;
+        await commitBatchIfNeeded();
         results.push({ id: refSnap.id, type: 'referrer', status: 'action_required_missing_upi' });
         continue;
       }
@@ -236,7 +247,7 @@ export async function POST(req: NextRequest) {
               utrNumber: rpData.utr || '',
               paidAt: rpData.status === 'processed' ? FieldValue.serverTimestamp() : null
             });
-            batchCount++;
+            await commitBatchIfNeeded();
             results.push({ id: refSnap.id, type: 'referrer', status: 'disbursed_via_api', payoutId: rpData.id });
           } else {
             console.error('RazorpayX Referrer Payout Error:', rpData);
@@ -244,7 +255,7 @@ export async function POST(req: NextRequest) {
               payoutStatus: 'ready_for_payout',
               payoutVpa: targetVpa
             });
-            batchCount++;
+            await commitBatchIfNeeded();
             results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout_queued' });
           }
         } catch (apiErr) {
@@ -253,7 +264,7 @@ export async function POST(req: NextRequest) {
             payoutStatus: 'ready_for_payout',
             payoutVpa: targetVpa
           });
-          batchCount++;
+          await commitBatchIfNeeded();
           results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout_api_fallback' });
         }
       } else {
@@ -261,7 +272,7 @@ export async function POST(req: NextRequest) {
           payoutStatus: 'ready_for_payout',
           payoutVpa: targetVpa
         });
-        batchCount++;
+        await commitBatchIfNeeded();
         results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout' });
       }
     }
@@ -272,7 +283,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      processed: batchCount,
+      processed: totalProcessed,
       results
     });
 

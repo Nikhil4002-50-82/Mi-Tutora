@@ -44,13 +44,21 @@ match /reviews/{reviewId} {
 }
 ```
 
-### The API Routes
+### The API Routes & Cloud Trigger
 #### 1. Creation (`/api/submit-review`)
 1. **Validation:** Checks if a review with the given `applicationDocId` already exists.
 2. **Authorization:** Verifies the `applicationDocId` exists and its `status` is `tuition_started` (active hiring).
-3. **Database Write:** Uses `firebase-admin` (which bypasses Firestore Rules) in a secure Batch Write to create the review and mathematically update the teacher's average.
+3. **Database Write:** Creates the `reviews` document using `firebase-admin`.
 
-#### 2. Retrieval (`/api/reviews`)
+#### 2. Reactive Rolling Average Trigger (`onReviewCreated`)
+*   **File:** `functions/src/triggers/onReviewCreated.ts`
+*   **Trigger Event:** `firestore.onDocumentCreated('reviews/{reviewId}')`
+*   **Atomic Transaction:** Executes an atomic transaction on `tutors/{tutorDocId}`:
+    $$\text{New Average} = \frac{(\text{Current Average} \times \text{Review Count}) + \text{New Rating}}{\text{Review Count} + 1}$$
+    $$\text{New Review Count} = \text{Review Count} + 1$$
+*   **Resilience:** Decouples rating recalculation from the client request cycle and guarantees aggregate consistency across the platform.
+
+#### 3. Retrieval (`/api/reviews`)
 When fetching reviews for a teacher, the backend dynamically performs secure database joins before responding. It uses the stored `applicationDocId` and `parentDocId` to fetch the beautiful human-readable `parentName`, the `groupId` (e.g. MTGXXXXX), and the specific `studentsList`. This ensures the UI has complete context without ever duplicating data into the `reviews` collection.
 
 ## 3. Frontend UI

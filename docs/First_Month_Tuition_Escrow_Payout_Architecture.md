@@ -132,9 +132,12 @@ A critical architectural mandate is that introducing this escrow and payout syst
 
 1. **Prerequisite**: During profile onboarding, the teacher provides their UPI ID (`vpa`), which is saved to their `tutors` document.
 2. **Scheduled Trigger (Day 30)**:
-   - A Cloud Function or Cron Job runs daily, querying:
+   - The 2nd Gen Cloud Function `dailyPayouts` (`functions/src/scheduled/dailyPayouts.ts`) triggers via Cloud Scheduler every midnight at **00:00 IST** (`0 0 * * *`), querying:
      `collection('tutor_payouts').where('status', '==', 'escrow_held').where('releaseEligibleAt', '<=', now)`
-3. **Execution**:
+   - Also executed via the Next.js runner endpoint `/api/payouts/process`.
+3. **Execution & Batch Concurrency**:
+   - Uses `BatchManager` strictly capping Firestore writes at 400 operations per batch to prevent transaction limits.
+   - Escrow records utilize deterministic document IDs (`payout_${applicationId}`) to ensure complete idempotency.
    - For each eligible document, the backend transitions status to `'processing'` and dispatches an HTTPS request to Razorpay Payouts API:
      ```json
      POST https://api.razorpay.com/v1/payouts

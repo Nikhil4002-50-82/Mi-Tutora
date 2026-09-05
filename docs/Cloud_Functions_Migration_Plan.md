@@ -1,89 +1,101 @@
-# Cloud Functions Migration Plan
+# Firebase Cloud Functions (2nd Gen) Architecture & Production Implementation
 
-As the MiTutora platform scales, certain heavy operations, security-critical transactions, and time-based automations must be moved off the frontend (React/Browser) and Next.js Edge APIs, and directly into Firebase Cloud Functions.
+This document details the completed backend architecture of **Mi-Tutora** using **Firebase Cloud Functions (2nd Gen)** deployed to the **Mumbai region (`asia-south1`)**. 
 
-This document outlines the complete architectural roadmap for creating a pure Firebase backend.
-
----
-
-## 1. Matchmaking & Ranking Engine (Scalability)
-
-### The Problem
-Currently, when a student opens their dashboard, the Next.js API/Frontend fetches a massive list of teachers and evaluates `calculateSuitabilityScore()` and `isStrictMatch()` directly in the React client. If the platform scales to 10,000+ teachers, this will cause severe performance degradation, high battery drain on mobile devices, and excessive Firestore read costs.
-
-### The Cloud Function Solution
-- **Type:** HTTP Callable Function (`getRankedTutors`)
-- **Execution:** When the student loads the "Recommended" tab, the frontend sends the student's `groupDocId` and `budget` to this Cloud Function.
-- **Logic:** 
-  1. The Cloud Function queries the database securely.
-  2. It runs the strict filters and scores every teacher internally on Google's high-speed servers.
-  3. It sorts the array.
-  4. It returns **only the top 20** results to the frontend.
-- **Benefit:** Drops database reads by 99% and ensures the app loads instantly even on older phones.
+All heavy mathematical calculations, ranking algorithms, escrow disbursements, hourly time-sensitive state machines, and webhook listeners have been migrated out of client code and executed in secure, isolated serverless runtime containers.
 
 ---
 
-## 2. Time-Based Automations (Cron Jobs)
+## 1. Architectural Summary & System Topology
 
-### The Problem
-Time-sensitive rules—like the 48-hour auto-decline after a demo, or checking if a 7-day trial has expired—are currently evaluated "lazily". They only trigger if a user happens to log in and the Next.js API processes their dashboard payload.
-
-### The Cloud Function Solution
-- **Type:** Scheduled Functions (`onSchedule`)
-- **Functions Needed:**
-  1. **`cron_checkDemoTimeouts` (Runs every 1 hour):** 
-     - Scans the `applications` collection for any document in `waiting_for_parent_decision`.
-     - Compares the `demoDate` and `demoTime` to the current server time.
-     - If > 48 hours have elapsed, automatically updates the status to `declined` and frees up both users.
-  2. **`cron_subscriptionExpiries` (Runs every 24 hours at midnight):** 
-     - Scans the `tutors` collection for users where `subscriptionPlan === 'pro'` but `subscriptionExpiry < Date.now()`.
-     - Automatically downgrades them to `'basic'` and resets their weekly token quotas.
-
----
-
-## 3. Database Triggers (Automated Side-Effects)
-
-### The Problem
-Right now, complex multi-document updates (like the referral system) require the frontend or Next.js APIs to manually coordinate "Batch Writes". If the network drops halfway through, or a user closes the app, it can lead to orphaned data.
-
-### The Cloud Function Solution
-- **Type:** Firestore Triggers (`onDocumentCreated`, `onDocumentUpdated`)
-- **Functions Needed:**
-  1. **`trigger_referralRewards`:** 
-     - Listens to `pending_tuition_fees` documents.
-     - When a fee document status changes from `pending` to `paid`, this function wakes up.
-     - It checks if the student was referred by someone.
-     - If yes, it securely calculates 25% of the fee and adds it to the referrer's `walletBalance`.
-  2. **`trigger_onHireCleanup`:**
-     - Listens to `applications`.
-     - When an application status changes to `tuition_started`, this function automatically hunts down every *other* application involving that student group and changes them to `declined`, keeping the database perfectly clean without relying on frontend logic.
+```
+                           ┌────────────────────────────────────────────────────────┐
+                           │            Firebase Cloud Functions (2nd Gen)           │
+                           │                 Region: asia-south1                    │
+                           └────────────────────────────────────────────────────────┘
+                                     │                        │              │
+                     ┌───────────────┴───────────────┐        │              │
+                     ▼                               ▼        │              ▼
+          ┌─────────────────────┐        ┌──────────────────┐ │   ┌────────────────────┐
+          │   Cloud Scheduler   │        │ Callable & HTTP  │ │   │ Firestore Triggers │
+          │   (Cron Runners)    │        │   API Handlers   │ │   │  & Auth Triggers   │
+          └─────────────────────┘        └──────────────────┘ │   └────────────────────┘
+                     │                            │           │              │
+         ┌───────────┼────────────┐               │           │    ┌─────────┼──────────┐
+         ▼           ▼            ▼               ▼           ▼    ▼         ▼          ▼
+     Weekly       Daily        Hourly          Banked      Ranked  Queue    Rating   Referral
+      Quota      Payouts     Demo Expiry       Tokens      Match   Purge     Sync      Auth
+     00:00 IST  00:00 IST     0 * * * *       Callable    Callable Write   OnCreate  OnCreate
+```
 
 ---
 
-## 4. Notifications & Third-Party Integrations
+## 2. Production Functions Catalog
 
-### The Problem
-Sending WhatsApp messages, emails, or push notifications from the Next.js API or Client exposes API keys and can slow down the user interface if the third-party service (like Twilio or PowerAPI) is slow to respond.
-
-### The Cloud Function Solution
-- **Type:** Firestore Triggers (`onDocumentCreated`, `onDocumentUpdated`)
-- **Functions Needed:**
-  1. **`trigger_sendWhatsAppAlert`:**
-     - Listens for new documents in the `applications` collection.
-     - Wakes up in the background and sends a WhatsApp message to the teacher ("You have a new tuition request!"). 
-     - Because it's a background trigger, the student's UI is never blocked waiting for the message to send.
+| Category | Function Name | File Location | Trigger / Schedule | Responsibility |
+| :--- | :--- | :--- | :--- | :--- |
+| **Scheduled** | `weeklyQuotaReset` | `functions/src/scheduled/weeklyQuotaReset.ts` | Every Monday `00:00 IST` (`0 0 * * 1`) | Resets weekly proposal token quotas for all tutors (Free: 5, Pro: 15). Uses `BatchManager` (400-op chunks). |
+| **Scheduled** | `dailyPayouts` | `functions/src/scheduled/dailyPayouts.ts` | Every Night `00:00 IST` (`0 0 * * *`) | Processes Day 30 matured escrow payouts (Tutor 60%, Referrer 25%) via RazorpayX. Deterministic doc ID `payout_${appId}`. |
+| **Scheduled** | `expireDemosAndDecisions` | `functions/src/scheduled/expireDemos.ts` | Hourly (`0 * * * *`, IST) | Auto-completes expired demo sessions (>24h past scheduled time) and auto-declines 48h inactive hiring decisions. |
+| **Callable** | `redeemBankedToken` | `functions/src/callable/redeemToken.ts` | `onCall` (Auth required) | Converts 1 referral banked token into an active weekly proposal credit. Atomic Firestore transaction. |
+| **Callable** | `deleteUserAccount` | `functions/src/callable/deleteAccount.ts` | `onCall` (Auth required) | Safely anonymizes account, deletes personal data, but blocks deletion if active tuition exists. |
+| **Callable** | `getRankedTutors` | `functions/src/callable/getRankedTutors.ts` | `onCall` (Public/Auth) | Evaluates 100% of tutors, applies strict filters & suitability scoring, returns 20-card slices with `hasMore`. |
+| **Callable** | `getRankedStudents` | `functions/src/callable/getRankedStudents.ts` | `onCall` (Tutor Auth) | Evaluates 100% of student posts, applies subject/board/budget scoring, returns 20-card slices with `hasMore`. |
+| **Reactive Trigger** | `onUserCreated` | `functions/src/triggers/onUserCreated.ts` | `auth.user().onCreate` | Validates referral codes upon signup, prevents self-referrals, and creates tracking records in Firestore. |
+| **Reactive Trigger** | `onReviewCreated` | `functions/src/triggers/onReviewCreated.ts` | `firestore.onDocumentCreated` | Recalculates rolling star average on tutor profile atomically when a review is submitted. |
+| **Reactive Trigger** | `onApplicationWritten` | `functions/src/triggers/onApplicationWritten.ts` | `firestore.onDocumentWritten` | Auto-declines competing applications when a tutor is hired; decrements active queues. |
+| **Secure Webhook** | `handleRazorpayWebhook` | `functions/src/webhooks/razorpayWebhook.ts` | `onRequest` (HTTPS POST) | Ingests payment captures, validates HMAC SHA-256 signatures, activates tuitions/escrow with concurrency locks. |
 
 ---
 
-## 5. Migrating Next.js API Routes
+## 3. Server-Side Ranking Engine & 20-Card Lazy Loading
 
-### The Problem
-The current architecture relies heavily on Next.js Serverless APIs (`/src/app/api/...`) for critical security tasks (Razorpay webhooks, KYC verification, and the `executeAppointTutor` hire transaction). 
+### Implementation Details (`functions/src/utils/matchingEngine.ts`)
+- **Global Rank #1 Guarantee:** Rather than limiting Firestore queries with arbitrary limits that miss the best match, the engine queries all candidate profiles, runs strict filtering (`isStrictMatch`) and multi-factor suitability scoring (+50/subject, +30 class, +20 board, 0-30 budget, +20 KYC, +20 Pro), and sorts the entire candidate pool by score descending.
+- **20-Card Paginated Delivery:**
+  The callable functions accept `{ page: number, pageSize: 20 }` and return `{ items, total, page, pageSize, hasMore }`.
+- **Client Integration:**
+  Both Student and Teacher dashboards consume these slices, rendering an initial 20 cards and loading subsequent 20-card batches on user scroll / "Load More" click.
 
-### The Cloud Function Solution
-- **Type:** HTTP Functions (`onRequest` or `onCall`)
-- **Action:** Move the logic from these files directly into Firebase:
-  - `api/transactions/hire/route.ts` ➡️ `functions/src/hireTutor.ts`
-  - `api/kyc/verify-otp/route.ts` ➡️ `functions/src/verifyAadhar.ts`
-  - `api/verify-payment/route.ts` ➡️ `functions/src/razorpayWebhook.ts`
-- **Benefit:** Centralizes all secure backend operations inside the Firebase ecosystem, eliminating reliance on Next.js hosting for backend security.
+---
+
+## 4. Batch & Concurrency Safeguards
+
+1. **`BatchManager` (400-Operation Limit):**
+   Firestore enforces a hard maximum of 500 operations per batch write. All scheduled batch operations (`weeklyQuotaReset`, `dailyPayouts`) use a helper class that automatically commits and rolls over to a new batch at 400 operations, preventing batch overflow exceptions.
+2. **Deterministic Escrow IDs:**
+   Escrow disbursement records in `tutor_payouts` use deterministic document keys formatted as `payout_${applicationId}`. If a network retry occurs, Firestore treats it as an idempotent overwrite rather than creating duplicate payouts.
+3. **Optimistic Concurrency Lock on Payments:**
+   `handleRazorpayWebhook` validates payments against an atomic write lock on `payments/{orderId}`, ensuring duplicate webhook deliveries from Razorpay cannot trigger double activations or duplicate escrow creations.
+4. **Banked Token Atomicity:**
+   `redeemBankedToken` executes inside a Firestore runTransaction:
+   - Reads `tutors/{tutorId}`
+   - Verifies `bankedTokens > 0`
+   - Decrements `bankedTokens` by 1 and increments `tokens` by 1 simultaneously.
+
+---
+
+## 5. Development & Deployment Workflow
+
+To build and test the Cloud Functions locally:
+
+```bash
+# Navigate to functions directory
+cd functions
+
+# Install dependencies
+npm install
+
+# Compile TypeScript
+npm run build
+
+# Run local Firebase Emulator suite
+npm run serve
+```
+
+To deploy to production:
+
+```bash
+firebase deploy --only functions
+```
+

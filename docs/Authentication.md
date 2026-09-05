@@ -32,3 +32,14 @@ The Google flow is highly optimized and unified across both the `login` and `sig
 ## 6. Session Persistence & Protection
 - **Local Cache:** The active session and current role are temporarily stored in `localStorage` (`user`) so the frontend can route them instantly without waiting for network calls.
 - **True Authentication:** Access to the actual dashboard data (`dashboardApi.ts`) is strictly gated by `auth.onAuthStateChanged`. If a user manually edits their `localStorage` to spoof an identity, the backend queries will fail because Firebase rules enforce true authentication tokens.
+
+## 7. Cloud Auth Trigger (`onUserCreated`)
+*   **File:** `functions/src/triggers/onUserCreated.ts`
+*   **Trigger:** `auth.user().onCreate` (Firebase Auth 2nd Gen)
+*   **Responsibility:** When any user registers via email or Google OAuth, this serverless trigger initializes backend tracking documents, parses `referredBy` tags, guards against self-referral attempts, and creates the pending referral ticket in Firestore.
+
+## 8. Secure Account Deletion (`deleteUserAccount`)
+*   **File:** `functions/src/callable/deleteAccount.ts`
+*   **Trigger:** `onCall` (Authenticated User)
+*   **Active Tuition Lock:** Before permitting deletion, the function checks all associated `applications`. If the user is currently engaged in an active tuition (`status === 'tuition_started'`), account deletion is strictly rejected (`FAILED_PRECONDITION`) to protect ongoing teaching commitments and escrow funds.
+*   **Safe Anonymization:** If eligible, user documents are sanitized and the Firebase Auth account is permanently deleted.

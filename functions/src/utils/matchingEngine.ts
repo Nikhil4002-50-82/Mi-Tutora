@@ -1,55 +1,73 @@
-function getAcademicDetail(studentGroup: any, field: string): any {
+/**
+ * Server-Side Matchmaking & Ranking Engine.
+ * Implements the mathematical formulas and strict filtering logic defined in docs/Ranking_System_Architecture.md.
+ */
+
+export function getAcademicDetail(studentGroup: any, field: string): any {
+  if (!studentGroup) return undefined;
   if (studentGroup[field]) return studentGroup[field];
-  if (studentGroup.students && studentGroup.students.length > 0 && studentGroup.students[0][field]) return studentGroup.students[0][field];
-  if (studentGroup.studentsDetails && studentGroup.studentsDetails.length > 0 && studentGroup.studentsDetails[0][field]) return studentGroup.studentsDetails[0][field];
-  if (studentGroup.requestDoc && studentGroup.requestDoc[field]) return studentGroup.requestDoc[field];
+  if (studentGroup.students && studentGroup.students.length > 0 && studentGroup.students[0][field]) {
+    return studentGroup.students[0][field];
+  }
+  if (studentGroup.studentsDetails && studentGroup.studentsDetails.length > 0 && studentGroup.studentsDetails[0][field]) {
+    return studentGroup.studentsDetails[0][field];
+  }
+  if (studentGroup.requestDoc && studentGroup.requestDoc[field]) {
+    return studentGroup.requestDoc[field];
+  }
   return undefined;
 }
 
 export function doesClassMatch(studentClass: string, teacherClasses: string[]): boolean {
-    if (!studentClass || teacherClasses.length === 0) return false;
-    
-    studentClass = studentClass.toLowerCase().trim();
-    teacherClasses = teacherClasses.map(c => c.toLowerCase().trim());
-    
-    if (teacherClasses.includes(studentClass)) return true;
+  if (!studentClass || !teacherClasses || teacherClasses.length === 0) return false;
 
-    const stdMatch = studentClass.match(/(\d+)[a-z]*\s+standard/);
-    if (stdMatch) {
-        const grade = parseInt(stdMatch[1]);
-        if (grade >= 1 && grade <= 5 && teacherClasses.includes('1st - 5th')) return true;
-        if (grade >= 6 && grade <= 8 && teacherClasses.includes('6th - 8th')) return true;
-        if (grade >= 9 && grade <= 10 && teacherClasses.includes('9th - 10th')) return true;
-        if (grade === 11 && (teacherClasses.includes('1st pu') || teacherClasses.includes('11th'))) return true;
-        if (grade === 12 && (teacherClasses.includes('2nd pu') || teacherClasses.includes('12th'))) return true;
-    }
+  studentClass = studentClass.toLowerCase().trim();
+  const normalizedClasses = teacherClasses.map((c) => c.toLowerCase().trim());
 
-    return false;
+  if (normalizedClasses.includes(studentClass)) return true;
+
+  const stdMatch = studentClass.match(/(\d+)[a-z]*\s+standard/);
+  if (stdMatch) {
+    const grade = parseInt(stdMatch[1], 10);
+    if (grade >= 1 && grade <= 5 && normalizedClasses.includes("1st - 5th")) return true;
+    if (grade >= 6 && grade <= 8 && normalizedClasses.includes("6th - 8th")) return true;
+    if (grade >= 9 && grade <= 10 && normalizedClasses.includes("9th - 10th")) return true;
+    if (grade === 11 && (normalizedClasses.includes("1st pu") || normalizedClasses.includes("11th"))) return true;
+    if (grade === 12 && (normalizedClasses.includes("2nd pu") || normalizedClasses.includes("12th"))) return true;
+  }
+
+  return false;
 }
 
 export function calculateSuitabilityScore(studentGroup: any, teacher: any): number {
   if (!studentGroup || !teacher) return 0;
-  
+
   let score = 0;
-  
-  const studentCat = (getAcademicDetail(studentGroup, 'category') || '').toLowerCase().trim();
-  const teacherCats = teacher.category ? teacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
-  
+
+  const studentCat = (getAcademicDetail(studentGroup, "category") || "").toLowerCase().trim();
+  const teacherCats = teacher.category ? teacher.category.toLowerCase().split(",").map((c: string) => c.trim()) : [];
+
   // Base requirement: Category must match, else score is 0
   if (studentCat && !teacherCats.includes(studentCat)) {
-    return 0; 
+    return 0;
   }
 
   // Board Match (20 points)
-  if (studentCat === 'school') {
-    const studentBoard = (getAcademicDetail(studentGroup, 'board') || '').toLowerCase().trim();
+  if (studentCat === "school") {
+    const studentBoard = (getAcademicDetail(studentGroup, "board") || "").toLowerCase().trim();
     const teacherBoards = (teacher.boards || []).map((b: string) => b.toLowerCase().trim());
     if (studentBoard && teacherBoards.includes(studentBoard)) {
       score += 20;
     }
 
     // Class Match (30 points)
-    const studentClass = (getAcademicDetail(studentGroup, 'classLevel') || getAcademicDetail(studentGroup, 'classGrade') || '').toLowerCase().trim();
+    const studentClass = (
+      getAcademicDetail(studentGroup, "classLevel") ||
+      getAcademicDetail(studentGroup, "classGrade") ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
     const teacherClasses = (teacher.classes || []).map((c: string) => c.toLowerCase().trim());
     if (doesClassMatch(studentClass, teacherClasses)) {
       score += 30;
@@ -60,35 +78,50 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
   let studentNeeds: string[] = [];
   let teacherOffers: string[] = [];
 
-  if (studentCat === 'school') {
-    studentNeeds = getAcademicDetail(studentGroup, 'subjects') || getAcademicDetail(studentGroup, 'combinedSubjects') || [];
+  if (studentCat === "school") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "subjects") ||
+      getAcademicDetail(studentGroup, "combinedSubjects") ||
+      [];
     teacherOffers = teacher.subjects || [];
-  } else if (studentCat === 'programming') {
-    studentNeeds = getAcademicDetail(studentGroup, 'technologies') || getAcademicDetail(studentGroup, 'combinedTechnologies') || [];
+  } else if (studentCat === "programming") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "technologies") ||
+      getAcademicDetail(studentGroup, "combinedTechnologies") ||
+      [];
     teacherOffers = teacher.technologies || [];
-  } else if (studentCat === 'languages') {
-    studentNeeds = getAcademicDetail(studentGroup, 'languages') || getAcademicDetail(studentGroup, 'combinedLanguages') || [];
+  } else if (studentCat === "languages") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "languages") ||
+      getAcademicDetail(studentGroup, "combinedLanguages") ||
+      [];
     teacherOffers = teacher.languagesTaught || teacher.languages || [];
   }
 
   if (studentNeeds.length > 0 && teacherOffers.length > 0) {
-    const normalizedNeeds = studentNeeds.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    
-    normalizedNeeds.forEach((need:string) => {
-      if (normalizedOffers.some((offer:string) => offer.includes(need) || need.includes(offer))) {
+    const normalizedNeeds = studentNeeds.map((s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    const normalizedOffers = teacherOffers.map((s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ""));
+
+    normalizedNeeds.forEach((need: string) => {
+      if (normalizedOffers.some((offer: string) => offer.includes(need) || need.includes(offer))) {
         score += 50;
       }
     });
   }
 
   // Budget Proximity Match (Sliding Scale: +0 to +30 points)
-  const studentBudget = parseFloat(studentGroup.budget || studentGroup.totalBudget || studentGroup.combinedBudget || getAcademicDetail(studentGroup, 'budget') || 0);
+  const studentBudget = parseFloat(
+    studentGroup.budget ||
+      studentGroup.totalBudget ||
+      studentGroup.combinedBudget ||
+      getAcademicDetail(studentGroup, "budget") ||
+      0
+  );
   const teacherFee = parseFloat(teacher.feeRange || teacher.minFee || 0);
 
   if (studentBudget > 0 && teacherFee > 0) {
     const diffRatio = Math.abs(studentBudget - teacherFee) / teacherFee;
-    const budgetPoints = Math.round(Math.max(0, 30 - (diffRatio * 30)));
+    const budgetPoints = Math.round(Math.max(0, 30 - diffRatio * 30));
     score += budgetPoints;
   }
 
@@ -98,11 +131,11 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
   }
 
   // Premium Subscription Boost
-  const isSubscribedFlags = teacher.subscriptionPlan === 'pro' || teacher.isSubscribed;
+  const isSubscribedFlags = teacher.subscriptionPlan === "pro" || teacher.isSubscribed;
   const hasValidExpiry = teacher.subscriptionExpiry ? teacher.subscriptionExpiry > Date.now() : false;
-  
+
   if (isSubscribedFlags && hasValidExpiry) {
-      score += 20;
+    score += 20;
   }
 
   return score;
@@ -111,45 +144,60 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
 export function isStrictMatch(studentGroup: any, teacher: any): boolean {
   if (!studentGroup || !teacher) return false;
 
-  const studentCat = (getAcademicDetail(studentGroup, 'category') || '').toLowerCase().trim();
-  const teacherCats = teacher.category ? teacher.category.toLowerCase().split(',').map((c: string) => c.trim()) : [];
+  const studentCat = (getAcademicDetail(studentGroup, "category") || "").toLowerCase().trim();
+  const teacherCats = teacher.category ? teacher.category.toLowerCase().split(",").map((c: string) => c.trim()) : [];
   if (studentCat && !teacherCats.includes(studentCat)) return false;
 
-  if (studentCat === 'school') {
-      const studentBoard = (getAcademicDetail(studentGroup, 'board') || '').toLowerCase().trim();
-      const teacherBoards = (teacher.boards || []).map((b: string) => b.toLowerCase().trim());
-      if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
+  if (studentCat === "school") {
+    const studentBoard = (getAcademicDetail(studentGroup, "board") || "").toLowerCase().trim();
+    const teacherBoards = (teacher.boards || []).map((b: string) => b.toLowerCase().trim());
+    if (studentBoard && !teacherBoards.includes(studentBoard)) return false;
 
-      const studentClass = (getAcademicDetail(studentGroup, 'classLevel') || getAcademicDetail(studentGroup, 'classGrade') || '').toLowerCase().trim();
-      const teacherClasses = (teacher.classes || []).map((c: string) => c.toLowerCase().trim());
-      if (!doesClassMatch(studentClass, teacherClasses)) return false;
+    const studentClass = (
+      getAcademicDetail(studentGroup, "classLevel") ||
+      getAcademicDetail(studentGroup, "classGrade") ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
+    const teacherClasses = (teacher.classes || []).map((c: string) => c.toLowerCase().trim());
+    if (!doesClassMatch(studentClass, teacherClasses)) return false;
   }
 
-  const genderPref = getAcademicDetail(studentGroup, 'teacherGenderPreference');
-  if (genderPref && genderPref !== 'No Preference') {
-      if (teacher.gender !== genderPref) return false;
+  const genderPref = getAcademicDetail(studentGroup, "teacherGenderPreference");
+  if (genderPref && genderPref !== "No Preference") {
+    if (teacher.gender !== genderPref) return false;
   }
 
   let studentNeeds: string[] = [];
   let teacherOffers: string[] = [];
-  
-  if (studentCat === 'school') {
-    studentNeeds = getAcademicDetail(studentGroup, 'subjects') || getAcademicDetail(studentGroup, 'combinedSubjects') || [];
+
+  if (studentCat === "school") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "subjects") ||
+      getAcademicDetail(studentGroup, "combinedSubjects") ||
+      [];
     teacherOffers = teacher.subjects || [];
-  } else if (studentCat === 'programming') {
-    studentNeeds = getAcademicDetail(studentGroup, 'technologies') || getAcademicDetail(studentGroup, 'combinedTechnologies') || [];
+  } else if (studentCat === "programming") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "technologies") ||
+      getAcademicDetail(studentGroup, "combinedTechnologies") ||
+      [];
     teacherOffers = teacher.technologies || [];
-  } else if (studentCat === 'languages') {
-    studentNeeds = getAcademicDetail(studentGroup, 'languages') || getAcademicDetail(studentGroup, 'combinedLanguages') || [];
+  } else if (studentCat === "languages") {
+    studentNeeds =
+      getAcademicDetail(studentGroup, "languages") ||
+      getAcademicDetail(studentGroup, "combinedLanguages") ||
+      [];
     teacherOffers = teacher.languagesTaught || teacher.languages || [];
   }
-  
+
   if (studentNeeds.length > 0) {
     if (teacherOffers.length === 0) return false;
-    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const allSubjectsMatched = studentNeeds.every((need:string) => {
-      const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
+    const normalizedOffers = teacherOffers.map((s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    const allSubjectsMatched = studentNeeds.every((need: string) => {
+      const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normalizedOffers.some((offer: string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
     });
     if (!allSubjectsMatched) return false;
   }
@@ -158,16 +206,16 @@ export function isStrictMatch(studentGroup: any, teacher: any): boolean {
 }
 
 export function getApplicationPriorityScore(status: string): number {
-  if (status === 'locked' || status === 'declined') return -1000;
+  if (status === "locked" || status === "declined") return -1000;
   if (
     [
-      'pending',
-      'negotiating',
-      'reviewing',
-      'offer_sent',
-      'demo_requested_by_student',
-      'demo_requested_by_teacher',
-      'demo_pending_payment',
+      "pending",
+      "negotiating",
+      "reviewing",
+      "offer_sent",
+      "demo_requested_by_student",
+      "demo_requested_by_teacher",
+      "demo_pending_payment",
     ].includes(status)
   ) {
     return 1000;
@@ -176,7 +224,7 @@ export function getApplicationPriorityScore(status: string): number {
 }
 
 export interface RankTutorsOptions {
-  tab: 'recommended' | 'all';
+  tab: "recommended" | "all";
   page: number;
   limit: number;
   category?: string;
@@ -194,7 +242,7 @@ export interface RankedTutorResult {
 }
 
 /**
- * Executes global scoring, sorting, and pagination for candidate tutors.
+ * Executes server-side global scoring, sorting, and pagination for candidate tutors.
  * Guarantees that Rank #1 is always index 0 of Page 1.
  */
 export function rankAndPaginateTutors(
@@ -204,7 +252,7 @@ export function rankAndPaginateTutors(
   options: RankTutorsOptions
 ): RankedTutorResult {
   const {
-    tab = 'recommended',
+    tab = "recommended",
     page = 1,
     limit = 20,
     category,
@@ -217,7 +265,7 @@ export function rankAndPaginateTutors(
     scoringContext?.budget ||
       scoringContext?.totalBudget ||
       scoringContext?.combinedBudget ||
-      getAcademicDetail(scoringContext, 'budget') ||
+      getAcademicDetail(scoringContext, "budget") ||
       0
   );
 
@@ -229,12 +277,12 @@ export function rankAndPaginateTutors(
     const matchGroup = (app: any) => {
       return (
         (activeGroupId && (app.groupDocId === activeGroupId || app.studentDocId === activeGroupId)) ||
-        (!activeGroupId && app.parentDocId === studentUserId)
+        (!activeGroupId && (app.parentDocId === studentUserId))
       );
     };
 
     const app = applications.find((a: any) => a.tutorDocId === tutor.id && matchGroup(a));
-    if (app && app.status === 'tuition_started') return false;
+    if (app && app.status === "tuition_started") return false;
     return true;
   });
 
@@ -255,7 +303,7 @@ export function rankAndPaginateTutors(
 
   // 3. Filter by tab ('recommended' requires strictMatch and suitabilityScore > 0)
   let eligibleTutors = scoredTutors;
-  if (tab === 'recommended') {
+  if (tab === "recommended") {
     eligibleTutors = scoredTutors.filter((t) => t.strictMatch && t.suitabilityScore > 0);
   }
 
@@ -273,18 +321,18 @@ export function rankAndPaginateTutors(
       const matchGroup = (app: any) => {
         return (
           (activeGroupId && (app.groupDocId === activeGroupId || app.studentDocId === activeGroupId)) ||
-          (!activeGroupId && app.parentDocId === studentUserId)
+          (!activeGroupId && (app.parentDocId === studentUserId))
         );
       };
       const app = applications.find((app: any) => app.tutorDocId === tutorId && matchGroup(app));
-      if (!app) return '';
+      if (!app) return "";
       if (
-        app.status === 'locked' ||
-        (app.status === 'declined' &&
+        app.status === "locked" ||
+        (app.status === "declined" &&
           app.declinedAt &&
           Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000)
       ) {
-        return 'locked';
+        return "locked";
       }
       return app.status;
     };
@@ -321,7 +369,7 @@ export function rankAndPaginateTutors(
 }
 
 export interface RankStudentsOptions {
-  tab: 'recommended' | 'all';
+  tab: "recommended" | "all";
   page: number;
   limit: number;
   category?: string;
@@ -337,7 +385,7 @@ export interface RankedStudentResult {
 }
 
 /**
- * Executes global scoring, sorting, and pagination for candidate student groups.
+ * Executes server-side global scoring, sorting, and pagination for candidate student groups.
  * Guarantees that Rank #1 is always index 0 of Page 1.
  */
 export function rankAndPaginateStudents(
@@ -347,7 +395,7 @@ export function rankAndPaginateStudents(
   options: RankStudentsOptions
 ): RankedStudentResult {
   const {
-    tab = 'recommended',
+    tab = "recommended",
     page = 1,
     limit = 20,
     category,
@@ -370,7 +418,7 @@ export function rankAndPaginateStudents(
       studentGroup.budget ||
         studentGroup.totalBudget ||
         studentGroup.combinedBudget ||
-        getAcademicDetail(studentGroup, 'budget') ||
+        getAcademicDetail(studentGroup, "budget") ||
         0
     );
     const strictMatch = isStrictMatch(studentGroup, activeTeacher);
@@ -387,7 +435,7 @@ export function rankAndPaginateStudents(
 
   // 3. Filter by tab
   let eligibleGroups = scoredGroups;
-  if (tab === 'recommended') {
+  if (tab === "recommended") {
     eligibleGroups = scoredGroups.filter((g) => g.strictMatch && g.suitabilityScore > 0);
   }
 
@@ -395,7 +443,7 @@ export function rankAndPaginateStudents(
   if (category) {
     const normCat = category.toLowerCase().trim();
     eligibleGroups = eligibleGroups.filter((g) => {
-      const gCat = (getAcademicDetail(g, 'category') || '').toLowerCase().trim();
+      const gCat = (getAcademicDetail(g, "category") || "").toLowerCase().trim();
       return gCat.includes(normCat);
     });
   }
@@ -406,14 +454,14 @@ export function rankAndPaginateStudents(
       const app = applications.find(
         (app: any) => app.studentDocId === studentId || app.groupDocId === studentId
       );
-      if (!app) return '';
+      if (!app) return "";
       if (
-        app.status === 'locked' ||
-        (app.status === 'declined' &&
+        app.status === "locked" ||
+        (app.status === "declined" &&
           app.declinedAt &&
           Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000)
       ) {
-        return 'locked';
+        return "locked";
       }
       return app.status;
     };

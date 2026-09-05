@@ -23,13 +23,17 @@ service cloud.firestore {
       allow read, create: if request.auth != null;
       allow delete: if request.auth != null && request.auth.uid == tutorId;
       
-      // Enforce the Weekly Token limits
+      // Enforce the Weekly Token limits and lock bankedTokens to backend only
       allow update: if 
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['weeklyQuota']))
-        || 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['bankedTokens']))
+        &&
         (
-          request.resource.data.weeklyQuota.tokensUsed <= (
-            (request.resource.data.get('subscriptionPlan', 'basic') == 'pro' || request.resource.data.get('isSubscribed', false) == true) ? 15 : 5
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['weeklyQuota']))
+          || 
+          (
+            request.resource.data.weeklyQuota.tokensUsed <= (
+              (request.resource.data.get('subscriptionPlan', 'basic') == 'pro' || request.resource.data.get('isSubscribed', false) == true) ? 15 : 5
+            )
           )
         );
     }
@@ -56,9 +60,10 @@ service cloud.firestore {
         );
     }
 
-    // Secure the "applications" collection against price manipulation and fake payments
+    // Secure the "applications" collection against price manipulation, fake payments, and unauthorized deletion
     match /applications/{appId} {
-      allow read, delete: if true; 
+      allow read: if true; 
+      allow delete: if false; // Deletions strictly restricted to server Admin SDK 
       
       // 1. Prevent ANY frontend modification of feePaid or demoPaymentPaid (Backend only)
       // 2. Lock down finalPrice, budget, and currentOffer if the app has moved past the negotiation phase

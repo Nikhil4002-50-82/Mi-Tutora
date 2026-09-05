@@ -45,13 +45,12 @@ To optimize the user experience, all of this UI is surfaced directly on the **De
 
 ### D. Student JIT Retrieval (`/api/get-demo-link`)
 When the trigger conditions are met, the Student Portal displays a "Join Demo Room" button and a live countdown timer.
-1.  **The Lock:** If the current time is greater than 5 minutes before the demo, the button is blurred and disabled.
-2.  **The Unlock:** At exactly **5 minutes before** the `demoDate` and `demoTime`, the countdown hits zero, and the button unlocks.
-3.  **Secure Read:** The student clicks the button, sending a POST request to `/api/get-demo-link`.
-4.  **Time Verification:** The backend API parses the `demoDate` and `demoTime` and compares it against the **secure server clock**. 
-    - If the student hacked the frontend to click early, the server returns a `403 Forbidden` error.
-    - If the time is valid, the server fetches the hidden link from the vault and sends it to the student.
-5.  **Redirection:** The frontend instantly executes `window.open(link, '_blank')`, dropping the student seamlessly into the Google Meet, Zoom, or Teams room.
+1.  **Strict IST Timezone Offset:** Demo times are parsed with an explicit `+05:30` IST offset (`${demoDate}T${demoTime}:00+05:30`) to eliminate UTC discrepancies across devices located in different timezones.
+2.  **The Lock (Before T-5):** If current time is earlier than 5 minutes before class start (`now < demoStartTime - 5 * 60 * 1000`), the button remains disabled with a countdown timer.
+3.  **The Unlock Window [T-5 to T+90]:** At exactly **5 minutes before** the scheduled start, the button unlocks. The room remains accessible until **90 minutes after** the start time (`now <= demoStartTime + 90 * 60 * 1000`), ensuring comfortable class completion.
+4.  **The Post-Demo Lock (After T+90):** After 90 minutes have elapsed, the link is permanently locked from student access to prevent unauthorized room reuse.
+5.  **Secure Server Verification:** The backend API (`/api/get-demo-link`) re-verifies the exact same [T-5m, T+90m] window against the server clock. If a student attempts to bypass the client UI, the server returns `403 Forbidden`.
+6.  **Redirection:** Upon verified authorization, the server fetches the hidden link from the vault and sends it to the frontend, which invokes `window.open(link, '_blank')`.
 
 ---
 

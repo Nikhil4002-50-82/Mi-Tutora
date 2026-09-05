@@ -67,16 +67,43 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentDoc = snap.docs[0];
-    const paymentData = paymentDoc.data();
-
-    // Prevent Replay Attacks: If already processed and marked paid, return success immediately
-    if (paymentData.status === 'paid') {
-      return NextResponse.json({ success: true, message: 'Payment already verified' });
-    }
+    const paymentDocRef = paymentDoc.ref;
+    const initialData = paymentDoc.data();
 
     // Secure ownership: Ensure the user verifying the payment owns the ledger record
-    if (paymentData.userId && paymentData.userId !== decodedToken.uid) {
+    if (initialData.userId && initialData.userId !== decodedToken.uid) {
       return NextResponse.json({ error: 'Unauthorized: Payment does not belong to this user' }, { status: 403 });
+    }
+
+    // Prevent Replay Attacks & Concurrency Race Conditions via Firestore Transaction Lock
+    let paymentData: any = initialData;
+    let alreadyPaid = false;
+
+    await adminDb.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(paymentDocRef);
+      if (!freshSnap.exists) {
+        throw new Error('Order ID not found in secure ledger.');
+      }
+      const freshData = freshSnap.data() || {};
+      if (freshData.status === 'paid') {
+        alreadyPaid = true;
+        paymentData = freshData;
+        return;
+      }
+
+      // Atomically claim lock and mark as paid so concurrent requests immediately exit
+      transaction.update(paymentDocRef, {
+        status: 'paid',
+        razorpayPaymentId: razorpay_payment_id,
+        verifiedVia: 'client',
+        verifiedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      paymentData = freshData;
+    });
+
+    if (alreadyPaid) {
+      return NextResponse.json({ success: true, message: 'Payment already verified' });
     }
 
     // SECURE: Strictly derive application ID, role, and removal flag from ledger record
@@ -154,10 +181,10 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
 
             // Mark tracker as paid
             const pendingFeeRef = adminDb.collection('pending_tuition_fees').doc(applicationId);
-            batch.update(pendingFeeRef, {
+            batch.set(pendingFeeRef, {
                 status: 'paid',
                 paidAt: FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
 
             // Financial Split Math: 40% Platform Commission, 60% Tutor Share, 25% of Cut for Referrals
             const rewardBase = appData.finalPrice || appData.currentOffer || appData.budget || 4000;
@@ -184,8 +211,8 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                 : Date.now();
             const releaseEligibleAt = startMs + (30 * 24 * 60 * 60 * 1000);
 
-            // Create Escrow Record in 'tutor_payouts'
-            const payoutRef = adminDb.collection('tutor_payouts').doc();
+            // Create Escrow Record in 'tutor_payouts' with deterministic document ID
+            const payoutRef = adminDb.collection('tutor_payouts').doc(`payout_${applicationId}`);
             batch.set(payoutRef, {
                 payoutDocId: payoutRef.id,
                 applicationDocId: applicationId,
@@ -210,7 +237,7 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                 utrNumber: '',
                 createdAt: FieldValue.serverTimestamp(),
                 paidAt: null
-            });
+            }, { merge: true });
 
             // Process Referrals on full payment (funded out of 40% platform cut)
             try {

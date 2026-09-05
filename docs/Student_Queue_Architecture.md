@@ -99,6 +99,19 @@ flowchart TD
 
 ---
 
+## Layer 4: Serverless Queue Pruning & Auto-Decline Trigger (`onApplicationWritten`)
+
+To guarantee database consistency and eliminate orphaned active queue slots, queue state changes are governed server-side by the 2nd Gen Firestore trigger `onApplicationWritten` (`functions/src/triggers/onApplicationWritten.ts`):
+
+1. **Auto-Declining Competing Leads:**
+   The moment any application transitions to `tuition_started` (a tutor is hired), this background trigger searches for all other open applications associated with that `groupDocId` and automatically transitions them to `declined` with `reason: 'student_hired_another_tutor'`.
+2. **Queue Cleanup & Slot Liberation:**
+   The trigger updates the respective tutors' `pendingRequests` arrays and resets the student's concurrent request count, ensuring slots are immediately liberated across the marketplace.
+3. **Event-Driven Idempotency:**
+   Because this runs as an asynchronous Cloud Function trigger, network drops or closed browser tabs on the parent's device cannot interrupt the queue cleanup process.
+
+---
+
 ## Note on Initiator Roles
 
 It is important to note that these limits primarily apply to **Student-Initiated** actions. 

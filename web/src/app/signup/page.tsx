@@ -7,6 +7,7 @@ import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, Grad
 const logo = '/imports/logo.png';
 import { getFriendlyAuthError } from '@/utils/authErrors';
 import { generateCustomId } from '@/utils/idGenerator';
+import { generateReferralCode } from '@/utils/referral';
 
 function SignupContent() {
   const [email, setEmail] = useState('');
@@ -66,19 +67,21 @@ function SignupContent() {
           if (!querySnapshot.empty) {
             const referrerUserDoc = querySnapshot.docs[0];
             const referrerUser = referrerUserDoc.data();
-            finalReferrerName = referrerUser.name || '';
-            
-            await addDoc(collection(db, 'referrals'), {
-              referrerId: referrerUser.id,
-              referrerName: referrerUser.name,
-              referredUserId: user.uid,
-              referredUserName: name,
-              referralCode: referralCode.trim().toUpperCase(),
-              referralType: role,
-              status: 'pending',
-              estimatedReward: 0,
-              createdAt: Date.now()
-            });
+            if (referrerUser.id !== user.uid) {
+              finalReferrerName = referrerUser.name || '';
+              
+              await addDoc(collection(db, 'referrals'), {
+                referrerId: referrerUser.id,
+                referrerName: referrerUser.name,
+                referredUserId: user.uid,
+                referredUserName: name,
+                referralCode: referralCode.trim().toUpperCase(),
+                referralType: role,
+                status: 'pending',
+                estimatedReward: 0,
+                createdAt: Date.now()
+              });
+            }
           }
         }
 
@@ -87,6 +90,9 @@ function SignupContent() {
           email: user.email,
           name: name,
           roles: [role],
+          role: role,
+          referralCode: generateReferralCode(name, user.uid),
+          walletBalance: 0,
           referredBy: referralCode.trim()
         };
         if (finalReferrerName) userPayload.referrerName = finalReferrerName;

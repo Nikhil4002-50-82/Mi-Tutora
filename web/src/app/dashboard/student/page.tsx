@@ -81,6 +81,8 @@ export default function StudentDashboard() {
   const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [editingStudentId, setEditingStudentId] = useState<string>('');
   const [tuitionSubTab, setTuitionSubTab] = useState<'all'|'recommendation'>('all');
+  const [visibleTutorsCount, setVisibleTutorsCount] = useState<number>(20);
+  const [isLoadingMoreTutors, setIsLoadingMoreTutors] = useState<boolean>(false);
   const [isSwitchingTab, setIsSwitchingTab] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -118,6 +120,11 @@ export default function StudentDashboard() {
     const timer = setInterval(() => setNowTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setVisibleTutorsCount(20);
+  }, [tuitionSubTab, selectedCategory, activeGroupId]);
+
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useStudentData();
@@ -1579,8 +1586,14 @@ export default function StudentDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).map((teacher: any) => {
+                {(() => {
+                  const allFilteredTutors = (tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))) || [];
+                  const displayedTutors = allFilteredTutors.slice(0, visibleTutorsCount);
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {displayedTutors.map((teacher: any) => {
                       const matchGroup = (app: any) => {
                         return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
                       };
@@ -1783,7 +1796,7 @@ export default function StudentDashboard() {
                         </div>
                       );
                     })}
-                    {(!((tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory)))) || ((tuitionSubTab === 'all' ? allTutorsWithScores : computedRecommendedTutors)?.filter((t: any) => !selectedCategory || (t.category && t.category.includes(selectedCategory))).length === 0)) && (
+                    {allFilteredTutors.length === 0 && (
                       <div className="col-span-full p-10 bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
                         <Users className="w-12 h-12 text-gray-300 mb-3" />
                         <h3 className="text-lg font-bold text-gray-900">No tutors found</h3>
@@ -1791,6 +1804,46 @@ export default function StudentDashboard() {
                       </div>
                     )}
                   </div>
+
+                  {/* 20-Card Lazy Loading / Load More Controls */}
+                  {allFilteredTutors.length > visibleTutorsCount && (
+                    <div className="flex flex-col items-center justify-center pt-8 pb-4">
+                      <button
+                        onClick={() => {
+                          setIsLoadingMoreTutors(true);
+                          setTimeout(() => {
+                            setVisibleTutorsCount((prev) => prev + 20);
+                            setIsLoadingMoreTutors(false);
+                          }, 200);
+                        }}
+                        disabled={isLoadingMoreTutors}
+                        className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-75 cursor-pointer"
+                      >
+                        {isLoadingMoreTutors ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Loading Next 20 Tutors...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Load More Tutors ({allFilteredTutors.length - visibleTutorsCount} remaining)</span>
+                            <ChevronDown className="w-5 h-5" />
+                          </>
+                        )}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2 font-medium">
+                        Showing {Math.min(visibleTutorsCount, allFilteredTutors.length)} of {allFilteredTutors.length} ranked tutors
+                      </p>
+                    </div>
+                  )}
+                  {allFilteredTutors.length > 20 && visibleTutorsCount >= allFilteredTutors.length && (
+                    <div className="text-center py-6 text-sm text-gray-500 font-medium">
+                      🎉 You've viewed all {allFilteredTutors.length} matching tutors.
+                    </div>
+                  )}
+                </>
+              );
+            })()}
                   </div>
                 )}
               </div>
@@ -3187,102 +3240,49 @@ export default function StudentDashboard() {
         onConfirm={async () => {
           setIsDeletingAccount(true);
           try {
-            const { db, auth } = await import('@/utils/firebase/client');
-            const { doc, deleteDoc, query, collection, where, getDocs, getDoc, updateDoc, arrayRemove } = await import('firebase/firestore');
-            const { deleteUser } = await import('firebase/auth');
-            
-            if(!auth.currentUser) throw new Error('Not logged in');
-            
+            const { auth } = await import('@/utils/firebase/client');
+            if (!auth.currentUser) throw new Error('Not logged in');
+
             const lastSignIn = new Date(auth.currentUser.metadata.lastSignInTime || 0).getTime();
             if (Date.now() - lastSignIn > 5 * 60 * 1000) {
               toast.error("For security reasons, you must have logged in recently to delete your account. Please sign out, sign back in, and try again.");
               setIsDeletingAccount(false);
               return;
             }
-            
-            const uid = auth.currentUser.uid;
-            const userDocRef = doc(db, 'users', uid);
-            const userDoc = await getDoc(userDocRef);
-            const userData = userDoc.data() || {};
-            const roles = userData.roles || (userData.role ? [userData.role] : []);
-            
-            const isDualRole = roles.length > 1;
-            
-            // Delete parent doc
-            await deleteDoc(doc(db, 'parents', uid));
-            
-            // Delete all students
-            const stuQ = query(collection(db, 'students'), where('parentDocId', '==', uid));
-            const stuSnap = await getDocs(stuQ);
-            for (const d of stuSnap.docs) await deleteDoc(doc(db, 'students', d.id));
-            
-            // Delete all requests
-            const reqQ = query(collection(db, 'tuition_requests'), where('parentDocId', '==', uid));
-            const reqSnap = await getDocs(reqQ);
-            for (const d of reqSnap.docs) await deleteDoc(doc(db, 'tuition_requests', d.id));
-            
-            // Delete all applications
-            const appQ = query(collection(db, 'applications'), where('parentDocId', '==', uid));
-            const appSnap = await getDocs(appQ);
-            for (const d of appSnap.docs) {
-              await deleteDoc(doc(db, 'applications', d.id));
+
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/api/auth/delete-account', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ role: 'student' }),
+            });
+
+            const result = await res.json();
+            if (!res.ok || !result.success) {
+              throw new Error(result.error || 'Failed to delete account');
             }
-            
-            // Delete tutor requests
-            const tutorReqQ = query(collection(db, 'tutor_requests'), where('parentDocId', '==', uid));
-            const tutorReqSnap = await getDocs(tutorReqQ);
-            for (const d of tutorReqSnap.docs) await deleteDoc(doc(db, 'tutor_requests', d.id));
 
-            // Delete direct requests
-            const directReqQ = query(collection(db, 'direct_requests'), where('parentDocId', '==', uid));
-            const directReqSnap = await getDocs(directReqQ);
-            for (const d of directReqSnap.docs) await deleteDoc(doc(db, 'direct_requests', d.id));
-
-            // Delete groups
-            const groupQ = query(collection(db, 'groups'), where('parentDocId', '==', uid));
-            const groupSnap = await getDocs(groupQ);
-            for (const d of groupSnap.docs) await deleteDoc(doc(db, 'groups', d.id));
-
-            // Delete referrals
-            const refQ1 = query(collection(db, 'referrals'), where('referrerId', '==', uid));
-            const refSnap1 = await getDocs(refQ1);
-            for (const d of refSnap1.docs) await deleteDoc(doc(db, 'referrals', d.id));
-            
-            const refQ2 = query(collection(db, 'referrals'), where('referredUserId', '==', uid));
-            const refSnap2 = await getDocs(refQ2);
-            for (const d of refSnap2.docs) await deleteDoc(doc(db, 'referrals', d.id));
-
-            if (isDualRole) {
-              const newRoles = roles.filter((r: string) => r !== 'student');
-              await updateDoc(userDocRef, {
-                roles: newRoles
-              });
-              
-              const updatedUser = { ...JSON.parse(localStorage.getItem('user') || '{}'), role: newRoles[0] || 'teacher', roles: newRoles };
+            if (!result.isFullyDeleted) {
+              const remainingRoles = result.remainingRoles || ['teacher'];
+              const updatedUser = {
+                ...JSON.parse(localStorage.getItem('user') || '{}'),
+                role: remainingRoles[0] || 'teacher',
+                roles: remainingRoles,
+              };
               localStorage.setItem('user', JSON.stringify(updatedUser));
-              
               toast.success('Student profile deleted successfully');
               window.location.href = '/dashboard/teacher';
             } else {
-              await deleteDoc(userDocRef);
-              try {
-                await deleteUser(auth.currentUser);
-                localStorage.removeItem('user');
-                toast.success('Account deleted successfully');
-                window.location.href = '/';
-              } catch (e: any) {
-                if(e.code === 'auth/requires-recent-login') {
-                  localStorage.removeItem('user');
-                  toast.success('Account deleted successfully');
-                  await auth.signOut();
-                  window.location.href = '/login';
-                } else {
-                  throw e;
-                }
-              }
+              localStorage.removeItem('user');
+              toast.success('Account deleted successfully');
+              await auth.signOut();
+              window.location.href = '/';
             }
           } catch (err: any) {
-            toast.error(err.message);
+            toast.error(err.message || 'Failed to delete account');
             setIsDeletingAccount(false);
           }
         }}

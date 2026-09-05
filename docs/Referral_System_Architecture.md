@@ -97,9 +97,10 @@ sequenceDiagram
 
 ## 5. Security & Anti-Fraud Locks
 
-1. **Server-Side Authorization:** Referral rewards are never calculated on the frontend. The math is strictly executed inside the atomic database transaction in `/api/verify-payment` after validating cryptographic Razorpay HMAC signatures.
-2. **Self-Referral Prevention:** Users cannot enter their own referral code during registration.
+1. **Server-Side Authorization & Auth Trigger (`onUserCreated`):** Referral tracking tickets are handled via the 2nd Gen Firebase Auth trigger (`functions/src/triggers/onUserCreated.ts`). When a user signs up, the trigger checks `referredBy`, validates the code against existing users, rejects self-referrals, and initializes the `referrals` document.
+2. **Self-Referral Prevention:** Users cannot refer themselves (`referrerId !== referredUserId`).
 3. **Single Qualification Lock:** The backend query explicitly filters for `status == 'pending'`. Once marked `'qualified'`, a referral can never trigger a second reward.
 4. **Escrow Safety Lock:** Funds are held in escrow until Day 30 (`startDate + 30 days`), preventing any payout leakage if a class is discontinued during the 7-day trial.
-5. **Direct UPI Validation:** Referrer UPI IDs are validated via regex format check (`/^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/`) before disbursement. If missing, the status safely transitions to `'action_required_missing_upi'` without failing.
+5. **Direct UPI Validation & Payout Runner (`dailyPayouts`):** Referrer UPI IDs are validated via regex format check (`/^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/`) before disbursement. The nightly Cloud Scheduler runner `dailyPayouts` disburses matured referral rewards directly to UPI. If missing, the status safely transitions to `'action_required_missing_upi'`.
+6. **Banked Token Redemption (`redeemBankedToken`):** When a teacher is referred, the earned banked token can be redeemed 1:1 for active proposals via the callable function `redeemBankedToken` with atomic write locks.
 

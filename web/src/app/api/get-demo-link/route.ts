@@ -52,14 +52,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Demo date and time are not fully set' }, { status: 400 });
     }
 
-    // Parse the demo datetime (e.g. "2024-05-10" and "16:30")
-    // Assuming IST timezone since it's an Indian platform. Or just use local Date if the server is in the same zone.
-    // For safety, assuming the inputs are standard local time.
-    const demoDateTimeStr = `${appData.demoDate}T${appData.demoTime}:00`;
-    const demoDateObj = new Date(demoDateTimeStr);
-    
-    // Allow entry 5 minutes before
+    // Parse the demo datetime with explicit IST (+05:30) timezone offset
+    const cleanTime = (appData.demoTime || '').split('||')[0].trim();
+    const formattedTime = cleanTime.length === 5 ? `${cleanTime}:00` : cleanTime;
+    const demoDateObj = new Date(`${appData.demoDate}T${formattedTime}+05:30`);
+
+    if (isNaN(demoDateObj.getTime())) {
+      return NextResponse.json({ error: 'Invalid demo date or time format' }, { status: 400 });
+    }
+
+    // Allow entry 5 minutes before scheduled start time
     const allowedEntryTime = new Date(demoDateObj.getTime() - 5 * 60 * 1000);
+    // Lock link 90 minutes after scheduled start time (unless converted to full tuition)
+    const lockExpiryTime = new Date(demoDateObj.getTime() + 90 * 60 * 1000);
     const now = new Date();
 
     if (now < allowedEntryTime) {
@@ -67,6 +72,13 @@ export async function POST(req: NextRequest) {
         error: 'Too early to join. The link will unlock 5 minutes before the scheduled time.',
         serverTime: now.toISOString(),
         unlockTime: allowedEntryTime.toISOString()
+      }, { status: 403 });
+    }
+
+    if (now > lockExpiryTime && appData.status !== 'tuition_started') {
+      return NextResponse.json({ 
+        error: 'Demo class time window has expired.',
+        serverTime: now.toISOString()
       }, { status: 403 });
     }
 
