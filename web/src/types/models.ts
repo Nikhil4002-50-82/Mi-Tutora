@@ -133,6 +133,8 @@ export interface Tutor {
   travelDistance?: string;
   tutorId?: string;
   verificationStatus?: string;
+  verificationDocs?: Record<string, { url: string; fileName: string; uploadedAt: number }>;
+  verificationSubmittedAt?: number;
   whatsapp?: string;
   minFee?: number;
   suitabilityScore?: number;

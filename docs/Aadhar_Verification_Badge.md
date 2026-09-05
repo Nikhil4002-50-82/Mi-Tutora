@@ -67,3 +67,13 @@ Because trust and safety are paramount, verified teachers receive an algorithmic
 - **File:** `web/src/utils/matching.ts`
 - **Logic:** `if (teacher.aadharVerified === true) { score += 20; }`
 - **Philosophy:** This provides an "organic nudge". It means a free, unverified teacher who is a perfect 100% academic match for a student (e.g., matches both Math and Science perfectly) can still outrank a verified teacher who is a poor academic match. However, if two teachers are academically identical, the verified teacher will always win the tie-breaker and appear higher on the parent's screen.
+
+---
+
+## 6. Relation to Educational Document Verification
+
+While Aadhaar verification guarantees government identity validation and grants a matchmaking algorithm boost (+20 pts) along with a green badge, **Educational Document Verification** is a separate, compulsory trust layer required for sending tuition proposals.
+- See the full architectural specification in [Document_Verification.md](file:///c:/Users/Dell/Desktop/mushi/docs/Document_Verification.md).
+- Identity verification (`aadharVerified`) is optional and boosts ranking.
+- Educational document verification (`verificationDocs`, `verificationStatus`) is mandatory during profile onboarding and gates teachers from submitting proposals until academic certificates are uploaded.
+

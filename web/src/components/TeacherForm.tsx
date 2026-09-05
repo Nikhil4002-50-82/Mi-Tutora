@@ -6,8 +6,31 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateReferralCode } from '@/utils/referral';
-import { MapPin, Loader2, Edit2, User } from 'lucide-react';
+import { 
+  MapPin, 
+  Loader2, 
+  Edit2, 
+  User, 
+  FileText, 
+  CheckCircle, 
+  CheckCircle2, 
+  AlertTriangle, 
+  AlertCircle, 
+  ExternalLink, 
+  X, 
+  UploadCloud, 
+  Clock, 
+  ShieldCheck 
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { storage } from '@/utils/firebase/client';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  getRequiredDocuments,
+  validatePdfFile,
+  isVerificationComplete,
+  DocumentRequirement,
+} from '@/utils/documentVerification';
 
 
 interface Props {
@@ -30,6 +53,12 @@ export default function TeacherForm({
   const [isEditing, setIsEditing] = useState(!hasProfile);
   const [sameAsPhone, setSameAsPhone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [uploadProgressMsg, setUploadProgressMsg] = useState('');
+  const [stagedFiles, setStagedFiles] = useState<Record<string, File>>({});
+  const [existingDocs, setExistingDocs] = useState<Record<string, { url: string; fileName: string; uploadedAt: number }>>(
+    initialData?.verificationDocs || {}
+  );
   const [successMsg, setSuccessMsg] = useState('');
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -89,12 +118,48 @@ export default function TeacherForm({
         languages: initialData.languages || [] as string[],
         category: initialData.category || category || (typeof window !== 'undefined' ? localStorage.getItem('selectedCategory') || '' : ''),
       });
+      if (initialData.verificationDocs) {
+        setExistingDocs(initialData.verificationDocs);
+      }
       setDataLoaded(true);
       if (!hasProfile) {
         setIsEditing(true);
       }
     }
   }, [initialData, dataLoaded, category, hasProfile]);
+
+  useEffect(() => {
+    if (initialData?.verificationDocs) {
+      setExistingDocs(initialData.verificationDocs);
+    }
+  }, [initialData?.verificationDocs]);
+
+  const handleFileSelect = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const result = validatePdfFile(file);
+    if (!result.valid) {
+      toast.error(result.error || 'Invalid file');
+      alert(result.error || 'Invalid file');
+      e.target.value = '';
+      return;
+    }
+
+    setStagedFiles(prev => ({
+      ...prev,
+      [docId]: file,
+    }));
+    e.target.value = '';
+  };
+
+  const handleRemoveStagedFile = (docId: string) => {
+    setStagedFiles(prev => {
+      const next = { ...prev };
+      delete next[docId];
+      return next;
+    });
+  };
 
   const handleCheckboxChange = (field: string, value: string) => {
     setFormData((prev: any) => {
@@ -190,6 +255,20 @@ export default function TeacherForm({
       alert("Please select at least one teaching category.");
       return;
     }
+
+    if (isDashboard) {
+      if (!formData.qualification) {
+        toast.error("Please select your highest qualification.");
+        alert("Please select your highest qualification.");
+        return;
+      }
+
+      if (!isVerificationComplete(formData.qualification, existingDocs, stagedFiles)) {
+        toast.error("Please upload all required educational documents (PDF format) for your qualification.");
+        alert("Please upload all required educational documents (PDF format) before saving.");
+        return;
+      }
+    }
     
     setLoading(true);
     setSuccessMsg('');
@@ -242,6 +321,44 @@ export default function TeacherForm({
         existingTutorId = generateCustomId('MTT');
       }
 
+      // Upload any staged verification documents to Firebase Storage
+      let finalVerificationDocs: Record<string, { url: string; fileName: string; uploadedAt: number }> = {
+        ...existingDocs,
+      };
+
+      const stagedKeys = Object.keys(stagedFiles);
+      if (stagedKeys.length > 0) {
+        setUploadingDocs(true);
+        for (const docId of stagedKeys) {
+          const file = stagedFiles[docId];
+          if (file) {
+            setUploadProgressMsg(`Uploading ${file.name}...`);
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const storageRef = ref(storage, `tutor_documents/${user.uid}/${docId}_${Date.now()}_${safeName}`);
+            const snapshot = await uploadBytes(storageRef, file, {
+              contentType: 'application/pdf',
+            });
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+            finalVerificationDocs[docId] = {
+              url: downloadUrl,
+              fileName: file.name,
+              uploadedAt: Date.now(),
+            };
+          }
+        }
+        setUploadingDocs(false);
+        setUploadProgressMsg('');
+      }
+
+      const hasNewDocs = stagedKeys.length > 0;
+      const currentStatus = initialData?.verificationStatus;
+      const verificationStatus = hasNewDocs
+        ? 'pending'
+        : (currentStatus || (Object.keys(finalVerificationDocs).length > 0 ? 'pending' : 'unsubmitted'));
+      const verificationSubmittedAt = hasNewDocs
+        ? Date.now()
+        : (initialData?.verificationSubmittedAt || Date.now());
+
       // Update the existing tutor record
       const isOnlineOnlyCategory = formData.category === 'programming' || formData.category === 'languages';
       const actualMode = isOnlineOnlyCategory ? 'Online' : formData.mode;
@@ -280,14 +397,18 @@ export default function TeacherForm({
         latitude: 0.0,
         longitude: 0.0,
         hasProfile: true,
+        verificationDocs: finalVerificationDocs,
+        verificationStatus: verificationStatus,
+        verificationSubmittedAt: verificationSubmittedAt,
         createdAt: Date.now()
       }, { merge: true });
 
-      
+      setExistingDocs(finalVerificationDocs);
+      setStagedFiles({});
 
       sessionStorage.removeItem('teacherFormData');
       setSuccessMsg('Profile updated successfully!');
-      toast.success("Profile saved successfully!", { description: "Your teacher profile has been updated." });
+      toast.success("Profile saved successfully!", { description: "Your teacher profile and verification documents have been updated." });
       if (isDashboard) {
         if (onSuccess) await onSuccess();
       } else {
@@ -296,10 +417,14 @@ export default function TeacherForm({
       setIsEditing(false);
       
     } catch (error: any) {
+      setUploadingDocs(false);
+      setUploadProgressMsg('');
       toast.error('Failed to update profile', { description: error.message });
       alert(error.message || 'Failed to update profile');
     } finally {
       setLoading(false);
+      setUploadingDocs(false);
+      setUploadProgressMsg('');
     }
   };
 
@@ -436,6 +561,71 @@ export default function TeacherForm({
                   <p className="text-base text-gray-700 whitespace-pre-wrap">{formData.description}</p>
                 </div>
               )}
+
+              {/* EDUCATIONAL VERIFICATION DOCUMENTS CARD */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Educational Verification Documents
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Academic certificates for: <span className="font-semibold text-slate-700">{formData.qualification || 'Not set'}</span>
+                    </p>
+                  </div>
+                  <div>
+                    {initialData?.verificationStatus === 'verified' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Verified
+                      </span>
+                    )}
+                    {initialData?.verificationStatus === 'rejected' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Action Required
+                      </span>
+                    )}
+                    {(!initialData?.verificationStatus || initialData?.verificationStatus === 'pending' || initialData?.verificationStatus === 'unsubmitted') && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" /> {initialData?.verificationStatus === 'unsubmitted' || !initialData?.verificationStatus ? 'Unsubmitted' : 'Pending Verification'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* List of documents for this qualification */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  {getRequiredDocuments(formData.qualification).map((req) => {
+                    const docData = existingDocs[req.id];
+                    return (
+                      <div key={req.id} className="p-3.5 rounded-2xl border border-slate-200 bg-white flex items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${docData?.url ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{req.label}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{docData ? (docData.fileName || 'Uploaded PDF') : 'Missing document'}</p>
+                          </div>
+                        </div>
+                        {docData?.url ? (
+                          <a
+                            href={docData.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1 transition-colors"
+                          >
+                            View <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="shrink-0 text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                            Missing
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -798,6 +988,114 @@ export default function TeacherForm({
             </select>
           </div>
 
+        </div>
+
+        {/* COMPULSORY ACADEMIC DOCUMENT VERIFICATION */}
+        <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-5 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <label className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#00a992]" />
+                Academic Verification Documents *
+              </label>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Upload your educational certificates/marksheets in <strong className="text-slate-700">PDF format</strong> (max 5MB each).
+              </p>
+            </div>
+            {formData.qualification && (
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                Required for: {formData.qualification}
+              </span>
+            )}
+          </div>
+
+          {!formData.qualification ? (
+            <div className="text-center py-6 px-4 bg-white/70 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
+              Please select your <strong>Highest Qualification</strong> above to view required documents.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {getRequiredDocuments(formData.qualification).map((req) => {
+                const staged = stagedFiles[req.id];
+                const existing = existingDocs[req.id];
+
+                return (
+                  <div key={req.id} className="p-4 rounded-xl border border-slate-200 bg-white transition-all hover:border-slate-300 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">{req.label}</span>
+                          <span className="text-rose-500 text-xs font-bold">*</span>
+                          {existing?.url && !staged && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                            </span>
+                          )}
+                          {staged && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                              Ready to upload
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">{req.description}</p>
+                      </div>
+
+                      {/* ACTIONS / FILE STATE */}
+                      <div className="shrink-0 flex items-center gap-2">
+                        {staged ? (
+                          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                            <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div className="text-left max-w-[150px] sm:max-w-[200px]">
+                              <p className="text-xs font-semibold text-emerald-900 truncate">{staged.name}</p>
+                              <p className="text-[10px] text-emerald-600">{(staged.size / (1024 * 1024)).toFixed(2)} MB</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveStagedFile(req.id)}
+                              className="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded-lg transition-colors ml-1"
+                              title="Remove selected file"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : existing?.url ? (
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={existing.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1 transition-colors"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" /> View
+                            </a>
+                            <label className="cursor-pointer text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1 border border-slate-200">
+                              <UploadCloud className="w-3.5 h-3.5" /> Replace
+                              <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                onChange={(e) => handleFileSelect(req.id, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer text-xs font-bold text-[#00a992] hover:text-[#008f7b] bg-[#00a992]/10 hover:bg-[#00a992]/20 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 border border-[#00a992]/20">
+                            <UploadCloud className="w-4 h-4" /> Upload PDF
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              onChange={(e) => handleFileSelect(req.id, e)}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* OCCUPATION */}
@@ -1179,7 +1477,14 @@ export default function TeacherForm({
           disabled={loading || (!hasProfile && !acceptedLegal)}
           className="w-full bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 disabled:opacity-50 disabled:hover:from-[#00a992] disabled:hover:to-teal-500 disabled:hover:-translate-y-0 text-white font-bold py-5 rounded-xl transition-all shadow-lg shadow-teal-500/25 text-lg hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2"
         >
-          {loading ? 'Processing...' : (hasProfile ? '✅ Save Changes' : (isDashboard ? '✅ Save Profile' : '🚀 Continue to Apply'))}
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>{uploadProgressMsg || 'Processing...'}</span>
+            </>
+          ) : (
+            hasProfile ? '✅ Save Changes' : (isDashboard ? '✅ Save Profile' : '🚀 Continue to Apply')
+          )}
         </button>
 
       </form>

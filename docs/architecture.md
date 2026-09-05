@@ -116,12 +116,19 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 
 ---
 
-## 5. Trust & Safety: Aadhar KYC Verification
-*Full Specification: [`docs/Aadhar_Verification_Badge.md`](./Aadhar_Verification_Badge.md)*
+## 5. Trust & Safety: Aadhar KYC & Educational Document Verification
+*Full Specifications: [`Aadhar_Verification_Badge.md`](./Aadhar_Verification_Badge.md), [`Document_Verification.md`](./Document_Verification.md)*
 
+### A. Aadhar Identity KYC
 *   **Live Gov API Integration:** Integrates with Sandbox.co.in OTP verification API.
 *   **Secure Masking:** Only the last 4 digits (`XXXX-XXXX-1234`) are retained in Firestore for display; full Aadhar numbers are never permanently stored.
 *   **Trust Badge & Algorithm Boost:** Verified educators receive the green verified shield badge and an automatic **+20 ranking boost**.
+
+### B. Compulsory Educational Document Verification
+*   **Dynamic Qualification Mapping:** The required verification documents are dynamically determined by the teacher's selected highest qualification (e.g., 10th marksheet for 10th; 10th + 12th for 12th; 10th + 12th + degree certificate for bachelor degrees; master certificates for post-graduates).
+*   **Strict PDF Restrictions:** Frontend and Firebase Storage rules physically restrict uploads strictly to **PDF format** (`.pdf`) capped at **5MB** per file.
+*   **Secure Firebase Storage Scheme:** Files are stored under `tutor_documents/{userId}/{docId}_{timestamp}_{fileName}` with owner-only write permissions.
+*   **Proposal Sending Lockout:** Tutors cannot submit tuition proposals (`make_offer` or direct demo requests) without first submitting all required educational marksheets and degree certificates.
 
 ---
 
@@ -247,6 +254,7 @@ erDiagram
 | 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`Database_Architecture.md#21-collection-users`](./Database_Architecture.md) |
 | 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`Database_Architecture.md#22-collection-parents`](./Database_Architecture.md) |
 | 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC. | Auth UID | [`Database_Architecture.md#23-collection-tutors`](./Database_Architecture.md) |
+| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC, `verificationDocs`, `verificationStatus`. | Auth UID | [`Database_Architecture.md#23-collection-tutors`](./Database_Architecture.md) |
 | 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`Database_Architecture.md#24-collection-students`](./Database_Architecture.md) |
 | 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`Database_Architecture.md#25-collection-groups`](./Database_Architecture.md) |
 | 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`Database_Architecture.md#26-collection-tuition_requests`](./Database_Architecture.md) |
@@ -268,6 +276,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 | Subsystem / Feature Area | Detailed Architecture Specification |
 | :--- | :--- |
 | **Complete Database Schema & ER Model** | 👉 [`docs/Database_Architecture.md`](./Database_Architecture.md) |
+| **Educational Document Verification Architecture** | 👉 [`docs/Document_Verification.md`](./Document_Verification.md) |
 | **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./First_Month_Tuition_Escrow_Payout_Architecture.md) |
 | **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./Referral_System_Architecture.md) |
 | **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md) |
@@ -291,7 +300,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](../web/tests):
 
 ```bash
-# Run all 13 test suites (99 unit & integration tests)
+# Run all 14 test suites (123 unit & integration tests)
 cd web
 npx playwright test
 
@@ -299,4 +308,4 @@ npx playwright test
 npx tsc --noEmit
 ```
 
-*All 99 automated tests pass with 0 errors, validating the mathematical split, escrow lifecycle, matching logic, and anti-fraud protections.*
+*All 123 automated tests pass with 0 errors, validating the mathematical split, escrow lifecycle, matching logic, and anti-fraud protections.*

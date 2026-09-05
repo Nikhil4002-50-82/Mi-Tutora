@@ -111,6 +111,8 @@ export default function TeacherDashboard() {
 
 
   const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
+  const verificationStatus = data?.profile?.verificationStatus;
+  const hasSubmittedVerification = verificationStatus === 'pending' || verificationStatus === 'verified';
 
   useEffect(() => {
     const existingUpi = data?.profile?.upiId || data?.userData?.upiId;
@@ -680,6 +682,12 @@ export default function TeacherDashboard() {
       return;
     }
 
+    if (!hasSubmittedVerification) {
+      toast.error("Please upload your academic verification documents before sending offers.");
+      setActiveTab('profile');
+      return;
+    }
+
     try {
       setOfferLoading(true);
       const { db, auth } = await import('@/utils/firebase/client');
@@ -738,6 +746,13 @@ export default function TeacherDashboard() {
     if (offerLoading) { isSubmittingRef.current = false; return false; }
     if (!hasProfile) {
       toast.error("Please complete your profile first.");
+      setActiveTab('profile');
+      isSubmittingRef.current = false;
+      return false;
+    }
+
+    if (!hasSubmittedVerification) {
+      toast.error("Please upload your academic verification documents before requesting demos.");
       setActiveTab('profile');
       isSubmittingRef.current = false;
       return false;
