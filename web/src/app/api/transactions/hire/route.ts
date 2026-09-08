@@ -48,12 +48,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Demo not scheduled' }, { status: 400 });
     }
 
-    const demoDateObj = new Date(appData.demoDate);
-    const timeParts = appData.demoTime.split('||')[0].split(':');
-    if (timeParts.length >= 2) {
-      demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+    const cleanTime = (appData.demoTime || '').split('||')[0].trim();
+    const formattedTime = cleanTime.length === 5 ? `${cleanTime}:00` : cleanTime;
+    let demoEndTime: number;
+    const istParsed = new Date(`${appData.demoDate}T${formattedTime}+05:30`).getTime();
+    if (!isNaN(istParsed)) {
+      demoEndTime = istParsed;
+    } else {
+      const demoDateObj = new Date(appData.demoDate);
+      const timeParts = cleanTime.split(':');
+      if (timeParts.length >= 2) {
+        demoDateObj.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+      }
+      demoEndTime = demoDateObj.getTime();
     }
-    const demoEndTime = demoDateObj.getTime();
 
     if (Date.now() < demoEndTime) {
       return NextResponse.json({ success: false, error: 'Demo has not finished yet' }, { status: 403 });

@@ -47,6 +47,12 @@ export async function POST(req: NextRequest) {
     if (role === 'student' && appData?.parentDocId !== decodedToken.uid) {
       return NextResponse.json({ error: 'Unauthorized: Not the parent for this application' }, { status: 403 });
     }
+
+    if (isRemoval && appData?.feePaid) {
+      return NextResponse.json({ 
+        error: 'Tuition already paid. Removal does not incur additional charges.' 
+      }, { status: 400 });
+    }
     
     // Determine the base price based on role and what exists in the document
     let coursePrice = 4000; // Fallback
@@ -116,10 +122,44 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    if (totalToPay <= 0) {
+      const crypto = await import('crypto');
+      const secret = process.env.RAZORPAY_KEY_SECRET || 'wallet_secret';
+      const walletOrderId = `order_wallet_${applicationId}_${Date.now()}`;
+      const walletPaymentId = `pay_wallet_${Date.now()}`;
+      const walletSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${walletOrderId}|${walletPaymentId}`)
+        .digest('hex');
+
+      await adminDb.collection('payments').add({
+        razorpayOrderId: walletOrderId,
+        applicationDocId: applicationId,
+        userId: decodedToken.uid,
+        amount: 0,
+        walletDiscountApplied: walletDiscountApplied,
+        currency: 'INR',
+        status: 'created',
+        type: role === 'student' ? 'tuition' : 'demo',
+        isRemoval: isRemoval || false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return NextResponse.json({
+        id: walletOrderId,
+        amount: 0,
+        currency: 'INR',
+        receipt: `receipt_${applicationId}_${Date.now()}`,
+        status: 'created',
+        walletCovered: true,
+        mockPaymentId: walletPaymentId,
+        mockSignature: walletSignature
+      });
+    }
+
     // Razorpay operates in paise (multiply by 100)
     const amountInPaise = totalToPay * 100;
-
-
 
     // LIVE MODE: Create an actual Razorpay order
     const razorpay = new Razorpay({

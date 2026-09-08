@@ -129,7 +129,10 @@ export const handleRazorpayWebhook = onRequest(async (req, res) => {
             const platformFee = Math.round(rewardBase * 0.4);
             const tutorShare = Math.round(rewardBase * 0.6);
             const rewardAmount = Math.round(platformFee * 0.25);
-            const releaseEligibleAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+            const startMs = appData.startDate 
+              ? (typeof appData.startDate.toMillis === "function" ? appData.startDate.toMillis() : (typeof appData.startDate === "number" ? appData.startDate : Date.now())) 
+              : Date.now();
+            const releaseEligibleAt = startMs + (30 * 24 * 60 * 60 * 1000);
 
             const payoutRef = db.collection("tutor_payouts").doc(`payout_${applicationId}`);
             transaction.set(
@@ -149,7 +152,7 @@ export const handleRazorpayWebhook = onRequest(async (req, res) => {
                 referralReward: rewardAmount,
                 monthNumber: 1,
                 status: "escrow_held",
-                startDate: admin.firestore.FieldValue.serverTimestamp(),
+                startDate: appData.startDate || admin.firestore.FieldValue.serverTimestamp(),
                 paidByStudentAt: admin.firestore.FieldValue.serverTimestamp(),
                 releaseEligibleAt,
                 payoutMethod: "upi",

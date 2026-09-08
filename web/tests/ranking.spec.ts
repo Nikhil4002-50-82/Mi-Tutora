@@ -147,5 +147,20 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       const score = calculateSuitabilityScore(student, teacher);
       expect(score).toBe(220);
     });
+
+    test('Prevents false positive matches for short tokens (e.g. C does not match CSS or React)', () => {
+      const student = { category: 'programming', technologies: ['C'] };
+      const teacher = { category: 'programming', technologies: ['CSS', 'React', 'JavaScript'] };
+      expect(isStrictMatch(student, teacher)).toBe(false);
+      expect(calculateSuitabilityScore(student, teacher)).toBe(0);
+    });
+
+    test('Prevents false positive match for Science vs Social Science', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Science'] };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Social Science'] };
+      expect(isStrictMatch(student, teacher)).toBe(false);
+      expect(calculateSuitabilityScore(student, teacher)).toBe(50); // Class (30) + Board (20) = 50, but 0 subject points
+    });
   });
 });
+

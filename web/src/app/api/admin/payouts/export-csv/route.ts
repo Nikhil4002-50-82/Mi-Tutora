@@ -10,18 +10,29 @@ export async function GET(req: NextRequest) {
     }
 
     const authHeader = req.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ') && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
     }
 
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
-      } catch (e) {
-        if (process.env.NODE_ENV === 'production') {
-          return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-        }
-      }
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Enforce Admin Access Check
+    const isAdminClaim = decodedToken.admin === true || decodedToken.role === 'admin';
+    let isDbAdmin = false;
+    if (!isAdminClaim) {
+      const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+      const userData = userDoc.data();
+      const roles: string[] = Array.isArray(userData?.roles) ? userData.roles : [userData?.role];
+      isDbAdmin = roles.includes('admin');
+    }
+
+    if (!isAdminClaim && !isDbAdmin) {
+      return NextResponse.json({ error: 'Forbidden: Admin privileges required' }, { status: 403 });
     }
 
     const tutorSnapshot = await adminDb.collection('tutor_payouts').get();

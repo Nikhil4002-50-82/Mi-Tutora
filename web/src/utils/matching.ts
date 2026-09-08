@@ -27,6 +27,26 @@ export function doesClassMatch(studentClass: string, teacherClasses: string[]): 
     return false;
 }
 
+export function matchesSubjectToken(need: string, offer: string): boolean {
+  if (!need || !offer) return false;
+  const n = need.toLowerCase().trim();
+  const o = offer.toLowerCase().trim();
+  if (n === o) return true;
+
+  // Clean alphanumeric representation
+  const cleanN = n.replace(/[^a-z0-9]/g, '');
+  const cleanO = o.replace(/[^a-z0-9]/g, '');
+  if (cleanN === cleanO) return true;
+
+  // Math aliases
+  if ((cleanN === 'math' || cleanN === 'maths' || cleanN === 'mathematics') &&
+      (cleanO === 'math' || cleanO === 'maths' || cleanO === 'mathematics')) {
+    return true;
+  }
+
+  return false;
+}
+
 export function calculateSuitabilityScore(studentGroup: any, teacher: any): number {
   if (!studentGroup || !teacher) return 0;
   
@@ -72,11 +92,8 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
   }
 
   if (studentNeeds.length > 0 && teacherOffers.length > 0) {
-    const normalizedNeeds = studentNeeds.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    
-    normalizedNeeds.forEach((need:string) => {
-      if (normalizedOffers.some((offer:string) => offer.includes(need) || need.includes(offer))) {
+    studentNeeds.forEach((need: string) => {
+      if (teacherOffers.some((offer: string) => matchesSubjectToken(need, offer))) {
         score += 50;
       }
     });
@@ -146,10 +163,8 @@ export function isStrictMatch(studentGroup: any, teacher: any): boolean {
   
   if (studentNeeds.length > 0) {
     if (teacherOffers.length === 0) return false;
-    const normalizedOffers = teacherOffers.map((s:string) => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const allSubjectsMatched = studentNeeds.every((need:string) => {
-      const normalizedNeed = need.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return normalizedOffers.some((offer:string) => offer.includes(normalizedNeed) || normalizedNeed.includes(offer));
+    const allSubjectsMatched = studentNeeds.every((need: string) => {
+      return teacherOffers.some((offer: string) => matchesSubjectToken(need, offer));
     });
     if (!allSubjectsMatched) return false;
   }

@@ -168,5 +168,20 @@ test.describe('Payment Architecture & Financial Integrity (Payment_Architecture.
       const total = calculateTotalDemoFee(students, mockPricing);
       expect(total).toBe(400); // 150 + 250
     });
+
+    test('Correctly prices Karnataka 1st PUC and 2nd PUC to Class 11 and Class 12', () => {
+      const mockPucPricing = [
+        { id: 'school_class_1', displayName: 'Class 1 School Tuition', price: 100 },
+        { id: 'school_class_2', displayName: 'Class 2 School Tuition', price: 100 },
+        { id: 'school_class_11', displayName: 'Class 11 School Tuition', price: 200 },
+        { id: 'school_class_12', displayName: 'Class 12 School Tuition', price: 220 },
+      ];
+
+      const puc1 = { category: 'school', classLevel: '1st PUC' };
+      const puc2 = { category: 'school', classLevel: '2nd PUC' };
+
+      expect(getStudentDemoFee(puc1, mockPucPricing).price).toBe(200);
+      expect(getStudentDemoFee(puc2, mockPucPricing).price).toBe(220);
+    });
   });
 });

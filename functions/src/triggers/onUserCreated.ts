@@ -11,11 +11,11 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
   const email = user.email || "";
   const name = user.displayName || (email.split("@")[0] || "User");
 
-  // Generate unique 10-character referral code
+  // Generate unique formatted referral code (e.g. JOHN-23DEF4)
   const cleanName = (name || "USER").replace(/[^a-zA-Z]/g, "").toUpperCase();
   const namePart = (cleanName + "XXXX").substring(0, 4);
-  const uidPart = (uid || "000000").substring(0, 6).toUpperCase();
-  const referralCode = `${namePart}${uidPart}`;
+  const uidPart = (uid || "0000000000").substring(4, 10).toUpperCase();
+  const referralCode = `${namePart}-${uidPart}`;
 
   const userRef = db.collection("users").doc(uid);
   const existingUser = await userRef.get();

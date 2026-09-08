@@ -119,10 +119,39 @@ service cloud.firestore {
       allow write: if false; 
     }
 
+    // -------------------------------------------------------------------------
+    // REFERRALS: Strictly backend only writes
+    // -------------------------------------------------------------------------
+    match /referrals/{referralId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // PENDING TUITION FEES: Strictly backend only writes
+    // -------------------------------------------------------------------------
+    match /pending_tuition_fees/{feeId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // MARKETPLACE PRICING & CONFIG: Strictly backend only writes
+    // -------------------------------------------------------------------------
+    match /marketplace_pricing/{pricingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /global_config/{configId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Prevent anonymous mass-deletion on the rest of the DB while keeping it open for logic
     match /{collection}/{document=**} {
-      allow read, create, update: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews';
-      allow delete: if request.auth != null && collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews';
+      allow read, create, update: if collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews' && collection != 'referrals' && collection != 'pending_tuition_fees' && collection != 'marketplace_pricing' && collection != 'global_config';
+      allow delete: if request.auth != null && collection != 'users' && collection != 'tutors' && collection != 'parents' && collection != 'applications' && collection != 'payments' && collection != 'tutor_payouts' && collection != 'reviews' && collection != 'referrals' && collection != 'pending_tuition_fees' && collection != 'marketplace_pricing' && collection != 'global_config';
     }
   }
 }

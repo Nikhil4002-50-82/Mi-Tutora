@@ -969,6 +969,41 @@ export default function StudentDashboard() {
       const order = await res.json();
       if (!res.ok) throw new Error(order.error || 'Failed to create order');
 
+      if (order.walletCovered) {
+        const vToken = await auth.currentUser?.getIdToken();
+        const verifyRes = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${vToken}`
+          },
+          body: JSON.stringify({
+            razorpay_order_id: order.id,
+            razorpay_payment_id: order.mockPaymentId,
+            razorpay_signature: order.mockSignature,
+            applicationId: payingClass.id,
+            role: 'student',
+            isRemoval: !!payingClass.isRemoval,
+            useWallet
+          })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok) {
+          toast.error(verifyData.error || 'Payment verification failed');
+        } else {
+          const { db } = await import('@/utils/firebase/client');
+          const { syncStudentAvailability } = await import('@/utils/studentAvailability');
+          await syncStudentAvailability(db, payingClass.studentDocIds || [payingClass.studentDocId]).catch(console.error);
+          
+          toast.success("Payment completed successfully via wallet!");
+          setPayingClass(null);
+          setUseWallet(false);
+          mutate();
+        }
+        setPaymentLoading(false);
+        return;
+      }
+
       // 2. Load Razorpay SDK
       const loadRazorpay = () => new Promise(resolve => {
          if ((window as any).Razorpay) return resolve(true);

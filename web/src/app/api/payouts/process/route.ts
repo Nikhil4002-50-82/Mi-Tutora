@@ -22,15 +22,27 @@ export async function POST(req: NextRequest) {
       if (adminAuth) {
         try {
           const decodedToken = await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
-          if (decodedToken) isAuthorized = true;
+          if (decodedToken) {
+            const isAdminClaim = decodedToken.admin === true || decodedToken.role === 'admin';
+            let isDbAdmin = false;
+            if (!isAdminClaim) {
+              const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+              const userData = userDoc.data();
+              const roles: string[] = Array.isArray(userData?.roles) ? userData.roles : [userData?.role];
+              isDbAdmin = roles.includes('admin');
+            }
+            if (isAdminClaim || isDbAdmin) {
+              isAuthorized = true;
+            }
+          }
         } catch (e) {
           // Token invalid
         }
       }
     }
 
-    if (!isAuthorized && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Unauthorized: Admin or Cron authorization required' }, { status: 401 });
     }
 
     const now = Date.now();

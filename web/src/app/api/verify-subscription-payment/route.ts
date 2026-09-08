@@ -115,16 +115,24 @@ async function processSubscriptionUpdate(adminDb: any, userId: string, orderId: 
         throw new Error("Tutor profile not found.");
     }
 
+    const tutorData = tutorSnap.data() || {};
     const { Timestamp, FieldValue } = await import('firebase-admin/firestore');
     
     const oneMonthMillis = 30 * 24 * 60 * 60 * 1000; 
-    const expiryDate = Timestamp.now().toMillis() + oneMonthMillis;
+    const now = Date.now();
+    const currentExpiry = tutorData.subscriptionExpiry || 0;
+    const expiryDate = Math.max(now, currentExpiry) + oneMonthMillis;
+
+    const currentTokensUsed = tutorData.weeklyQuota?.tokensUsed || 0;
+    const updatedTokensUsed = Math.max(0, currentTokensUsed - 10);
 
     batch.update(tutorRef, {
         subscriptionPlan: 'pro',
         isSubscribed: true,
         subscriptionExpiry: expiryDate,
-        subscriptionUpdatedAt: FieldValue.serverTimestamp()
+        subscriptionUpdatedAt: FieldValue.serverTimestamp(),
+        'weeklyQuota.tokensUsed': updatedTokensUsed,
+        'weeklyQuota.lastUpdated': FieldValue.serverTimestamp()
     });
 
     await batch.commit();

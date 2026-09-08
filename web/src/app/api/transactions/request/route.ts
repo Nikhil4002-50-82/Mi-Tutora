@@ -139,8 +139,13 @@ export async function POST(req: NextRequest) {
             currentTokens = tutorData.weeklyQuota.tokensUsed || 0;
         }
         
+        let usedBankedToken = false;
         if (currentTokens >= teacherLimit) {
-            return NextResponse.json({ success: false, error: 'WEEKLY_QUOTA_EXCEEDED' }, { status: 403 });
+            if ((tutorData.bankedTokens || 0) > 0) {
+                usedBankedToken = true;
+            } else {
+                return NextResponse.json({ success: false, error: 'WEEKLY_QUOTA_EXCEEDED' }, { status: 403 });
+            }
         }
 
         const studentDocIds = studentData.students ? studentData.students.map((s:any)=>s.id) : [studentData.id];
@@ -172,13 +177,20 @@ export async function POST(req: NextRequest) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        batch.update(tutorRef, {
-            weeklyQuota: {
-                weekStartDate: currentWeekStart,
-                tokensUsed: currentTokens + 1,
-                lastUpdated: FieldValue.serverTimestamp()
-            }
-        });
+        if (usedBankedToken) {
+            batch.update(tutorRef, {
+                bankedTokens: FieldValue.increment(-1),
+                updatedAt: FieldValue.serverTimestamp()
+            });
+        } else {
+            batch.update(tutorRef, {
+                weeklyQuota: {
+                    weekStartDate: currentWeekStart,
+                    tokensUsed: currentTokens + 1,
+                    lastUpdated: FieldValue.serverTimestamp()
+                }
+            });
+        }
     }
 
     await batch.commit();

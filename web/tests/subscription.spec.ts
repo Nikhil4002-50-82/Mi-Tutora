@@ -74,6 +74,42 @@ test.describe('Subscription & Token Architecture', () => {
       expect(expiry - paymentTime).toBe(2592000000);
     });
 
+    test('Early renewal extends expiry from existing expiry date rather than overwriting', () => {
+      const now = 1756800000000;
+      const existingExpiry = now + (10 * 24 * 60 * 60 * 1000); // 10 days remaining
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      
+      const newExpiry = Math.max(now, existingExpiry) + THIRTY_DAYS_MS;
+      // Should equal existingExpiry + 30 days (40 days from now)
+      expect(newExpiry).toBe(existingExpiry + THIRTY_DAYS_MS);
+      expect(newExpiry - now).toBe(40 * 24 * 60 * 60 * 1000);
+    });
+
+    test('Pro upgrade deducts 10 tokens from tokensUsed bounded at 0', () => {
+      const currentUsed = 7;
+      const updatedUsed = Math.max(0, currentUsed - 10);
+      expect(updatedUsed).toBe(0);
+
+      const heavyUsed = 12;
+      const updatedHeavy = Math.max(0, heavyUsed - 10);
+      expect(updatedHeavy).toBe(2);
+    });
+
+    test('Banked token allows proposal when weekly quota is reached', () => {
+      function canSendWithBanked(currentTokens: number, limit: number, bankedTokens: number) {
+        if (currentTokens < limit) return { allowed: true, useBanked: false };
+        if (bankedTokens > 0) return { allowed: true, useBanked: true };
+        return { allowed: false, useBanked: false };
+      }
+
+      // Quota reached, has banked tokens
+      expect(canSendWithBanked(5, 5, 2)).toEqual({ allowed: true, useBanked: true });
+      // Quota reached, no banked tokens
+      expect(canSendWithBanked(5, 5, 0)).toEqual({ allowed: false, useBanked: false });
+      // Quota not reached
+      expect(canSendWithBanked(4, 5, 0)).toEqual({ allowed: true, useBanked: false });
+    });
+
     test('Neutralizes local clock rewind using latestServerTime', () => {
       const latestServerTime = 1756800000000;
       const expiredSubExpiry = latestServerTime - 1000; // Expired 1 second ago on server

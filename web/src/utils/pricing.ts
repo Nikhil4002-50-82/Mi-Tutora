@@ -8,6 +8,8 @@ export const getStudentDemoFee = (student: any, pricingData: any[]) => {
     const cl = (student.classLevel || '').toLowerCase();
     if (cl.includes('lkg')) targetId = 'school_lkg';
     else if (cl.includes('ukg')) targetId = 'school_ukg';
+    else if (cl.includes('1st pu') || cl.includes('1st puc') || cl.includes('11th') || cl.includes('class 11')) targetId = 'school_class_11';
+    else if (cl.includes('2nd pu') || cl.includes('2nd puc') || cl.includes('12th') || cl.includes('class 12')) targetId = 'school_class_12';
     else {
       const match = cl.match(/\d+/);
       if (match) targetId = `school_class_${match[0]}`;
