@@ -100,9 +100,11 @@ erDiagram
 | `rating` | `number` | Float (1.0 to 5.0) | Weighted average star rating computed from `reviews`. | `web/src/app/api/submit-review/route.ts` |
 | `reviewCount` | `number` | Non-negative integer | Total count of submitted reviews. | `web/src/app/api/submit-review/route.ts` |
 | `upiId` | `string` | Valid UPI ID (e.g. `teacher@okhdfcbank`) | Destination UPI address for automated 60% first-month tuition fee disbursements on Day 30 and student referral cash rewards. | `web/src/app/dashboard/teacher/page.tsx` |
-| `verificationDocs` | `map` | `Record<string, { url: string, fileName: string, uploadedAt: number }>` | Secure Firebase Storage download URLs and file metadata for mandatory educational certificates (10th marksheet, 12th marksheet, degree certificates, etc.). | `web/src/components/TeacherForm.tsx` |
-| `verificationStatus` | `string` | `'pending'` \| `'verified'` \| `'rejected'` | Document verification review state. Defaults to `'pending'` upon submission. Admin updates to `'verified'` or `'rejected'`. Must be `'pending'` or `'verified'` to unlock tuition proposals. | `web/src/app/dashboard/teacher/page.tsx` |
-| `verificationSubmittedAt` | `number` | Epoch timestamp in milliseconds | Millisecond timestamp when verification documents were uploaded and saved. | `web/src/components/TeacherForm.tsx` |
+| `resume` | `map` | `{ url: string, fileName: string, uploadedAt: number }` | Compulsory resume/CV document metadata and secure Firebase Storage download URL uploaded during onboarding. Must be present to unlock tuition proposals. | `web/src/components/TeacherForm.tsx` |
+| `resumeUrl` | `string` | Valid download URL string | Redundant direct download URL for the teacher's compulsory resume/CV. | `web/src/components/TeacherForm.tsx` |
+| `verificationDocs` | `map` | `Record<string, { url: string, fileName: string, uploadedAt: number }>` | Optional Firebase Storage download URLs and file metadata for supplementary educational certificates (10th marksheet, 12th marksheet, degree certificates, etc.). | `web/src/components/TeacherForm.tsx` |
+| `verificationStatus` | `string` | `'pending'` \| `'verified'` \| `'rejected'` \| `'unsubmitted'` | Optional educational document review state. Note: platform trust badge and ranking boost are driven by `aadharVerified`. | `web/src/app/dashboard/teacher/page.tsx` |
+| `verificationSubmittedAt` | `number` | Epoch timestamp in milliseconds | Millisecond timestamp when optional verification documents were uploaded and saved. | `web/src/components/TeacherForm.tsx` |
 
 ---
 

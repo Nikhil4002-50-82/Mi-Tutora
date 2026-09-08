@@ -2,32 +2,35 @@ import { test, expect } from '@playwright/test';
 import {
   getRequiredDocuments,
   validatePdfFile,
+  validateResumeFile,
+  isResumeComplete,
   isVerificationComplete,
   MAX_DOCUMENT_SIZE_BYTES,
 } from '../src/utils/documentVerification';
 
 test.describe('Teacher Document Verification Architecture', () => {
 
-  test.describe('Dynamic Qualification Document Mapping', () => {
-    test('10th Qualification requires 10th marksheet only', () => {
+  test.describe('Dynamic Qualification Document Mapping (Optional Attachments)', () => {
+    test('10th Qualification requires 10th marksheet only (optional)', () => {
       const docs = getRequiredDocuments('10th');
       expect(docs.length).toBe(1);
       expect(docs.map((d) => d.id)).toEqual(['marksheet_10th']);
-      expect(docs[0].required).toBe(true);
+      expect(docs[0].required).toBe(false);
     });
 
-    test('12th Qualification requires 10th and 12th marksheets', () => {
+    test('12th Qualification maps 10th and 12th marksheets (optional)', () => {
       const docs = getRequiredDocuments('12th');
       expect(docs.length).toBe(2);
       expect(docs.map((d) => d.id)).toEqual(['marksheet_10th', 'marksheet_12th']);
-      expect(docs.every((d) => d.required)).toBe(true);
+      expect(docs.every((d) => d.required === false)).toBe(true);
     });
 
-    test('B.E / B.Tech requires 10th, 12th, and Engineering Degree Certificate', () => {
+    test('B.E / B.Tech maps 10th, 12th, and Engineering Degree Certificate', () => {
       const docs = getRequiredDocuments('B.E / B.Tech');
       expect(docs.length).toBe(3);
       expect(docs.map((d) => d.id)).toEqual(['marksheet_10th', 'marksheet_12th', 'degree_certificate']);
       expect(docs[2].label).toContain('B.E / B.Tech');
+      expect(docs.every((d) => d.required === false)).toBe(true);
     });
 
     test('Bachelor degrees (B.Sc, B.A, B.Com) require 10th, 12th, and Degree Certificate', () => {
@@ -166,14 +169,62 @@ test.describe('Teacher Document Verification Architecture', () => {
     });
   });
 
-  test.describe('Proposal Gating & Verification Status Checks', () => {
+  test.describe('Strict Resume File Validation', () => {
+    test('Accepts valid PDF and Word resume files under 5MB', () => {
+      const validPdf = { name: 'tutor_resume.pdf', size: 1024 * 1024 };
+      expect(validateResumeFile(validPdf)).toEqual({ valid: true });
+
+      const validDoc = { name: 'my_cv.doc', size: 2 * 1024 * 1024 };
+      expect(validateResumeFile(validDoc)).toEqual({ valid: true });
+
+      const validDocx = { name: 'Curriculum_Vitae.docx', size: 3 * 1024 * 1024 };
+      expect(validateResumeFile(validDocx)).toEqual({ valid: true });
+    });
+
+    test('Rejects non-resume file extensions', () => {
+      const png = { name: 'photo.png', size: 500 * 1024 };
+      const resPng = validateResumeFile(png);
+      expect(resPng.valid).toBe(false);
+      expect(resPng.error).toContain('Only PDF and Word documents');
+
+      const exe = { name: 'setup.exe', size: 100 * 1024 };
+      expect(validateResumeFile(exe).valid).toBe(false);
+    });
+
+    test('Rejects resume files exceeding 5MB limit', () => {
+      const largeDoc = { name: 'huge_cv.pdf', size: MAX_DOCUMENT_SIZE_BYTES + 2048 };
+      const res = validateResumeFile(largeDoc);
+      expect(res.valid).toBe(false);
+      expect(res.error).toContain('exceeds the maximum 5MB limit');
+    });
+
+    test('Rejects null or undefined files gracefully', () => {
+      expect(validateResumeFile(null as any).valid).toBe(false);
+    });
+  });
+
+  test.describe('Resume Completeness Checker (isResumeComplete)', () => {
+    test('Returns false when neither existing resume nor staged file is provided', () => {
+      expect(isResumeComplete(null, null)).toBe(false);
+      expect(isResumeComplete({}, null)).toBe(false);
+    });
+
+    test('Returns true when staged resume file is present', () => {
+      const stagedFile = { name: 'resume.pdf', size: 1024 };
+      expect(isResumeComplete(null, stagedFile)).toBe(true);
+    });
+
+    test('Returns true when existing resume has a valid url', () => {
+      const existing = { url: 'https://storage.googleapis.com/resume.pdf' };
+      expect(isResumeComplete(existing, null)).toBe(true);
+    });
+  });
+
+  test.describe('Proposal Gating & Compulsory Resume Checks', () => {
     function canSendTuitionProposal(profile: any): boolean {
       const hasProfile = !!profile?.phone || !!profile?.category || !!profile?.subjects;
-      if (!hasProfile) return false;
-
-      const status = profile?.verificationStatus;
-      const hasSubmittedVerification = status === 'pending' || status === 'verified';
-      return hasSubmittedVerification;
+      const hasResume = Boolean(profile?.resume?.url || profile?.resumeUrl);
+      return hasProfile && hasResume;
     }
 
     test('Blocks proposals if teacher has no profile', () => {
@@ -181,52 +232,37 @@ test.describe('Teacher Document Verification Architecture', () => {
       expect(canSendTuitionProposal({})).toBe(false);
     });
 
-    test('Blocks proposals if verificationStatus is missing/undefined', () => {
+    test('Blocks proposals if profile is complete but resume is missing', () => {
       const profile = {
         phone: '9876543210',
         category: 'school',
         subjects: ['Mathematics'],
-        // verificationStatus undefined
+        // no resume
       };
       expect(canSendTuitionProposal(profile)).toBe(false);
     });
 
-    test('Blocks proposals if verificationStatus is unsubmitted', () => {
+    test('Allows proposals when profile and compulsory resume are present (even without academic marksheets)', () => {
       const profile = {
         phone: '9876543210',
         category: 'school',
         subjects: ['Mathematics'],
-        verificationStatus: 'unsubmitted',
-      };
-      expect(canSendTuitionProposal(profile)).toBe(false);
-    });
-
-    test('Blocks proposals if verificationStatus is rejected', () => {
-      const profile = {
-        phone: '9876543210',
-        category: 'school',
-        subjects: ['Mathematics'],
-        verificationStatus: 'rejected',
-      };
-      expect(canSendTuitionProposal(profile)).toBe(false);
-    });
-
-    test('Allows proposals if verificationStatus is pending (documents submitted)', () => {
-      const profile = {
-        phone: '9876543210',
-        category: 'school',
-        subjects: ['Mathematics'],
-        verificationStatus: 'pending',
+        resume: {
+          url: 'https://storage.googleapis.com/resume.pdf',
+          fileName: 'resume.pdf',
+          uploadedAt: Date.now(),
+        },
+        // verificationDocs empty / not uploaded
       };
       expect(canSendTuitionProposal(profile)).toBe(true);
     });
 
-    test('Allows proposals if verificationStatus is verified', () => {
+    test('Allows proposals when profile has resumeUrl direct link', () => {
       const profile = {
         phone: '9876543210',
         category: 'school',
         subjects: ['Mathematics'],
-        verificationStatus: 'verified',
+        resumeUrl: 'https://storage.googleapis.com/resume.pdf',
       };
       expect(canSendTuitionProposal(profile)).toBe(true);
     });

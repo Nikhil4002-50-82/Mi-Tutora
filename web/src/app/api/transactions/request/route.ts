@@ -90,15 +90,16 @@ export async function POST(req: NextRequest) {
         }
 
         batch.set(appRef, {
+            applicationDocId: appRef.id,
             applicationId: generateCustomId('MTA'),
             tutorDocId: tutor.id,
-            tutorName: tutor.name,
+            tutorName: tutor.name || '',
             parentDocId: userId,
-            groupDocId: groupToUse.id,
+            groupDocId: groupToUse.id || '',
             studentDocIds: groupToUse.students ? groupToUse.students.map((s: any) => s.id) : [groupToUse.id],
-            studentName: groupToUse.name,
-            currentOffer: actionType === 'make_offer' ? offerPrice : tutorPrice,
-            finalPrice: actionType === 'make_offer' ? offerPrice : tutorPrice,
+            studentName: groupToUse.name || 'Student',
+            currentOffer: (actionType === 'make_offer' ? offerPrice : tutorPrice) || 500,
+            finalPrice: (actionType === 'make_offer' ? offerPrice : tutorPrice) || 500,
             initialBudget: tutorPrice > 0 ? tutorPrice : (offerPrice || 500),
             absoluteMin: tutorPrice > 0 ? Math.ceil(tutorPrice * 0.6) : Math.ceil((offerPrice || 500) * 0.6),
             absoluteMax: tutorPrice > 0 ? tutorPrice : (offerPrice || 500),
@@ -106,16 +107,16 @@ export async function POST(req: NextRequest) {
             lastUpdatedBy: 'student',
             status: actionType === 'make_offer' ? 'negotiating' : 'demo_requested_by_student',
             source: 'direct',
-            category: tutor.category || groupToUse.category || '',
-            mode: tutor.mode,
+            category: tutor.category || groupToUse.category || 'general',
+            mode: tutor.mode || 'Online',
             demoHours: preferredTimeRange || 'Flexible',
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        batch.update(parentRef, {
+        batch.set(parentRef, {
             dailyUsage: { date: today, count: currentDailyCount + 1, lastUpdated: FieldValue.serverTimestamp() }
-        });
+        }, { merge: true });
 
     } else if (role === 'teacher') {
         const tutorRef = adminDb.collection('tutors').doc(userId);
@@ -154,18 +155,18 @@ export async function POST(req: NextRequest) {
             applicationDocId: appRef.id,
             applicationId: generateCustomId('MTA'),
             tutorDocId: userId,
-            tutorName: teacherName,
+            tutorName: teacherName || tutorData.name || 'Teacher',
             requestDocId: '',
-            parentDocId: studentData.parentDocId || studentData.parentId,
-            studentDocId: studentData.students?.[0]?.id || studentData.id,
-            groupDocId: studentData.id,
+            parentDocId: studentData.parentDocId || studentData.parentId || '',
+            studentDocId: studentData.students?.[0]?.id || studentData.id || '',
+            groupDocId: studentData.id || '',
             studentDocIds: studentDocIds,
-            studentName: studentData.name,
-            currentOffer: offerPrice,
-            finalPrice: offerPrice,
-            initialBudget: studentData.budget || offerPrice,
-            absoluteMin: studentData.budget || offerPrice,
-            absoluteMax: studentData.budget ? Math.floor(studentData.budget * 1.4) : Math.floor(offerPrice * 1.4),
+            studentName: studentData.name || 'Student',
+            currentOffer: offerPrice || 500,
+            finalPrice: offerPrice || 500,
+            initialBudget: studentData.budget || offerPrice || 500,
+            absoluteMin: studentData.budget || offerPrice || 500,
+            absoluteMax: studentData.budget ? Math.floor(studentData.budget * 1.4) : Math.floor((offerPrice || 500) * 1.4),
             initiator: 'teacher',
             lastUpdatedBy: actionType === 'make_offer' ? 'teacher' : 'tutor',
             status: actionType === 'make_offer' ? 'negotiating' : 'demo_requested_by_teacher',
@@ -178,18 +179,18 @@ export async function POST(req: NextRequest) {
         });
 
         if (usedBankedToken) {
-            batch.update(tutorRef, {
+            batch.set(tutorRef, {
                 bankedTokens: FieldValue.increment(-1),
                 updatedAt: FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
         } else {
-            batch.update(tutorRef, {
+            batch.set(tutorRef, {
                 weeklyQuota: {
                     weekStartDate: currentWeekStart,
                     tokensUsed: currentTokens + 1,
                     lastUpdated: FieldValue.serverTimestamp()
                 }
-            });
+            }, { merge: true });
         }
     }
 
@@ -198,6 +199,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in request transaction:', error);
-    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ success: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
   }
 }

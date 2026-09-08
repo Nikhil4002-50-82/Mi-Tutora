@@ -135,7 +135,8 @@ export interface Tutor {
   verificationStatus?: string;
   verificationDocs?: Record<string, { url: string; fileName: string; uploadedAt: number }>;
   verificationSubmittedAt?: number;
-  whatsapp?: string;
+  resume?: { url: string; fileName: string; uploadedAt: number };
+  resumeUrl?: string;
   minFee?: number;
   suitabilityScore?: number;
   isSubscribed?: boolean;

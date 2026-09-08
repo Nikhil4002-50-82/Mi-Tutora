@@ -113,6 +113,7 @@ export default function TeacherDashboard() {
 
 
   const hasProfile = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
+  const hasResume = Boolean(data?.profile?.resume?.url || data?.profile?.resumeUrl);
   const verificationStatus = data?.profile?.verificationStatus;
   const hasSubmittedVerification = verificationStatus === 'pending' || verificationStatus === 'verified';
 
@@ -723,8 +724,8 @@ export default function TeacherDashboard() {
       return;
     }
 
-    if (!hasSubmittedVerification) {
-      toast.error("Please upload your academic verification documents before sending offers.");
+    if (!hasResume) {
+      toast.error("Please upload your Resume / CV in your profile before sending offers.");
       setActiveTab('profile');
       return;
     }
@@ -792,8 +793,8 @@ export default function TeacherDashboard() {
       return false;
     }
 
-    if (!hasSubmittedVerification) {
-      toast.error("Please upload your academic verification documents before requesting demos.");
+    if (!hasResume) {
+      toast.error("Please upload your Resume / CV in your profile before requesting demos.");
       setActiveTab('profile');
       isSubmittingRef.current = false;
       return false;

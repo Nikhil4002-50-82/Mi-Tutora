@@ -7,6 +7,39 @@ export interface DocumentRequirement {
 
 export const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
+export function validateResumeFile(file: { name: string; size: number; type?: string }): {
+  valid: boolean;
+  error?: string;
+} {
+  if (!file) {
+    return { valid: false, error: 'No file provided.' };
+  }
+
+  const isResumeFormat = /\.(pdf|doc|docx)$/i.test(file.name);
+  if (!isResumeFormat) {
+    return { valid: false, error: 'Invalid file format. Only PDF and Word documents (.pdf, .doc, .docx) are allowed.' };
+  }
+
+  if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    return {
+      valid: false,
+      error: `File size (${sizeMb} MB) exceeds the maximum 5MB limit. Please upload a smaller file.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+export function isResumeComplete(
+  existingResume?: { url?: string } | null,
+  stagedFile?: any | null
+): boolean {
+  const hasStaged = Boolean(stagedFile);
+  const hasExisting = Boolean(existingResume && existingResume.url);
+  return hasStaged || hasExisting;
+}
+
 export function getRequiredDocuments(qualification: string): DocumentRequirement[] {
   if (!qualification || typeof qualification !== 'string') {
     return [];
@@ -18,42 +51,42 @@ export function getRequiredDocuments(qualification: string): DocumentRequirement
     id: 'marksheet_10th',
     label: '10th Standard Marksheet',
     description: 'Class 10 / SSLC / Matriculation marksheet or passing certificate',
-    required: true,
+    required: false,
   };
 
   const doc12th: DocumentRequirement = {
     id: 'marksheet_12th',
     label: '12th / PUC Marksheet',
     description: 'Class 12 / PUC / Intermediate / Diploma marksheet',
-    required: true,
+    required: false,
   };
 
   const docBachelor: DocumentRequirement = {
     id: 'degree_certificate',
     label: 'Bachelor Degree Certificate',
     description: 'Graduation degree certificate, provisional certificate, or consolidated marksheet',
-    required: true,
+    required: false,
   };
 
   const docMaster: DocumentRequirement = {
     id: 'master_certificate',
     label: 'Post-Graduate / Master Degree Certificate',
     description: "Master's degree certificate or final year consolidated marksheet",
-    required: true,
+    required: false,
   };
 
   const docPhD: DocumentRequirement = {
     id: 'phd_certificate',
     label: 'Doctorate / PhD Degree Certificate',
     description: 'Doctoral degree certificate or official provisional notification',
-    required: true,
+    required: false,
   };
 
   const docOther: DocumentRequirement = {
     id: 'other_certificate',
     label: 'Highest Qualification Certificate',
     description: 'Official degree, diploma, or marksheet for your highest qualification',
-    required: true,
+    required: false,
   };
 
   switch (cleanQual) {
