@@ -129,5 +129,24 @@ export const processDailyPayouts = onSchedule(
 
     await batchManager.commitRemaining();
     console.log(`[processDailyPayouts] Finished processing ${batchManager.totalOperations} escrow updates.`);
+
+    // 3. Trigger automated RazorpayX transfer runner if configured
+    const runnerUrl = process.env.PAYOUT_RUNNER_URL || process.env.NEXT_PUBLIC_APP_URL;
+    const cronSecret = process.env.CRON_SECRET || "mitutora_payout_secret";
+    if (runnerUrl && typeof fetch === "function") {
+      try {
+        const endpoint = `${runnerUrl.replace(/\/$/, "")}/api/payouts/process`;
+        console.log(`[processDailyPayouts] Dispatching automated payout execution to ${endpoint}`);
+        await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-cron-secret": cronSecret,
+          },
+        });
+      } catch (runnerErr) {
+        console.error("[processDailyPayouts] Payout runner dispatch error:", runnerErr);
+      }
+    }
   }
 );

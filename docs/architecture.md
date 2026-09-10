@@ -128,7 +128,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 *Full Specifications: [`docs/Aadhar_Verification_Badge.md`](./Aadhar_Verification_Badge.md), [`docs/Document_Verification.md`](./Document_Verification.md)*
 
 ### A. Aadhar Identity KYC
-*   **Live Gov API Integration:** Integrates with Sandbox.co.in OTP verification API.
+*   **Live Gov API Integration:** Integrates with PowerAPI OTP verification API (with mock fallback for testing).
 *   **Secure Masking:** Only the last 4 digits (`XXXX-XXXX-1234`) are retained in Firestore for display; full Aadhar numbers are never permanently stored.
 *   **Trust Badge & Algorithm Boost:** Verified educators receive the green verified shield badge and an automatic **+20 ranking boost**.
 
@@ -160,7 +160,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 ---
 
 ## 8. The 7-Day Trial & Mandatory Fee Settlement
-*Full Specification: [`docs/Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md), [`docs/Payment_Architecture.md`](./Payment_Architecture.md)*
+*Full Specification: [`docs/Student_Fee_Payment_Architecture.md`](./Student_Fee_Payment_Architecture.md), [`docs/Payment_Architecture.md`](./Payment_Architecture.md)*
 
 When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 7-day live trial countdown begins:
 *   **Cancellation on Days 1 to 6 (Prorated Fee):** If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
@@ -332,7 +332,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 | **Educational Document Verification Architecture** | 👉 [`docs/Document_Verification.md`](./Document_Verification.md) |
 | **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./First_Month_Tuition_Escrow_Payout_Architecture.md) |
 | **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./Referral_System_Architecture.md) |
-| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md) |
+| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architecture.md`](./Student_Fee_Payment_Architecture.md) |
 | **Payment Gateway & Webhook Verification** | 👉 [`docs/Payment_Architecture.md`](./Payment_Architecture.md) |
 | **Matchmaking & Ranking Algorithm** | 👉 [`docs/Ranking_System_Architecture.md`](./Ranking_System_Architecture.md) |
 | **Subscriptions, Pro Plan & Weekly Quota Rollover** | 👉 [`docs/Subscription_Architecture.md`](./Subscription_Architecture.md) |

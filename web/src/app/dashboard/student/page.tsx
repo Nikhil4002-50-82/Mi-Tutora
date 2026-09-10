@@ -89,6 +89,8 @@ export default function StudentDashboard() {
   const [referralUpi, setReferralUpi] = useState('');
   const [isEditingReferralUpi, setIsEditingReferralUpi] = useState(false);
   const [savingReferralUpi, setSavingReferralUpi] = useState(false);
+  const [deletingReferralUpi, setDeletingReferralUpi] = useState(false);
+  const [showDeleteReferralUpiModal, setShowDeleteReferralUpiModal] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
   const [reviewModalConfig, setReviewModalConfig] = useState({ isOpen: false, applicationId: '', tutorName: '', parentDocId: '' });
@@ -159,6 +161,26 @@ export default function StudentDashboard() {
       toast.error(err.message || 'Failed to update UPI');
     } finally {
       setSavingReferralUpi(false);
+    }
+  };
+
+  const handleDeleteReferralUpi = async () => {
+    setDeletingReferralUpi(true);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, deleteField } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'users', data?.user?.uid as string), {
+        upiId: deleteField()
+      });
+      setReferralUpi('');
+      setIsEditingReferralUpi(false);
+      setShowDeleteReferralUpiModal(false);
+      toast.success('Referral UPI removed successfully');
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove UPI');
+    } finally {
+      setDeletingReferralUpi(false);
     }
   };
 
@@ -1844,12 +1866,34 @@ export default function StudentDashboard() {
                   {allFilteredTutors.length > visibleTutorsCount && (
                     <div className="flex flex-col items-center justify-center pt-8 pb-4">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setIsLoadingMoreTutors(true);
-                          setTimeout(() => {
+                          try {
+                            const nextPage = Math.floor(visibleTutorsCount / 20) + 1;
+                            const token = await auth.currentUser?.getIdToken();
+                            if (token) {
+                              await fetch('/api/tutors/ranked', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  tab: tuitionSubTab,
+                                  page: nextPage,
+                                  limit: 20,
+                                  category: selectedCategory,
+                                  activeGroupId: activeGroup?.id,
+                                  scoringContext
+                                })
+                              }).catch(console.error);
+                            }
+                          } catch (err) {
+                            console.error('Error fetching ranked tutors:', err);
+                          } finally {
                             setVisibleTutorsCount((prev) => prev + 20);
                             setIsLoadingMoreTutors(false);
-                          }, 200);
+                          }
                         }}
                         disabled={isLoadingMoreTutors}
                         className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-75 cursor-pointer"
@@ -2786,10 +2830,10 @@ export default function StudentDashboard() {
                       </p>
 
                       {!isEditingReferralUpi && (
-                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 mb-2">
-                          <div>
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                          <div className="min-w-0 flex-1">
                             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saved UPI ID</p>
-                            <p className="font-mono text-sm font-bold text-gray-800 mt-0.5">
+                            <p className="font-mono text-sm font-bold text-gray-800 mt-0.5 break-all">
                               {data?.userData?.upiId || 'No UPI ID saved'}
                             </p>
                           </div>
@@ -2798,7 +2842,7 @@ export default function StudentDashboard() {
                               setReferralUpi(data?.userData?.upiId || '');
                               setIsEditingReferralUpi(true);
                             }}
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0"
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 self-end sm:self-auto"
                           >
                             {data?.userData?.upiId ? 'Edit' : 'Add UPI'}
                           </button>
@@ -2815,7 +2859,7 @@ export default function StudentDashboard() {
                             placeholder="e.g. yourname@okhdfcbank"
                             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           />
-                          <div className="flex gap-2">
+                          <div className="flex items-center gap-2">
                             <button
                               disabled={savingReferralUpi}
                               onClick={handleSaveReferralUpi}
@@ -2831,6 +2875,17 @@ export default function StudentDashboard() {
                             >
                               Cancel
                             </button>
+                            {data?.userData?.upiId && (
+                              <button
+                                type="button"
+                                disabled={savingReferralUpi || deletingReferralUpi}
+                                onClick={() => setShowDeleteReferralUpiModal(true)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 p-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center shrink-0"
+                                title="Delete UPI ID"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3265,6 +3320,18 @@ export default function StudentDashboard() {
             setActionConfirmModal(null);
           }
         }}
+      />
+
+      {/* Delete Referral UPI Confirm Modal */}
+      <TransactionConfirmModal
+        isOpen={showDeleteReferralUpiModal}
+        type="warning"
+        title="Remove Referral UPI ID?"
+        description="Are you sure you want to remove your referral payout UPI ID? Automatic Day 30 disbursements will be paused until a new UPI ID is provided."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={handleDeleteReferralUpi}
+        onCancel={() => setShowDeleteReferralUpiModal(false)}
       />
 
       {/* Delete Account Modal */}

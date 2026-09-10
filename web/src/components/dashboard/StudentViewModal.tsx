@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, X, CheckCircle2, TrendingUp, CalendarDays } from 'lucide-react';
+import { Users, X, CheckCircle2, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface StudentViewModalProps {
@@ -107,6 +107,7 @@ export function StudentViewModal({
               </div>
             )}
 
+            {/* Individual Students List */}
             {(selectedViewUser.students && selectedViewUser.students.length > 0 ? selectedViewUser.students : [selectedViewUser]).map((studentDetail: any, index: number) => (
               <div key={studentDetail.id || index} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                 <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
@@ -119,7 +120,6 @@ export function StudentViewModal({
                 )}
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                   {studentDetail.classLevel && (
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Class</p>
@@ -159,23 +159,41 @@ export function StudentViewModal({
                       </div>
                     </div>
                   )}
-                  
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Preferred Days</p>
-                    <p className="font-bold text-gray-800">
-                      {studentDetail.daysPerWeek || 'Flexible'}
-                      {studentDetail.specificDays?.length > 0 && ` (${studentDetail.specificDays.join(', ')})`}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Daily Duration</p>
-                    <p className="font-bold text-gray-800">{studentDetail.hoursPerDay || 'Flexible'}</p>
-                  </div>
                 </div>
               </div>
             ))}
 
+            {/* Common Group Schedule & Timing Preferences */}
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/80">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-emerald-600" /> Group Schedule & Timing Preferences
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Preferred Days</p>
+                  <p className="font-bold text-gray-800">
+                    {(() => {
+                      const days = selectedViewUser.daysPerWeek || selectedViewApp?.daysPerWeek || selectedViewUser.students?.[0]?.daysPerWeek;
+                      const specific = selectedViewUser.specificDays || selectedViewApp?.specificDays || selectedViewUser.students?.[0]?.specificDays;
+                      if (!days && (!specific || specific.length === 0)) return 'Flexible';
+                      let label = days ? (days.toLowerCase().includes('day') || days === 'Everyday' ? days : `${days} Days / Week`) : '';
+                      if (specific && specific.length > 0) {
+                        return label ? `${label} (${specific.join(', ')})` : specific.join(', ');
+                      }
+                      return label || 'Flexible';
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Preferred Time / Duration</p>
+                  <p className="font-bold text-gray-800">
+                    {selectedViewUser.preferredTimeRange || selectedViewApp?.preferredTimeRange || selectedViewUser.hours || selectedViewUser.students?.[0]?.hours || 'Flexible / Any Time'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Group Budget & Delivery Mode */}
             <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">

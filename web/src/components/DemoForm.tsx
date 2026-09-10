@@ -451,14 +451,16 @@ export default function DemoForm({
         const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.parentName, user.uid);
         await setDoc(userDocRef, { hasProfile: true, referralCode: newCode, name: formData.parentName }, { merge: true });
 
-        // Retroactively update pending referral tickets with formal name
-        const refQ = query(collection(db, 'referrals'), where('referredUserId', '==', user.uid));
-        const refSnap = await getDocs(refQ);
-        if (!refSnap.empty) {
-          for (const rDoc of refSnap.docs) {
-            await updateDoc(doc(db, 'referrals', rDoc.id), { referredUserName: formData.parentName });
-          }
-        }
+        // Retroactively update pending referral tickets with formal name via secure server route
+        await fetch('/api/referrals/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'sync_name',
+            refereeUid: user.uid,
+            refereeName: formData.parentName
+          })
+        }).catch(console.error);
       }
 
       let customParentId = user.uid;

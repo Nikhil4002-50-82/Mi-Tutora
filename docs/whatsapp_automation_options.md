@@ -1,6 +1,9 @@
 # WhatsApp Automation Options
 
-Since the platform currently runs entirely on the frontend (React/Next.js) and connects directly to Firebase, there is no "backend server" constantly running in the background to send messages automatically while users are offline. Furthermore, standard WhatsApp links (`wa.me`) require a user to manually click and open their own WhatsApp app. 
+> [!NOTE]
+> **Historical Architecture Note:** This exploration document was authored prior to the deployment of Firebase Cloud Functions (2nd Gen) and Next.js App Router API endpoints. With serverless backend runtime and Cloud Scheduler now active in the platform (`functions/src`), background webhook triggers (Option A) can be wired directly to WhatsApp Business API providers (e.g., Twilio / Interakt) without requiring long-lived servers.
+
+Since the platform initially ran entirely on the frontend (React/Next.js) and connected directly to Firebase, standard WhatsApp links (`wa.me`) required a user to manually click and open their own WhatsApp app. 
 
 To achieve automated messaging, we have two options:
 

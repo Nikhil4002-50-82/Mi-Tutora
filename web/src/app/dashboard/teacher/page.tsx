@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2 } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -82,6 +82,8 @@ export default function TeacherDashboard() {
   const [payoutUpi, setPayoutUpi] = useState('');
   const [isEditingPayoutUpi, setIsEditingPayoutUpi] = useState(false);
   const [savingPayoutUpi, setSavingPayoutUpi] = useState(false);
+  const [deletingPayoutUpi, setDeletingPayoutUpi] = useState(false);
+  const [showDeletePayoutUpiModal, setShowDeletePayoutUpiModal] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
@@ -99,12 +101,11 @@ export default function TeacherDashboard() {
   const [hasFetchedLinks, setHasFetchedLinks] = useState(false);
   const [meetingPlatforms, setMeetingPlatforms] = useState<{ [key: string]: 'gmeet' | 'zoom' | 'teams' }>({});
   
-  // KYC State
+  // KYC State (PowerAPI integration - temporarily deactivated in Settings UI pending company license)
   const [kycStep, setKycStep] = useState<'input' | 'otp' | 'verified'>('input');
   const [aadharInput, setAadharInput] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [kycRefId, setKycRefId] = useState('');
-  const [mockAadhar, setMockAadhar] = useState('');
   const [kycLoading, setKycLoading] = useState(false);
 
   const router = useRouter();
@@ -159,6 +160,30 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleDeletePayoutUpi = async () => {
+    setDeletingPayoutUpi(true);
+    try {
+      const { db } = await import('@/utils/firebase/client');
+      const { doc, updateDoc, deleteField } = await import('firebase/firestore');
+      const uid = data?.user?.uid as string;
+      await updateDoc(doc(db, 'tutors', uid), {
+        upiId: deleteField()
+      });
+      await updateDoc(doc(db, 'users', uid), {
+        upiId: deleteField()
+      }).catch(() => {});
+      setPayoutUpi('');
+      setIsEditingPayoutUpi(false);
+      setShowDeletePayoutUpiModal(false);
+      toast.success('Payout UPI removed successfully');
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove UPI');
+    } finally {
+      setDeletingPayoutUpi(false);
+    }
+  };
+
   const initialTuitionTabSet = useRef(false);
   useEffect(() => {
     if (data && !loading && !initialTuitionTabSet.current) {
@@ -210,6 +235,10 @@ export default function TeacherDashboard() {
     }
   }, [data?.profile?.aadharVerified]);
 
+  // =========================================================================
+  // KYC / AADHAAR HANDLERS (PowerAPI Integration)
+  // Ready for production: active once Settings UI block is uncommented
+  // =========================================================================
   const handleGenerateOTP = async () => {
     if (!aadharInput || aadharInput.replace(/\s+/g, '').length !== 12) {
       toast.error('Please enter a valid 12-digit Aadhar number');
@@ -229,7 +258,6 @@ export default function TeacherDashboard() {
       const resData = await res.json();
       if (res.ok) {
         setKycRefId(resData.reference_id);
-        setMockAadhar(resData._mockAadhar || '');
         setKycStep('otp');
         toast.success(resData.message || 'OTP sent successfully');
       } else {
@@ -258,8 +286,7 @@ export default function TeacherDashboard() {
         },
         body: JSON.stringify({ 
           reference_id: kycRefId, 
-          otp: otpInput, 
-          _mockAadhar: mockAadhar 
+          otp: otpInput
         })
       });
       const resData = await res.json();
@@ -684,11 +711,14 @@ export default function TeacherDashboard() {
       name: sourceApp.studentName || matchedGroup?.name || fallback.name || primaryStudent.name || 'Student',
       category: sourceApp.category || matchedGroup?.category || fallback.category || primaryStudent.category,
       students,
+      daysPerWeek: sourceApp.daysPerWeek || sourceApp.groupDetails?.daysPerWeek || matchedGroup?.daysPerWeek || fallback.daysPerWeek || '',
+      specificDays: sourceApp.specificDays || sourceApp.groupDetails?.specificDays || matchedGroup?.specificDays || fallback.specificDays || [],
+      preferredTimeRange: sourceApp.preferredTimeRange || sourceApp.groupDetails?.preferredTimeRange || matchedGroup?.preferredTimeRange || fallback.preferredTimeRange || '',
       phoneNumber: primaryStudent.phoneNumber || primaryStudent.whatsappNumber || parentContact.phone || parentContact.whatsapp || fallback.phoneNumber || '',
       email: primaryStudent.email || parentContact.email || fallback.email || '',
       parentDetails: parentContact,
       budget: sourceApp.finalPrice || sourceApp.currentOffer || matchedGroup?.budget || fallback.budget || 0,
-      preferredMode: primaryStudent.preferredMode || sourceApp.preferredMode || sourceApp.mode || matchedGroup?.preferredMode || fallback.preferredMode || 'Online',
+      preferredMode: primaryStudent.preferredMode || sourceApp.preferredMode || sourceApp.mode || matchedGroup?.preferredMode || matchedGroup?.mode || fallback.preferredMode || 'Online',
       address: primaryStudent.address || parentContact.address || matchedGroup?.address || fallback.address,
       area: primaryStudent.area || parentContact.area || matchedGroup?.area || fallback.area,
     };
@@ -1839,12 +1869,32 @@ export default function TeacherDashboard() {
                       {allFilteredStudents.length > visibleStudentsCount && (
                         <div className="flex flex-col items-center justify-center pt-8 pb-4">
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setIsLoadingMoreStudents(true);
-                              setTimeout(() => {
+                              try {
+                                const nextPage = Math.floor(visibleStudentsCount / 20) + 1;
+                                const token = await auth.currentUser?.getIdToken();
+                                if (token) {
+                                  await fetch('/api/students/ranked', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                      tab: tuitionSubTab,
+                                      page: nextPage,
+                                      limit: 20,
+                                      category: selectedCategory
+                                    })
+                                  }).catch(console.error);
+                                }
+                              } catch (err) {
+                                console.error('Error fetching ranked students:', err);
+                              } finally {
                                 setVisibleStudentsCount((prev) => prev + 20);
                                 setIsLoadingMoreStudents(false);
-                              }, 200);
+                              }
                             }}
                             disabled={isLoadingMoreStudents}
                             className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-75 cursor-pointer"
@@ -2447,13 +2497,9 @@ export default function TeacherDashboard() {
                       <li 
                         key={cls.id} 
                         onClick={() => {
-                          if (cls.studentDetails) {
-                            setSelectedViewUser(cls.studentDetails);
-                            setSelectedViewApp(cls);
-                          } else if (cls.groupDetails) {
-                            setSelectedViewUser(cls.groupDetails);
-                            setSelectedViewApp(cls);
-                          }
+                          const viewUser = buildStudentViewUser(cls.app || cls, cls.groupDetails || cls.studentDetails || {});
+                          setSelectedViewUser(viewUser);
+                          setSelectedViewApp(cls.app || cls);
                         }}
                         className="relative bg-gradient-to-br from-white to-slate-50 rounded-3xl p-6 shadow-lg shadow-slate-200/50 border border-gray-100 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1 transition-all duration-300 group overflow-hidden flex flex-col cursor-pointer"
                       >
@@ -2882,10 +2928,10 @@ export default function TeacherDashboard() {
                       </p>
 
                       {!isEditingPayoutUpi && (
-                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 mb-2">
-                          <div>
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                          <div className="min-w-0 flex-1">
                             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saved UPI ID</p>
-                            <p className="font-mono text-sm font-bold text-gray-800 mt-0.5">
+                            <p className="font-mono text-sm font-bold text-gray-800 mt-0.5 break-all">
                               {data?.profile?.upiId || data?.userData?.upiId || 'No UPI ID saved'}
                             </p>
                           </div>
@@ -2894,7 +2940,7 @@ export default function TeacherDashboard() {
                               setPayoutUpi(data?.profile?.upiId || data?.userData?.upiId || '');
                               setIsEditingPayoutUpi(true);
                             }}
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0"
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 self-end sm:self-auto"
                           >
                             {(data?.profile?.upiId || data?.userData?.upiId) ? 'Edit' : 'Add UPI'}
                           </button>
@@ -2911,7 +2957,7 @@ export default function TeacherDashboard() {
                             placeholder="e.g. yourname@okhdfcbank"
                             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           />
-                          <div className="flex gap-2">
+                          <div className="flex items-center gap-2">
                             <button
                               disabled={savingPayoutUpi}
                               onClick={handleSavePayoutUpi}
@@ -2927,6 +2973,17 @@ export default function TeacherDashboard() {
                             >
                               Cancel
                             </button>
+                            {(data?.profile?.upiId || data?.userData?.upiId) && (
+                              <button
+                                type="button"
+                                disabled={savingPayoutUpi || deletingPayoutUpi}
+                                onClick={() => setShowDeletePayoutUpiModal(true)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 p-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center shrink-0"
+                                title="Delete UPI ID"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3128,7 +3185,7 @@ export default function TeacherDashboard() {
                         placeholder="e.g. mobile@upi or name@okhdfcbank"
                         className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
                         <button
                           disabled={savingPayoutUpi}
                           onClick={handleSavePayoutUpi}
@@ -3144,6 +3201,17 @@ export default function TeacherDashboard() {
                         >
                           Cancel
                         </button>
+                        {(data?.profile?.upiId || data?.userData?.upiId) && (
+                          <button
+                            type="button"
+                            disabled={savingPayoutUpi || deletingPayoutUpi}
+                            onClick={() => setShowDeletePayoutUpiModal(true)}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center shrink-0"
+                            title="Delete UPI ID"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -3164,8 +3232,15 @@ export default function TeacherDashboard() {
                   />
                 </div>
 
-                {/* TRUST & SAFETY VERIFICATION */}
-                {hasProfile && (
+                {/* ========================================================================= */}
+                {/* TRUST & SAFETY VERIFICATION (AADHAAR KYC)                                */}
+                {/* NOTE: Temporarily disabled pending official company license acquisition  */}
+                {/* for PowerAPI integration. Once company license is granted and             */}
+                {/* POWERAPI_KEY is configured, uncomment this entire block to re-enable      */}
+                {/* self-service Aadhaar verification in Teacher Profile Settings.           */}
+                {/* ========================================================================= */}
+                {/*
+                hasProfile && (
                   <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-8">
                     <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
                       <ShieldCheck className={`w-6 h-6 ${kycStep === 'verified' ? 'text-emerald-500' : 'text-slate-400'}`} />
@@ -3228,7 +3303,8 @@ export default function TeacherDashboard() {
                       </div>
                     )}
                   </div>
-                )}
+                )
+                */}
 
                 {data?.userData?.roles?.includes('student') && (
                   <div className="mt-12 pt-8 border-t border-slate-100">
@@ -3436,6 +3512,17 @@ export default function TeacherDashboard() {
         confirmText="Confirm & Pay"
         onConfirm={handleUpgradeToPro}
         onCancel={() => setUpgradeModalOpen(false)}
+      />
+      {/* Delete Payout UPI Confirm Modal */}
+      <TransactionConfirmModal
+        isOpen={showDeletePayoutUpiModal}
+        type="warning"
+        title="Remove Payout UPI ID?"
+        description="Are you sure you want to remove your payout UPI ID? Automatic Day 30 disbursements will be paused until a new UPI ID is provided."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={handleDeletePayoutUpi}
+        onCancel={() => setShowDeletePayoutUpiModal(false)}
       />
       {/* Delete Account Modal */}
       <DeleteAccountModal

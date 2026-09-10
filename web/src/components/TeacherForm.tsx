@@ -334,14 +334,16 @@ export default function TeacherForm({
       const newCode = (userDocSnap.exists() && userDocSnap.data().referralCode) || generateReferralCode(formData.fullName, user.uid);
       await setDoc(userDocRef, { hasProfile: true, referralCode: newCode, name: formData.fullName }, { merge: true });
 
-      // Retroactively update pending referral tickets with formal name
-      const refQ = query(collection(db, 'referrals'), where('referredUserId', '==', user.uid));
-      const refSnap = await getDocs(refQ);
-      if (!refSnap.empty) {
-        for (const rDoc of refSnap.docs) {
-          await updateDoc(doc(db, 'referrals', rDoc.id), { referredUserName: formData.fullName });
-        }
-      }
+      // Retroactively update pending referral tickets with formal name via secure server route
+      await fetch('/api/referrals/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_name',
+          refereeUid: user.uid,
+          refereeName: formData.fullName
+        })
+      }).catch(console.error);
 
       // Find the tutor document using user.uid (since tutorDocId is user.uid now)
       const tutorDocId = user.uid;

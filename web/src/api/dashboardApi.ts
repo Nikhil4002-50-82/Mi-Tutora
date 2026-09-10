@@ -318,8 +318,11 @@ export const fetchTeacherDashboardData = async () => {
   availableStudentsRaw.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
   const availableStudents = availableStudentsRaw;
 
-  // Phase 1: API Stitching - Fetch related groups for students to get teacherGenderPreference
-  const uniqueGroupIds = Array.from(new Set(availableStudentsRaw.map((s: any) => s.groupDocId).filter(Boolean))) as string[];
+  // Phase 1: API Stitching - Fetch related groups for students to get teacherGenderPreference & schedule
+  const uniqueGroupIds = Array.from(new Set([
+    ...availableStudentsRaw.map((s: any) => s.groupDocId),
+    ...applications.map((a: any) => a.groupDocId)
+  ].filter(Boolean))) as string[];
   let fetchedGroups: any[] = [];
   if (uniqueGroupIds.length > 0) {
     const chunkPromises = [];
@@ -440,13 +443,21 @@ export const deriveTeacherDashboardState = (baseData: any) => {
   const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
     const gId = student.groupDocId || `indv_${student.id}`;
     if (!acc[gId]) {
+      const groupDoc = (fetchedGroups || []).find((g: any) => g.id === gId) || null;
       acc[gId] = { 
         id: gId, 
         students: [], 
         totalBudget: 0,
         parentDocId: student.parentDocId || student.parentId,
         categories: [],
-        requestDoc: (fetchedGroups || []).find((g: any) => g.id === gId) || null
+        requestDoc: groupDoc,
+        daysPerWeek: groupDoc?.daysPerWeek || student.daysPerWeek || '',
+        specificDays: groupDoc?.specificDays || student.specificDays || [],
+        preferredTimeRange: groupDoc?.preferredTimeRange || student.preferredTimeRange || student.hours || '',
+        mode: groupDoc?.mode || student.preferredMode || '',
+        area: groupDoc?.area || student.area || '',
+        city: groupDoc?.city || student.city || '',
+        teacherGenderPreference: groupDoc?.teacherGenderPreference || 'No Preference'
       };
     }
     acc[gId].students.push(student);
@@ -495,12 +506,17 @@ export const deriveTeacherDashboardState = (baseData: any) => {
 
     const stitchedStudent = student ? { ...student, parentDetails: app.parentDetails } : null;
     const stitchedAppStudentsList = appStudentsList.map((s: any) => ({ ...s, parentDetails: app.parentDetails }));
+    const appGroup = (fetchedGroups || []).find((g: any) => g.id === app.groupDocId) || null;
 
     return { 
       ...app, 
       status: currentStatus,
       studentDetails: stitchedStudent,
       studentsList: stitchedAppStudentsList,
+      groupDetails: appGroup,
+      daysPerWeek: app.daysPerWeek || appGroup?.daysPerWeek || '',
+      specificDays: app.specificDays || appGroup?.specificDays || [],
+      preferredTimeRange: app.preferredTimeRange || appGroup?.preferredTimeRange || '',
       subjects: student?.subjects || [],
       technologies: student?.technologies || [],
       languages: student?.languages || []
@@ -609,7 +625,8 @@ export const deriveTeacherDashboardState = (baseData: any) => {
       subject: app.category || 'General',
       date: app.demoDate || 'TBD',
       status: app.status,
-      studentDetails: app.studentDetails
+      studentDetails: app.studentDetails,
+      groupDetails: app.groupDetails
     })),
     upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => ({
       id: app.id,
@@ -618,7 +635,8 @@ export const deriveTeacherDashboardState = (baseData: any) => {
       subject: app.category || 'General',
       date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
       status: app.status === 'tuition_started' ? 'confirmed' : 'pending',
-      studentDetails: app.studentDetails
+      studentDetails: app.studentDetails,
+      groupDetails: app.groupDetails
     })),
     _baseData: baseData
   };

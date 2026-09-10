@@ -22,11 +22,15 @@ $$\text{Platform Net Margin } = P - R = G \times 0.30 \quad (30\% \text{ net ret
 
 | Financial Component | Formula / Share | Example (₹6,000) | Destination & Custody |
 | :--- | :--- | :--- | :--- |
-| **Gross Inflow** | 100% of Tuition | **₹6,000** | Enters Platform Razorpay Merchant Account on Day 7 |
-| **Platform Commission** | 40% of Gross | **₹2,400** | Platform Revenue |
-| **Tutor Share (Escrow)** | 60% of Gross | **₹3,600** | **Held in platform escrow until Day 30** |
-| **Referral Reward (Escrow)** | 25% of Platform Fee | **₹600** | **Held in platform escrow until Day 30; then deposited automatically via UPI** |
+| **Base Tuition Fee** | Agreed Monthly Tuition Rate | **₹6,000** | Basis for 60/40 Escrow & Referral Reward |
+| **Gross Inflow (Checkout)**| Base Tuition + 18% GST | **₹7,080** | Paid by Parent on Day 7 via Razorpay |
+| **Platform Commission** | 40% of Base Fee | **₹2,400** | Platform Gross Margin |
+| **Tutor Share (Escrow)** | 60% of Base Fee | **₹3,600** | **Held in platform escrow until Day 30** |
+| **Referral Reward (Escrow)** | 25% of Platform Cut | **₹600** | **Held in platform escrow until Day 30; then deposited automatically via UPI** |
 | **Platform Net Margin** | Platform Cut minus Referral | **₹1,800** | Net platform retained earnings |
+
+> [!NOTE]
+> **GST Billing Alignment:** In accordance with Indian taxation rules, 18% GST is collected on checkout from the parent (`coursePrice + 18% GST` via `/api/create-order`). The platform 40/60 escrow split and referral reward are computed strictly on the net base tuition fee (`rewardBase`), preserving educator and affiliate earnings.
 
 ---
 
@@ -177,7 +181,7 @@ A critical architectural mandate is that introducing this escrow and payout syst
 
 ## 6. Post-Payment Policy & Strict Zero-Refund Rule
 
-In full alignment with [`Demo_Completion_Hiring_Architecture.md`](./Demo_Completion_Hiring_Architecture.md) and [`Student_Fee_Payment_Architectrue.md`](./Student_Fee_Payment_Architectrue.md):
+In full alignment with [`Demo_Completion_Hiring_Architecture.md`](./Demo_Completion_Hiring_Architecture.md) and [`Student_Fee_Payment_Architecture.md`](./Student_Fee_Payment_Architecture.md):
 - **Pre-Payment Evaluation**: The student has already undergone (1) the live demo class, (2) the 48-hour post-demo evaluation period, and (3) the 7-day live trial with prorated cancellation rights.
 - **Strict Zero-Refund**: Once Day 7 is reached and the student submits the monthly tuition fee via Razorpay (`feePaid: true`), the platform enforces a **strict Zero-Refund policy**. 
 - **No Post-Payment Disputes**: Because the student had over a week of evaluation before paying, there is no dispute window or hold on the Day 7 payment.

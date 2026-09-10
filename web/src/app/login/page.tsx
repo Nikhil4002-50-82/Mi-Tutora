@@ -115,24 +115,23 @@ function LoginContent() {
     try {
       let finalReferrerName = '';
       if (referralCode.trim()) {
-        const q = query(collection(db, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const referrerUserDoc = querySnapshot.docs[0];
-          const referrerUser = referrerUserDoc.data();
-          finalReferrerName = referrerUser.name || '';
-          
-          await addDoc(collection(db, 'referrals'), {
-            referrerId: referrerUser.id,
-            referrerName: referrerUser.name,
-            referredUserId: user.uid,
-            referredUserName: user.displayName || '',
-            referralCode: referralCode.trim().toUpperCase(),
-            referralType: role,
-            status: 'pending',
-            estimatedReward: 0,
-            createdAt: Date.now()
+        try {
+          const trackRes = await fetch('/api/referrals/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              referralCode: referralCode.trim(),
+              refereeUid: user.uid,
+              refereeName: user.displayName || '',
+              role
+            })
           });
+          const trackData = await trackRes.json();
+          if (trackData.success && trackData.referrerName) {
+            finalReferrerName = trackData.referrerName;
+          }
+        } catch (refErr) {
+          console.error('Referral tracking error:', refErr);
         }
       }
 

@@ -10,9 +10,9 @@ export { redeemBankedToken } from "./callable/redeemToken";
 export { deleteUserAccount } from "./callable/deleteAccount";
 
 // Export Phase 2 Scheduled Functions (Cloud Scheduler)
-export { processDailyPayouts } from "./scheduled/dailyPayouts";
+export { processDailyPayouts, processDailyPayouts as dailyPayouts } from "./scheduled/dailyPayouts";
 export { expireDemosAndDecisions } from "./scheduled/expireDemos";
-export { resetWeeklyTeacherQuotas } from "./scheduled/weeklyQuotaReset";
+export { resetWeeklyTeacherQuotas, resetWeeklyTeacherQuotas as weeklyQuotaReset } from "./scheduled/weeklyQuotaReset";
 
 // Export Phase 3 Event-Driven Triggers
 export { onApplicationWritten } from "./triggers/onApplicationWritten";

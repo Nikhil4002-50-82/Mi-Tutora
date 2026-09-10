@@ -14,17 +14,19 @@ test.describe('Aadhar KYC Verification Architecture (Aadhar_Verification_Badge.m
     return `XXXX-XXXX-${last4}`;
   }
 
-  function verifyMockOtp(otp: string, cleanAadhar: string) {
-    if (otp === '123456') {
+  function parsePowerApiResponse(apiData: { success: boolean; aadhaar_data?: { aadhaar_number?: string }; masked_aadhaar?: string; message?: string }) {
+    if (!apiData.success) {
       return {
-        success: true,
-        aadharVerified: true,
-        maskedAadhar: maskAadhar(cleanAadhar)
+        success: false,
+        error: apiData.message || 'Verification failed'
       };
     }
+    const raw = apiData.aadhaar_data?.aadhaar_number || '';
+    const masked = raw ? maskAadhar(raw) : (apiData.masked_aadhaar || 'XXXX-XXXX-XXXX');
     return {
-      success: false,
-      error: 'Invalid OTP. For mock testing, use 123456.'
+      success: true,
+      aadharVerified: true,
+      maskedAadhar: masked
     };
   }
 
@@ -50,22 +52,37 @@ test.describe('Aadhar KYC Verification Architecture (Aadhar_Verification_Badge.m
     });
   });
 
-  test.describe('Mock OTP Flow & Badging State', () => {
-    test('Verifies with mock OTP 123456 and activates badge', () => {
-      const aadhar = '555566667777';
-      const result = verifyMockOtp('123456', aadhar);
+  test.describe('PowerAPI Verified Response Processing', () => {
+    test('Processes successful PowerAPI response with raw aadhar', () => {
+      const response = parsePowerApiResponse({
+        success: true,
+        aadhaar_data: { aadhaar_number: '555566667777' }
+      });
 
-      expect(result.success).toBe(true);
-      expect(result.aadharVerified).toBe(true);
-      expect(result.maskedAadhar).toBe('XXXX-XXXX-7777');
+      expect(response.success).toBe(true);
+      expect(response.aadharVerified).toBe(true);
+      expect(response.maskedAadhar).toBe('XXXX-XXXX-7777');
     });
 
-    test('Rejects incorrect OTP', () => {
-      const aadhar = '555566667777';
-      const result = verifyMockOtp('000000', aadhar);
+    test('Processes successful PowerAPI response with pre-masked aadhar', () => {
+      const response = parsePowerApiResponse({
+        success: true,
+        masked_aadhaar: 'XXXX-XXXX-8888'
+      });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Invalid OTP');
+      expect(response.success).toBe(true);
+      expect(response.aadharVerified).toBe(true);
+      expect(response.maskedAadhar).toBe('XXXX-XXXX-8888');
+    });
+
+    test('Handles rejected or failed PowerAPI response', () => {
+      const response = parsePowerApiResponse({
+        success: false,
+        message: 'Invalid OTP entered'
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe('Invalid OTP entered');
     });
   });
 });
