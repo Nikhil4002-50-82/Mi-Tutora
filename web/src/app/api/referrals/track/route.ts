@@ -1,15 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/utils/firebase/admin';
+import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
 
 export async function POST(req: NextRequest) {
   try {
     const adminDb = getAdminDb();
-    if (!adminDb) {
+    const adminAuth = await getAdminAuth();
+    if (!adminDb || !adminAuth) {
       return NextResponse.json({ success: false, error: 'Database connection failed' }, { status: 500 });
     }
 
+    // Require a valid Firebase token — refereeUid must come from the verified token, not the body
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+    }
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { action = 'track', referralCode, refereeUid, refereeName, role } = body;
+    // SECURE: Override refereeUid from body with the verified token UID so users cannot forge other users' referrals
+    const { action = 'track', referralCode, refereeName, role } = body;
+    const refereeUid = decodedToken.uid;
+
 
     if (action === 'sync_name') {
       if (!refereeUid || !refereeName) {

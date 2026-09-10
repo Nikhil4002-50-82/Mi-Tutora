@@ -12,7 +12,12 @@ export async function POST(req: NextRequest) {
     // Authorization: Verify Secret or Admin Token
     const authHeader = req.headers.get('authorization');
     const cronSecretHeader = req.headers.get('x-cron-secret');
-    const expectedSecret = process.env.CRON_SECRET || 'mitutora_payout_secret';
+    const expectedSecret = process.env.CRON_SECRET;
+
+    if (!expectedSecret) {
+      console.error('[/api/payouts/process] CRON_SECRET environment variable is not set. Refusing to process payouts.');
+      return NextResponse.json({ error: 'Server misconfiguration: CRON_SECRET is not set.' }, { status: 500 });
+    }
 
     let isAuthorized = false;
     if (cronSecretHeader && cronSecretHeader === expectedSecret) {

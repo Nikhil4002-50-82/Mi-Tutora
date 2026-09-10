@@ -4,7 +4,7 @@ service cloud.firestore {
     
     // Secure the "users" collection against privilege escalation and mass deletion
     match /users/{userId} {
-      allow read: if true; 
+      allow read: if request.auth != null; 
       
       // Enforce safe roles on document creation (legacy 'role' string field is deprecated)
       allow create: if request.resource.data.roles.hasOnly(['student', 'teacher', 'parent'])
@@ -62,7 +62,7 @@ service cloud.firestore {
 
     // Secure the "applications" collection against price manipulation, fake payments, and unauthorized deletion
     match /applications/{appId} {
-      allow read: if true; 
+      allow read: if request.auth != null; 
       allow delete: if false; // Deletions strictly restricted to server Admin SDK 
       
       // 1. Prevent ANY frontend modification of feePaid or demoPaymentPaid (Backend only)
@@ -99,7 +99,7 @@ service cloud.firestore {
     // PAYMENTS LEDGER: Strictly backend only writes
     // -------------------------------------------------------------------------
     match /payments/{paymentId} {
-      allow read: if true; 
+      allow read: if request.auth != null; 
       allow write: if false; 
     }
 

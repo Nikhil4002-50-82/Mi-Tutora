@@ -99,6 +99,7 @@ export const deleteUserAccount = onCall(async (request) => {
     tuitionReqSnap,
     referralsSnap1,
     referralsSnap2,
+    orphanedPayoutsSnap,
   ] = await Promise.all([
     db.collection("students").where("parentDocId", "==", uid).get(),
     db.collection("groups").where("parentDocId", "==", uid).get(),
@@ -107,6 +108,8 @@ export const deleteUserAccount = onCall(async (request) => {
     db.collection("tuition_requests").where("parentDocId", "==", uid).get(),
     db.collection("referrals").where("referrerId", "==", uid).get(),
     db.collection("referrals").where("referredUserId", "==", uid).get(),
+    // Cancel any held escrow payouts so the daily scheduler doesn't send money to a deleted UPI (V13 fix)
+    db.collection("tutor_payouts").where("tutorDocId", "==", uid).where("status", "==", "escrow_held").get(),
   ]);
 
   studentsSnap.docs.forEach((d) => batch.delete(d.ref));
@@ -116,6 +119,11 @@ export const deleteUserAccount = onCall(async (request) => {
   tuitionReqSnap.docs.forEach((d) => batch.delete(d.ref));
   referralsSnap1.docs.forEach((d) => batch.delete(d.ref));
   referralsSnap2.docs.forEach((d) => batch.delete(d.ref));
+  // Cancel held escrow payouts linked to this tutor so the scheduler doesn't pay out to a deleted account
+  orphanedPayoutsSnap.docs.forEach((d) => batch.update(d.ref, {
+    status: "cancelled_account_deleted",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }));
 
   batch.delete(db.collection("parents").doc(uid));
   batch.delete(db.collection("tutors").doc(uid));

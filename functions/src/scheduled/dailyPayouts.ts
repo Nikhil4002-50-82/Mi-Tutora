@@ -132,8 +132,8 @@ export const processDailyPayouts = onSchedule(
 
     // 3. Trigger automated RazorpayX transfer runner if configured
     const runnerUrl = process.env.PAYOUT_RUNNER_URL || process.env.NEXT_PUBLIC_APP_URL;
-    const cronSecret = process.env.CRON_SECRET || "mitutora_payout_secret";
-    if (runnerUrl && typeof fetch === "function") {
+    const cronSecret = process.env.CRON_SECRET;
+    if (runnerUrl && typeof fetch === "function" && cronSecret) {
       try {
         const endpoint = `${runnerUrl.replace(/\/$/, "")}/api/payouts/process`;
         console.log(`[processDailyPayouts] Dispatching automated payout execution to ${endpoint}`);

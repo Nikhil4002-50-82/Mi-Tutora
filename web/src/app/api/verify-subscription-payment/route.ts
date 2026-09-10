@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAdminDb, getAdminAuth } from '@/utils/firebase/admin';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,23 +65,47 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentDoc = snap.docs[0];
-    const paymentData = paymentDoc.data();
-
-    // Prevent Replay Attacks
-    if (paymentData.status === 'paid') {
-      return NextResponse.json({ success: true, message: 'Subscription already verified' });
-    }
+    const paymentDocRef = paymentDoc.ref;
+    const initialData = paymentDoc.data();
 
     // Secure ownership: Ensure the user verifying the payment is the intended subscriber
-    const verifiedUserId = paymentData.userId;
+    const verifiedUserId = initialData.userId;
     if (verifiedUserId !== decodedToken.uid) {
       return NextResponse.json({ error: 'Unauthorized: Subscription does not belong to this user' }, { status: 403 });
+    }
+
+    // Prevent Replay Attacks & Concurrency Race Conditions via Firestore Transaction Lock
+    // (same atomic pattern used in verify-payment/route.ts)
+    let alreadyPaid = false;
+    await adminDb.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(paymentDocRef);
+      if (!freshSnap.exists) {
+        throw new Error('Order ID not found in secure ledger.');
+      }
+      const freshData = freshSnap.data() || {};
+      if (freshData.status === 'paid') {
+        alreadyPaid = true;
+        return;
+      }
+      // Atomically claim the lock — concurrent requests exit immediately on the status check
+      transaction.update(paymentDocRef, {
+        status: 'paid',
+        razorpayPaymentId: razorpay_payment_id,
+        verifiedVia: 'client',
+        verifiedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    if (alreadyPaid) {
+      return NextResponse.json({ success: true, message: 'Subscription already verified' });
     }
 
     // Payment is 100% authentic. Perform secure backend database update.
     await processSubscriptionUpdate(adminDb, verifiedUserId, razorpay_order_id, razorpay_payment_id);
 
     return NextResponse.json({ success: true });
+
 
   } catch (error: any) {
     console.error('Error verifying subscription payment:', error);
@@ -116,12 +140,13 @@ async function processSubscriptionUpdate(adminDb: any, userId: string, orderId: 
     }
 
     const tutorData = tutorSnap.data() || {};
-    const { Timestamp, FieldValue } = await import('firebase-admin/firestore');
     
-    const oneMonthMillis = 30 * 24 * 60 * 60 * 1000; 
+    // Use calendar month arithmetic (not flat 30 days) to handle months of varying lengths correctly
     const now = Date.now();
     const currentExpiry = tutorData.subscriptionExpiry || 0;
-    const expiryDate = Math.max(now, currentExpiry) + oneMonthMillis;
+    const baseDate = new Date(Math.max(now, currentExpiry));
+    baseDate.setMonth(baseDate.getMonth() + 1);
+    const expiryDate = baseDate.getTime();
 
     const currentTokensUsed = tutorData.weeklyQuota?.tokensUsed || 0;
     const updatedTokensUsed = Math.max(0, currentTokensUsed - 10);

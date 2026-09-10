@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Error generating OTP:', error);
+    console.error('Error generating OTP:', error.message);
     return NextResponse.json({ error: error.message || 'Failed to process request' }, { status: 500 });
   }
 }

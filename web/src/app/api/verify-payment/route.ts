@@ -255,7 +255,10 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
                         const refDoc = refSnap.docs[0];
                         const refData = refDoc.data();
                         const referrerId = refData.referrerId;
-                        
+
+                        // Idempotency guard: skip if this referral has already been processed (e.g. on a retry)
+                        if (refData.status !== 'pending') return;
+
                         if (refData.referralType === 'teacher') {
                             batch.update(adminDb.collection('referrals').doc(refDoc.id), {
                                 status: 'qualified',

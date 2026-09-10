@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/utils/firebase/admin';
 
+// Cache this route's responses for 60 seconds to reduce repeated N+1 Firestore reads (V9 security fix)
+export const revalidate = 60;
+
 export async function GET(req: NextRequest) {
   try {
     const tutorDocId = req.nextUrl.searchParams.get('tutorDocId');

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       parentDocId,
       applicationDocId: applicationId,
       rating,
-      comment: comment || '',
+      comment: (comment || '').slice(0, 1000),
       createdAt: Date.now()
     });
 
