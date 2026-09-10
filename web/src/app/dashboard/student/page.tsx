@@ -128,6 +128,30 @@ export default function StudentDashboard() {
     setVisibleTutorsCount(20);
   }, [tuitionSubTab, selectedCategory, activeGroupId]);
 
+  const mainContentRef = useRef<HTMLElement>(null);
+  const studentFormSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [
+    activeTab,
+    tuitionSubTab,
+    selectedCategory,
+    activeGroupId,
+    activeRequestViewId,
+    viewingGroupDetails
+  ]);
+
+  useEffect(() => {
+    if (activeStudentId || editingStudentId) {
+      setTimeout(() => {
+        studentFormSectionRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+      }, 0);
+    }
+  }, [activeStudentId, editingStudentId]);
+
   const router = useRouter();
 
   const { data, error: swrError, isLoading: loading, mutate } = useStudentData();
@@ -1333,7 +1357,7 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
+      <main ref={mainContentRef} className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
         <DashboardHeader 
           role="student"
@@ -1410,7 +1434,7 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-6 xl:col-span-7 flex flex-col justify-center">
                       <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
-                        Hello {activeStudent?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Student'}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
+                        Hello {(data?.profile?.name || data?.userData?.name || data?.user?.displayName || 'Parent').trim().split(' ')[0]}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
                       <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
                     </div>
@@ -2997,7 +3021,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {!hasProfile || activeStudentId === 'new' || editingStudentId ? (
-                  <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
+                  <div id="student-form-section" ref={studentFormSectionRef} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
                     {!hasProfile && (
                       <div className="bg-orange-50 border-b border-orange-100 p-4 text-orange-800 flex items-center justify-center gap-2 font-medium text-sm text-center">
                         <Lock className="w-4 h-4" /> Please submit a demo request profile to unlock the rest of your dashboard!
@@ -3232,14 +3256,25 @@ export default function StudentDashboard() {
                     
                     // 3. Prepare group update
                     let groupToSync = false;
+                    let groupDeleted = false;
                     if (groupId) {
                         const groupRef = doc(db, 'groups', groupId);
                         const groupSnap = await getDoc(groupRef);
                         if (groupSnap.exists()) {
                             const groupData = groupSnap.data();
                             const newStudentIds = (groupData.studentDocIds || []).filter((id: string) => id !== studentToRemove.id);
-                            batch.update(groupRef, { studentDocIds: newStudentIds });
-                            groupToSync = true;
+                            if (newStudentIds.length === 0) {
+                                batch.delete(groupRef);
+                                const reqQ = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupId));
+                                const reqSnap = await getDocs(reqQ);
+                                for (const reqDoc of reqSnap.docs) {
+                                    batch.delete(reqDoc.ref);
+                                }
+                                groupDeleted = true;
+                            } else {
+                                batch.update(groupRef, { studentDocIds: newStudentIds });
+                                groupToSync = true;
+                            }
                         }
                     }
                     
@@ -3250,9 +3285,14 @@ export default function StudentDashboard() {
                     await batch.commit();
                     
                     // 6. Post-commit: Sync the tuition request document
-                    if (groupToSync && groupId) {
+                    if (groupToSync && groupId && !groupDeleted) {
                         const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
                         await syncTuitionRequestForGroup(db, groupId, (data?.user?.uid || '') as string);
+                    }
+
+                    if (groupDeleted) {
+                        setViewingGroupDetails((curr: any) => curr?.id === groupId ? null : curr);
+                        setSelectedGroupForSettings((curr: any) => curr?.id === groupId ? null : curr);
                     }
                     
                     toast.success('Student removed successfully');

@@ -39,10 +39,15 @@ export default function GroupSettingsModal({
   });
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [showLocationConfirmModal, setShowLocationConfirmModal] = useState(false);
 
   const handleDetectLocation = () => {
+    setShowLocationConfirmModal(true);
+  };
+
+  const executeDetectLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
     setLocationLoading(true);
@@ -71,21 +76,22 @@ export default function GroupSettingsModal({
           latitude,
           longitude
         }));
+        toast.success('Location detected and address updated successfully!');
       } catch (err: any) {
         if (err.name === 'AbortError') {
           console.error('Geocoding request timed out');
         } else {
           console.error('Error fetching location details:', err);
         }
-        alert('Failed to automatically detect your address. Please enter it manually.');
+        toast.error('Failed to automatically detect your address. Please enter it manually.');
       } finally {
         setLocationLoading(false);
       }
     }, (error) => {
       console.warn('Geolocation error:', error.message);
-      alert('Failed to get location. Please ensure location permissions are granted.');
+      toast.error('Failed to get location. Please ensure location permissions are granted.');
       setLocationLoading(false);
-    }, { timeout: 10000 });
+    }, { timeout: 10000, maximumAge: 0, enableHighAccuracy: true });
   };
 
   useEffect(() => {
@@ -297,9 +303,10 @@ export default function GroupSettingsModal({
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={locationLoading}
-                    className="text-xs font-bold text-emerald-600 bg-emerald-100/50 px-3 py-1.5 rounded-lg hover:bg-emerald-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                    className="text-xs font-bold text-emerald-600 bg-emerald-100/50 px-3 py-1.5 rounded-lg hover:bg-emerald-200 transition-colors flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {locationLoading ? 'Detecting...' : '📍 Detect Current Location'}
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{locationLoading ? 'Detecting...' : 'Detect Current Location'}</span>
                   </button>
                 </div>
                 <input
@@ -417,6 +424,39 @@ export default function GroupSettingsModal({
         </div>
 
       </div>
+
+      {showLocationConfirmModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-teal-50 text-[#00a992] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-teal-100">
+              <MapPin className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Location Permission</h3>
+            <p className="text-slate-600 mb-8 font-medium text-sm leading-relaxed">
+              Allow Mushi to access your device location to automatically detect and fill your offline tutoring address?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLocationConfirmModal(false)}
+                className="flex-1 py-3.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLocationConfirmModal(false);
+                  executeDetectLocation();
+                }}
+                className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00a992] to-teal-500 text-white font-bold shadow-lg shadow-teal-500/25 hover:from-[#009b86] hover:to-teal-600 transition-all"
+              >
+                Allow Access
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

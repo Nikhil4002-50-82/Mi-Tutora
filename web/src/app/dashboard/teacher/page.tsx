@@ -129,6 +129,20 @@ export default function TeacherDashboard() {
     setVisibleStudentsCount(20);
   }, [tuitionSubTab, selectedCategory, subTab]);
 
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [
+    activeTab,
+    tuitionSubTab,
+    subTab,
+    selectedCategory,
+    activeRequestViewId
+  ]);
+
   const handleSavePayoutUpi = async () => {
     const cleanUpi = payoutUpi.trim();
     if (!cleanUpi) {
@@ -1290,7 +1304,7 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
+      <main ref={mainContentRef} className="flex-1 overflow-x-hidden overflow-y-auto flex flex-col relative">
         {/* TOP NAVIGATION BAR */}
         <DashboardHeader 
           role="teacher"

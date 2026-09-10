@@ -150,7 +150,11 @@ erDiagram
 | `specificDays` | `string[]` | e.g. `['Monday', 'Tuesday', ...]` | Specified schedule days. | `web/src/utils/groupUtils.ts:L70` |
 | `preferredTimeRange`| `string` | e.g. `'Evening (4 PM - 8 PM)'` | Preferred time window for sessions. | `web/src/utils/groupUtils.ts:L68` |
 | `teacherGenderPreference`| `string`| `'No Preference'`, `'Male'`, `'Female'` | Filter applied during teacher recommendation. | `web/src/utils/groupUtils.ts:L67` |
+| `isGroup` | `boolean` | `true` \| `false` | `true` if group contains multiple students (> 1), `false` for single-learner groups. | `web/src/components/DemoForm.tsx` |
 | `status` | `string` | `'active'` \| `'closed'` | Lifecycle of the group. | `web/src/utils/groupUtils.ts` |
+
+> [!NOTE]
+> **Automatic Empty Group Cleanup:** When a student is removed from the dashboard and they are the last remaining member of their group (`newStudentIds.length === 0`), the empty group document and all associated `tuition_requests` records are automatically deleted in the same atomic batch to prevent orphaned ghost groups.
 
 ---
 

@@ -16,7 +16,11 @@ import {
   Plus,
   Trash2,
   Users,
-  Briefcase
+  Briefcase,
+  Handshake,
+  Settings,
+  Building,
+  IndianRupee
 } from 'lucide-react';
 import { generateCustomId } from '@/utils/idGenerator';
 import { toast } from 'sonner';
@@ -240,16 +244,35 @@ export default function DemoForm({
     }
   }, [isDashboard, hasProfile, activeStudentId, initialData]);
 
+  useEffect(() => {
+    const studentFormSection = document.getElementById('student-form-section');
+    if (studentFormSection) {
+      studentFormSection.scrollIntoView({ behavior: 'instant', block: 'start' });
+    } else {
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, behavior: 'instant' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }
+  }, [formData.step]);
+
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   
   const [locationLoading, setLocationLoading] = useState(false);
+  const [locationPermissionTargetGroupId, setLocationPermissionTargetGroupId] = useState<string | null>(null);
   const router = useRouter();
 
   const handleDetectLocation = (groupId: string) => {
+    setLocationPermissionTargetGroupId(groupId);
+  };
+
+  const executeDetectLocation = (groupId: string) => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
     setLocationLoading(true);
@@ -284,21 +307,22 @@ export default function DemoForm({
             }
           }
         }));
+        toast.success('Location detected and address updated successfully!');
       } catch (err: any) {
         if (err.name === 'AbortError') {
           console.error('Geocoding request timed out');
         } else {
           console.error('Error fetching location details:', err);
         }
-        alert('Failed to automatically detect your address. Please enter it manually.');
+        toast.error('Failed to automatically detect your address. Please enter it manually.');
       } finally {
         setLocationLoading(false);
       }
     }, (error) => {
       console.warn('Geolocation error:', error.message);
-      alert('Failed to get location. Please ensure location permissions are granted.');
+      toast.error('Failed to get location. Please ensure location permissions are granted.');
       setLocationLoading(false);
-    }, { timeout: 10000 });
+    }, { timeout: 10000, maximumAge: 0, enableHighAccuracy: true });
   };
 
   const handleCommonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -667,71 +691,118 @@ export default function DemoForm({
              }
            }
            
-           const groupRef = doc(collection(db, 'groups'));
-           const groupDocId = groupRef.id;
+           // Check if gId is an existing group in Firestore
+           const existingGroupRef = doc(db, 'groups', gId);
+           const existingGroupSnap = await getDoc(existingGroupRef);
 
-           for (const sDoc of groupStudents) {
-               await updateDoc(sDoc.ref, { groupDocId: groupDocId });
+           if (existingGroupSnap.exists()) {
+             // 1. Existing group: Append new student IDs to the existing group
+             const existingData = existingGroupSnap.data();
+             const currentStudentIds = existingData?.studentDocIds || [];
+             const mergedStudentIds = Array.from(new Set([...currentStudentIds, ...studentIds]));
+
+             const groupUpdatePayload: any = {
+               studentDocIds: mergedStudentIds,
+               updatedAt: Date.now()
+             };
+
+             const hasCustomGroupPref = Object.keys(groupPref).length > 0 && (groupPref.mode || groupPref.hours || groupPref.days);
+             if (hasCustomGroupPref) {
+               if (groupPref.mode) groupUpdatePayload.mode = groupPref.mode;
+               if (groupPref.mode === 'Offline') {
+                 if (combinedAddress) groupUpdatePayload.area = combinedAddress;
+                 groupUpdatePayload.city = groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || '';
+                 if (finalLat) groupUpdatePayload.latitude = finalLat;
+                 if (finalLng) groupUpdatePayload.longitude = finalLng;
+               } else if (groupPref.mode === 'Online') {
+                 groupUpdatePayload.area = '';
+                 groupUpdatePayload.city = '';
+                 groupUpdatePayload.latitude = null;
+                 groupUpdatePayload.longitude = null;
+               }
+               if (groupPref.teacherGenderPreference) groupUpdatePayload.teacherGenderPreference = groupPref.teacherGenderPreference;
+               if (groupPref.hours) groupUpdatePayload.preferredTimeRange = groupPref.hours;
+               if (groupPref.days) groupUpdatePayload.daysPerWeek = groupPref.days;
+               if (groupPref.specificDays) groupUpdatePayload.specificDays = groupPref.specificDays;
+             }
+
+             await updateDoc(existingGroupRef, groupUpdatePayload);
+
+             for (const sDoc of groupStudents) {
+               await updateDoc(sDoc.ref, { groupDocId: gId });
+             }
+
+             // 2. Sync the existing aggregate tuition request document
+             const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+             await syncTuitionRequestForGroup(db, gId, user.uid);
+           } else {
+             // Brand new group: create new group doc and new tuition_requests doc
+             const groupRef = doc(collection(db, 'groups'));
+             const groupDocId = groupRef.id;
+
+             for (const sDoc of groupStudents) {
+                 await updateDoc(sDoc.ref, { groupDocId: groupDocId });
+             }
+
+             await setDoc(groupRef, {
+                groupId: generateCustomId('MTG'),
+                groupDocId: groupDocId,
+                parentDocId: user.uid,
+                studentDocIds: studentIds,
+                mode: groupPref.mode || '',
+                area: combinedAddress,
+                city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+                latitude: groupPref.mode === 'Online' ? null : finalLat,
+                longitude: groupPref.mode === 'Online' ? null : finalLng,
+                teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+                preferredTimeRange: groupPref.hours || '',
+                daysPerWeek: groupPref.days || '',
+                specificDays: groupPref.specificDays || [],
+                status: 'active',
+                createdAt: Date.now()
+             });
+             
+             const combinedSubjects = Array.from(new Set(groupStudents.flatMap(s => s.data.subjects)));
+             const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(s => s.data.technologies)));
+             const combinedLanguages = Array.from(new Set(groupStudents.flatMap(s => s.data.languages)));
+             const combinedBudget = groupStudents.reduce((acc, s) => acc + s.data.budget, 0);
+             const studentsDetails = groupStudents.map(s => ({
+                id: s.data.id,
+                name: s.data.name,
+                classLevel: s.data.classLevel,
+                board: s.data.board,
+                subjects: s.data.subjects,
+                technologies: s.data.technologies,
+                languages: s.data.languages,
+                budget: s.data.budget,
+             }));
+             
+             const newRequestId = generateCustomId('REQ');
+             const newRequestRef = doc(collection(db, 'tuition_requests'));
+             await setDoc(newRequestRef, {
+                requestId: newRequestId,
+                groupDocId: groupDocId,
+                parentDocId: user.uid,
+                category: groupStudents[0].data.category,
+                mode: groupPref.mode || '',
+                area: combinedAddress,
+                city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+                latitude: groupPref.mode === 'Online' ? null : finalLat,
+                longitude: groupPref.mode === 'Online' ? null : finalLng,
+                teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
+                preferredTimeRange: groupPref.hours || '',
+                daysPerWeek: groupPref.days || '',
+                specificDays: groupPref.specificDays || [],
+                studentsDetails,
+                combinedSubjects,
+                combinedTechnologies,
+                combinedLanguages,
+                combinedBudget,
+                status: 'open',
+                acceptedTutorId: '',
+                createdAt: Date.now()
+             });
            }
-
-           await setDoc(groupRef, {
-              groupId: generateCustomId('MTG'),
-              groupDocId: groupDocId,
-              parentDocId: user.uid,
-              studentDocIds: studentIds,
-              mode: groupPref.mode || '',
-              area: combinedAddress,
-              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-              latitude: groupPref.mode === 'Online' ? null : finalLat,
-              longitude: groupPref.mode === 'Online' ? null : finalLng,
-              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
-              preferredTimeRange: groupPref.hours || '',
-              daysPerWeek: groupPref.days || '',
-              specificDays: groupPref.specificDays || [],
-              status: 'active',
-              createdAt: Date.now()
-           });
-           
-           const combinedSubjects = Array.from(new Set(groupStudents.flatMap(s => s.data.subjects)));
-           const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(s => s.data.technologies)));
-           const combinedLanguages = Array.from(new Set(groupStudents.flatMap(s => s.data.languages)));
-           const combinedBudget = groupStudents.reduce((acc, s) => acc + s.data.budget, 0);
-           const studentsDetails = groupStudents.map(s => ({
-              id: s.data.id,
-              name: s.data.name,
-              classLevel: s.data.classLevel,
-              board: s.data.board,
-              subjects: s.data.subjects,
-              technologies: s.data.technologies,
-              languages: s.data.languages,
-              budget: s.data.budget,
-           }));
-           
-           const newRequestId = generateCustomId('REQ');
-           const newRequestRef = doc(collection(db, 'tuition_requests'));
-           await setDoc(newRequestRef, {
-              requestId: newRequestId,
-              groupDocId: groupDocId,
-              parentDocId: user.uid,
-              category: groupStudents[0].data.category,
-              mode: groupPref.mode || '',
-              area: combinedAddress,
-              city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-              latitude: groupPref.mode === 'Online' ? null : finalLat,
-              longitude: groupPref.mode === 'Online' ? null : finalLng,
-              teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
-              preferredTimeRange: groupPref.hours || '',
-              daysPerWeek: groupPref.days || '',
-              specificDays: groupPref.specificDays || [],
-              studentsDetails,
-              combinedSubjects,
-              combinedTechnologies,
-              combinedLanguages,
-              combinedBudget,
-              status: 'open',
-              acceptedTutorId: '',
-              createdAt: Date.now()
-           });
         }
         setSuccessMsg('Student(s) added successfully!');
         toast.success("Student(s) added successfully!", { description: "New students have been registered." });
@@ -1157,14 +1228,18 @@ export default function DemoForm({
                   {(pref.mode === 'Offline' && !isProgramming) && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
                       <div className="flex justify-between items-center">
-                        <label className="block text-sm font-semibold">🏠 Group Address *</label>
+                        <label className="block text-sm font-semibold flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-emerald-600" />
+                          <span>Group Address *</span>
+                        </label>
                         <button
                           type="button"
                           onClick={() => handleDetectLocation(groupId)}
                           disabled={locationLoading}
-                          className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                          className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
-                          {locationLoading ? 'Detecting...' : '📍 Detect Current Location'}
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span>{locationLoading ? 'Detecting...' : 'Detect Current Location'}</span>
                         </button>
                       </div>
                       <div className="grid gap-3">
@@ -1299,7 +1374,10 @@ export default function DemoForm({
         )}
         
         <div className="mb-6">
-          <label className="block text-sm font-semibold mb-2">📚 Category *</label>
+          <label className="block text-sm font-semibold mb-2 flex items-center">
+            <BookOpen className="w-4 h-4 mr-1.5 text-teal-600" />
+            <span>Category *</span>
+          </label>
           <select
             name="category"
             value={student.category || ''}
@@ -1316,7 +1394,10 @@ export default function DemoForm({
 
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold mb-2">👤 Student Name *</label>
+            <label className="block text-sm font-semibold mb-2 flex items-center">
+              <User className="w-4 h-4 mr-1.5 text-teal-600" />
+              <span>Student Name *</span>
+            </label>
             <input
               type="text"
               name="fullName"
@@ -1328,7 +1409,10 @@ export default function DemoForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-3">🚻 Gender *</label>
+            <label className="block text-sm font-semibold mb-3 flex items-center">
+              <Users className="w-4 h-4 mr-1.5 text-teal-600" />
+              <span>Gender *</span>
+            </label>
             <div className="flex flex-wrap gap-4 sm:gap-6 pt-3">
               {['Female', 'Male', 'Other'].map((item) => (
                 <label key={item} className="flex items-center gap-2 font-medium">
@@ -1349,8 +1433,11 @@ export default function DemoForm({
         </div>
 
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-          <label className="block text-sm font-semibold mb-2 flex justify-between">
-            <span>💰 Expected Budget / Monthly Fee *</span>
+          <label className="block text-sm font-semibold mb-2 flex justify-between items-center">
+            <span className="flex items-center">
+              <IndianRupee className="w-4 h-4 mr-1.5 text-emerald-600" />
+              <span>Expected Budget / Monthly Fee *</span>
+            </span>
             <span className="text-emerald-600 font-bold">&#8377;{student.budget}</span>
           </label>
           <input
@@ -1373,7 +1460,10 @@ export default function DemoForm({
           <>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold mb-2">👨‍🎓 Student Type *</label>
+                <label className="block text-sm font-semibold mb-2 flex items-center">
+                  <GraduationCap className="w-4 h-4 mr-1.5 text-teal-600" />
+                  <span>Student Type *</span>
+                </label>
                 <select
                   name="studentType"
                   value={student.studentType}
@@ -1388,7 +1478,10 @@ export default function DemoForm({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">🏫 Class / Grade *</label>
+                <label className="block text-sm font-semibold mb-2 flex items-center">
+                  <Building className="w-4 h-4 mr-1.5 text-teal-600" />
+                  <span>Class / Grade *</span>
+                </label>
                 <select
                   name="classGrade"
                   value={student.classGrade}
@@ -1527,10 +1620,10 @@ export default function DemoForm({
     };
 
     return (
-      <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-3xl mx-auto animate-in slide-in-from-right-8 duration-300">
+      <div className="bg-white rounded-3xl p-5 sm:p-7 md:p-10 border border-slate-200/80 max-w-3xl mx-auto animate-in slide-in-from-right-8 duration-300">
         <div className="text-center mb-10">
-           <div className="w-20 h-20 bg-teal-50 text-teal-600 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-5 shadow-sm border border-teal-100 transform -rotate-3">
-             🤝
+           <div className="w-20 h-20 bg-teal-50 text-[#00a992] rounded-3xl flex items-center justify-center mx-auto mb-5 border border-teal-100 transform -rotate-3">
+             <Handshake className="w-10 h-10" />
            </div>
            <h3 className="text-3xl font-black text-slate-800 mb-3 tracking-tight">How should we group these students?</h3>
            <p className="text-slate-500 font-medium text-lg max-w-md mx-auto">Choose a grouping strategy below to proceed to setting their study preferences.</p>
@@ -1538,16 +1631,20 @@ export default function DemoForm({
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
            {formData.numberOfStudents > 1 && (
-             <button type="button" onClick={() => handleGroupingStrategy('together')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 hover:shadow-lg hover:shadow-teal-900/5 transition-all text-left group relative overflow-hidden bg-white">
+             <button type="button" onClick={() => handleGroupingStrategy('together')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 transition-all text-left group relative overflow-hidden bg-white">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
-                <div className="text-4xl mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left">👨‍👩‍👧‍👦</div>
+                <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#00a992] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left border border-teal-100/60">
+                  <Users className="w-6 h-6" />
+                </div>
                 <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Group them together</h4>
                 <p className="text-sm text-slate-500 font-medium leading-relaxed">They will share the same teacher, timings, budget, and study mode.</p>
              </button>
            )}
-           <button type="button" onClick={() => handleGroupingStrategy('separate')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 hover:shadow-lg hover:shadow-teal-900/5 transition-all text-left group relative overflow-hidden bg-white">
+           <button type="button" onClick={() => handleGroupingStrategy('separate')} className="p-6 rounded-3xl border-2 border-slate-100 hover:border-teal-400 hover:bg-teal-50/50 transition-all text-left group relative overflow-hidden bg-white">
               <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
-              <div className="text-4xl mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left">🧑‍🎓</div>
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#00a992] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform origin-bottom-left border border-teal-100/60">
+                <GraduationCap className="w-6 h-6" />
+              </div>
               <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Keep them separate</h4>
               <p className="text-sm text-slate-500 font-medium leading-relaxed">Set individual study preferences and find separate teachers for each student.</p>
            </button>
@@ -1555,7 +1652,7 @@ export default function DemoForm({
 
         {existingGroups && existingGroups.length > 0 && (
            <div className="p-6 sm:p-8 rounded-3xl border-2 border-slate-100 bg-slate-50/50 relative overflow-hidden">
-             <div className="absolute -top-10 -right-10 text-9xl opacity-[0.03] pointer-events-none">🏢</div>
+             <Building className="absolute -top-6 -right-6 w-32 h-32 text-slate-300 opacity-20 pointer-events-none" />
              <h4 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Add to an existing group</h4>
              <p className="text-sm text-slate-500 font-medium mb-5">Add the newly created {formData.numberOfStudents > 1 ? 'students' : 'student'} to one of your active groups.</p>
              
@@ -1592,8 +1689,8 @@ export default function DemoForm({
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl shadow-teal-900/20 animate-in zoom-in-95 duration-300 relative overflow-hidden border border-slate-100">
                <div className="absolute -top-24 -right-24 w-48 h-48 bg-teal-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
                
-               <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-sm border border-teal-100">
-                 ⚙️
+               <div className="w-16 h-16 bg-teal-50 text-[#00a992] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-teal-100">
+                 <Settings className="w-8 h-8" />
                </div>
                <h3 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Review Preferences?</h3>
                <p className="text-slate-500 font-medium mb-8 leading-relaxed">Would you like to review and modify the study preferences (time, mode, budget) for this existing group, or keep the current settings?</p>
@@ -1635,8 +1732,8 @@ export default function DemoForm({
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-teal-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
             
             <div className="relative">
-              <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-sm border border-teal-100">
-                👨‍🎓
+              <div className="w-16 h-16 bg-teal-50 text-[#00a992] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-teal-100">
+                <GraduationCap className="w-8 h-8" />
               </div>
               <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Add New Students</h3>
               <p className="text-slate-500 mb-8 font-medium">How many students would you like to register? You can add up to 5 at once.</p>
@@ -1754,6 +1851,40 @@ export default function DemoForm({
             </div>
 
           </form>
+        </div>
+      )}
+
+      {locationPermissionTargetGroupId && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-teal-50 text-[#00a992] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-teal-100">
+              <MapPin className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Location Permission</h3>
+            <p className="text-slate-600 mb-8 font-medium text-sm leading-relaxed">
+              Allow Mushi to access your device location to automatically detect and fill your offline tutoring address?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setLocationPermissionTargetGroupId(null)}
+                className="flex-1 py-3.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const gId = locationPermissionTargetGroupId;
+                  setLocationPermissionTargetGroupId(null);
+                  if (gId) executeDetectLocation(gId);
+                }}
+                className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00a992] to-teal-500 text-white font-bold shadow-lg shadow-teal-500/25 hover:from-[#009b86] hover:to-teal-600 transition-all"
+              >
+                Allow Access
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

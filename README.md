@@ -134,11 +134,11 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 *   **Secure Masking:** Only the last 4 digits (`XXXX-XXXX-1234`) are retained in Firestore for display; full Aadhar numbers are never permanently stored.
 *   **Trust Badge & Algorithm Boost:** Verified educators receive the green verified shield badge and an automatic **+20 ranking boost**.
 
-### B. Compulsory Educational Document Verification
-*   **Dynamic Qualification Mapping:** The required verification documents are dynamically determined by the teacher's selected highest qualification (e.g., 10th marksheet for 10th; 10th + 12th for 12th; 10th + 12th + degree certificate for bachelor degrees; master certificates for post-graduates).
-*   **Strict PDF Restrictions:** Frontend and Firebase Storage rules physically restrict uploads strictly to **PDF format** (`.pdf`) capped at **5MB** per file.
+### B. Teacher Resume & Optional Educational Document Verification
+*   **Compulsory Resume/CV Onboarding:** Tutors must upload their resume/CV during profile setup. Proposals (`make_offer` or direct demo requests) are unlocked once the resume is on file.
+*   **Optional Dynamic Qualification Mapping:** Tutors may optionally upload official educational marksheets/certificates corresponding to their highest qualification (e.g., 10th marksheet for 10th; 10th + 12th for 12th; degree certificate for bachelor degrees; master certificates for post-graduates) to build parent trust.
+*   **Strict PDF Restrictions:** Frontend and Firebase Storage rules restrict document uploads strictly to **PDF format** (`.pdf`) capped at **5MB** per file.
 *   **Secure Firebase Storage Scheme:** Files are stored under `tutor_documents/{userId}/{docId}_{timestamp}_{fileName}` with owner-only write permissions.
-*   **Proposal Sending Lockout:** Tutors cannot submit tuition proposals (`make_offer` or direct demo requests) without first submitting all required educational marksheets and degree certificates.
 
 ---
 
@@ -341,7 +341,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 | **Educational Document Verification Architecture** | 👉 [`docs/Document_Verification.md`](./docs/Document_Verification.md) |
 | **Escrow & Day 30 Automated Razorpay Payouts** | 👉 [`docs/First_Month_Tuition_Escrow_Payout_Architecture.md`](./docs/First_Month_Tuition_Escrow_Payout_Architecture.md) |
 | **Referrals, Banked Tokens & Automated UPI Rewards** | 👉 [`docs/Referral_System_Architecture.md`](./docs/Referral_System_Architecture.md) |
-| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architectrue.md`](./docs/Student_Fee_Payment_Architectrue.md) |
+| **Student Tuition Payment & Zero-Refund Policy** | 👉 [`docs/Student_Fee_Payment_Architecture.md`](./docs/Student_Fee_Payment_Architecture.md) |
 | **Payment Gateway & Webhook Verification** | 👉 [`docs/Payment_Architecture.md`](./docs/Payment_Architecture.md) |
 | **Matchmaking & Ranking Algorithm** | 👉 [`docs/Ranking_System_Architecture.md`](./docs/Ranking_System_Architecture.md) |
 | **Subscriptions, Pro Plan & Weekly Quota Rollover** | 👉 [`docs/Subscription_Architecture.md`](./docs/Subscription_Architecture.md) |
@@ -362,7 +362,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 19 test suites (160 unit, integration & ranking pagination tests)
+# Run all 19 test suites (172 unit, integration & ranking pagination tests)
 cd web
 npx playwright test
 
@@ -374,5 +374,5 @@ cd ../functions
 npm run build
 ```
 
-*All 160 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+*All 172 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
 

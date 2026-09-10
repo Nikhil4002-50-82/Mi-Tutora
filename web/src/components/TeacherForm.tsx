@@ -149,6 +149,17 @@ export default function TeacherForm({
     }
   }, [initialData?.resume, initialData?.resumeUrl]);
 
+  useEffect(() => {
+    if (isEditing) {
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, behavior: 'instant' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }
+  }, [isEditing]);
+
   const handleFileSelect = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -234,9 +245,15 @@ export default function TeacherForm({
     }
   };
 
+  const [showLocationConfirmModal, setShowLocationConfirmModal] = useState(false);
+
   const handleDetectLocation = () => {
+    setShowLocationConfirmModal(true);
+  };
+
+  const executeDetectLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
     setLocationLoading(true);
@@ -264,21 +281,22 @@ export default function TeacherForm({
           city: city || prev.city,
           pincode: pincode || prev.pincode
         }));
+        toast.success('Location detected and address updated successfully!');
       } catch (err: any) {
         if (err.name === 'AbortError') {
           console.error('Geocoding request timed out');
         } else {
           console.error('Error fetching location details:', err);
         }
-        alert('Failed to automatically detect your address. Please enter it manually.');
+        toast.error('Failed to automatically detect your address. Please enter it manually.');
       } finally {
         setLocationLoading(false);
       }
     }, (error) => {
       console.warn('Geolocation error:', error.message);
-      alert('Failed to get location. Please ensure location permissions are granted.');
+      toast.error('Failed to get location. Please ensure location permissions are granted.');
       setLocationLoading(false);
-    }, { timeout: 10000 });
+    }, { timeout: 10000, maximumAge: 0, enableHighAccuracy: true });
   };
 
   const handleSubmit = async (
@@ -974,7 +992,10 @@ export default function TeacherForm({
           {(formData.mode !== 'Online' && formData.category !== 'programming' && formData.category !== 'languages') && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <label className="block text-sm font-semibold">🏠 Residential Address *</label>
+                <label className="block text-sm font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                  <span>Residential Address *</span>
+                </label>
                 <button
                   type="button"
                   onClick={handleDetectLocation}
@@ -1671,8 +1692,41 @@ export default function TeacherForm({
           )}
         </button>
 
-      </form>
-      </div>
+        </form>
+        </div>
+      )}
+
+      {showLocationConfirmModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-teal-50 text-[#00a992] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-teal-100">
+              <MapPin className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Location Permission</h3>
+            <p className="text-slate-600 mb-8 font-medium text-sm leading-relaxed">
+              Allow Mushi to access your device location to automatically detect and fill your residential address?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLocationConfirmModal(false)}
+                className="flex-1 py-3.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLocationConfirmModal(false);
+                  executeDetectLocation();
+                }}
+                className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00a992] to-teal-500 text-white font-bold shadow-lg shadow-teal-500/25 hover:from-[#009b86] hover:to-teal-600 transition-all"
+              >
+                Allow Access
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
