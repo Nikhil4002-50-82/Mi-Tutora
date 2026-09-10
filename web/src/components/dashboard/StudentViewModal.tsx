@@ -31,6 +31,52 @@ export function StudentViewModal({
   onUpgradeRequested,
   offerLoading
 }: StudentViewModalProps) {
+  const [asyncParentId, setAsyncParentId] = React.useState<string>('');
+  const [asyncGroupId, setAsyncGroupId] = React.useState<string>('');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    setAsyncParentId('');
+    setAsyncGroupId('');
+
+    if (!selectedViewUser) return;
+
+    const currentParentId = selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId;
+    const currentGroupId = selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId;
+
+    const pDocId = selectedViewUser.parentDocId || selectedViewApp?.parentDocId || selectedViewUser.students?.[0]?.parentDocId;
+    if (!currentParentId && pDocId) {
+      import('@/utils/firebase/client').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, getDoc }) => {
+          getDoc(doc(db, 'parents', pDocId)).then((snap) => {
+            if (isMounted && snap.exists()) {
+              const pData = snap.data();
+              if (pData?.parentId) setAsyncParentId(pData.parentId);
+            }
+          }).catch(console.error);
+        });
+      });
+    }
+
+    const gDocId = selectedViewUser.groupDocId || selectedViewApp?.groupDocId || selectedViewUser.students?.[0]?.groupDocId || (selectedViewUser.id && !selectedViewUser.id.startsWith('indv_') ? selectedViewUser.id : null);
+    if ((!currentGroupId || currentGroupId.length > 15) && gDocId && !gDocId.startsWith('indv_')) {
+      import('@/utils/firebase/client').then(({ db }) => {
+        import('firebase/firestore').then(({ doc, getDoc }) => {
+          getDoc(doc(db, 'groups', gDocId)).then((snap) => {
+            if (isMounted && snap.exists()) {
+              const gData = snap.data();
+              if (gData?.groupId) setAsyncGroupId(gData.groupId);
+            }
+          }).catch(console.error);
+        });
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedViewUser?.id, selectedViewUser?.parentId, selectedViewUser?.groupId, selectedViewUser?.parentDocId, selectedViewUser?.groupDocId]);
+
   if (!selectedViewUser) return null;
 
   return (
@@ -51,16 +97,25 @@ export function StudentViewModal({
             <div>
               <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
               <div className="flex gap-2 mt-1.5 flex-wrap">
-                {(selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds && selectedViewUser.id)) && (
-                  <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
-                    Parent ID: {selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || (selectedViewUser.studentDocIds ? selectedViewUser.id : '')}
-                  </p>
-                )}
-                {(selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId) && (
-                  <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
-                    Group ID: {selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId}
-                  </p>
-                )}
+                {(() => {
+                  const parentId = selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || asyncParentId;
+                  const rawGroupId = selectedViewUser.groupId || selectedViewApp?.groupId || selectedViewUser.students?.[0]?.groupId || asyncGroupId;
+                  const groupId = rawGroupId && !rawGroupId.startsWith('indv_') ? rawGroupId : '';
+                  return (
+                    <>
+                      {parentId && (
+                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                          Parent ID: {parentId}
+                        </p>
+                      )}
+                      {groupId && (
+                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                          Group ID: {groupId}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
                 <Users className="w-4 h-4" /> {selectedViewUser.students?.length || 1} Student(s)

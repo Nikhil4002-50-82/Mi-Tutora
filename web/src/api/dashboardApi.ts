@@ -357,6 +357,33 @@ export const fetchTeacherDashboardData = async () => {
     });
   }
 
+  // Phase 1.5: Fetch parent custom IDs (MTP...) from 'parents' collection for groups and students
+  const allParentDocIds = Array.from(new Set([
+    ...availableStudentsRaw.map((s: any) => s.parentDocId),
+    ...fetchedGroups.map((g: any) => g.parentDocId),
+    ...applications.map((a: any) => a.parentDocId)
+  ].filter(Boolean))) as string[];
+
+  let parentCustomIdsMap: Record<string, string> = {};
+  if (allParentDocIds.length > 0) {
+    const parentChunkPromises = [];
+    for (let i = 0; i < allParentDocIds.length; i += 10) {
+      const chunk = allParentDocIds.slice(i, i + 10);
+      parentChunkPromises.push(getDocs(query(collection(db, 'parents'), where(documentId(), 'in', chunk))));
+    }
+    const parentSnaps = await Promise.all(parentChunkPromises);
+    parentSnaps.forEach(pSnap => {
+      pSnap.docs.forEach(d => {
+        const pData = d.data();
+        if (pData?.parentId) {
+          parentCustomIdsMap[d.id] = pData.parentId;
+          if (pData.authUid) parentCustomIdsMap[pData.authUid] = pData.parentId;
+          if (pData.parentDocId) parentCustomIdsMap[pData.parentDocId] = pData.parentId;
+        }
+      });
+    });
+  }
+
   const globalLocks: Record<string, { unlockDate: number, tutorDocId: string }> = {};
   lockedAppsSnap.docs.forEach(d => {
     const data = d.data();
@@ -448,7 +475,8 @@ export const fetchTeacherDashboardData = async () => {
     availableStudentsRaw,
     availableStudents,
     studentsInfo,
-    fetchedGroups
+    fetchedGroups,
+    parentCustomIdsMap
   };
 
   return deriveTeacherDashboardState(baseData);
@@ -458,19 +486,26 @@ export const deriveTeacherDashboardState = (baseData: any) => {
   const { 
     user, userData, tutorId, tutorData, teacherCategories, globalLocks, 
     applications, tutorPayouts = [], referrals, marketplacePricing, 
-    availableStudentsRaw, availableStudents, studentsInfo, fetchedGroups 
+    availableStudentsRaw, availableStudents, studentsInfo, fetchedGroups,
+    parentCustomIdsMap = {}
   } = baseData;
 
   // Group students first
   const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
-    const gId = student.groupDocId || `indv_${student.id}`;
+    const gId = student.groupDocId || student.groupId || `indv_${student.id}`;
     if (!acc[gId]) {
-      const groupDoc = (fetchedGroups || []).find((g: any) => g.id === gId) || null;
+      const groupDoc = (fetchedGroups || []).find((g: any) => g.id === gId || g.groupDocId === gId || g.groupId === gId) || null;
+      const pDocId = student.parentDocId || groupDoc?.parentDocId || student.parentId;
+      const resolvedParentId = groupDoc?.parentId || student.parentId || (pDocId ? parentCustomIdsMap[pDocId] : '') || '';
+      const resolvedGroupId = groupDoc?.groupId || student.groupId || (gId.startsWith('indv_') ? '' : gId);
+
       acc[gId] = { 
         id: gId, 
+        groupId: resolvedGroupId,
+        parentId: resolvedParentId,
         students: [], 
         totalBudget: 0,
-        parentDocId: student.parentDocId || student.parentId,
+        parentDocId: pDocId,
         categories: [],
         requestDoc: groupDoc,
         daysPerWeek: groupDoc?.daysPerWeek || student.daysPerWeek || '',
@@ -482,7 +517,11 @@ export const deriveTeacherDashboardState = (baseData: any) => {
         teacherGenderPreference: groupDoc?.teacherGenderPreference || 'No Preference'
       };
     }
-    acc[gId].students.push(student);
+    acc[gId].students.push({
+      ...student,
+      parentId: acc[gId].parentId,
+      groupId: acc[gId].groupId
+    });
     acc[gId].totalBudget += (parseInt(student.budget) || 0);
     if (student.category) acc[gId].categories.push(student.category);
     return acc;
@@ -490,6 +529,8 @@ export const deriveTeacherDashboardState = (baseData: any) => {
 
   const availableGroupsRaw = Object.values(groupedStudentsMap).map((g: any) => ({
     ...g,
+    groupId: g.groupId,
+    parentId: g.parentId,
     name: g.students.length === 1 ? g.students[0].name : `Group: ${g.students.map((s:any) => s.name).join(', ')}`,
     category: g.categories[0] || 'school',
     budget: g.totalBudget
@@ -529,9 +570,13 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     const stitchedStudent = student ? { ...student, parentDetails: app.parentDetails } : null;
     const stitchedAppStudentsList = appStudentsList.map((s: any) => ({ ...s, parentDetails: app.parentDetails }));
     const appGroup = (fetchedGroups || []).find((g: any) => g.id === app.groupDocId) || null;
+    const resolvedParentId = app.parentId || appGroup?.parentId || (app.parentDocId && parentCustomIdsMap ? parentCustomIdsMap[app.parentDocId] : '') || '';
+    const resolvedGroupId = app.groupId || appGroup?.groupId || '';
 
     return { 
       ...app, 
+      groupId: resolvedGroupId,
+      parentId: resolvedParentId,
       status: currentStatus,
       studentDetails: stitchedStudent,
       studentsList: stitchedAppStudentsList,

@@ -1,6 +1,6 @@
 # Firestore Data Dump
 
-Generated on: 2026-09-10T08:46:59.678Z
+Generated on: 2026-09-10T13:58:31.523Z
 
 This file contains the raw data from all documents in the database to help trace foreign keys and logic.
 
@@ -48,11 +48,11 @@ This file contains the raw data from all documents in the database to help trace
     "_nanoseconds": 29000000
   },
   "feePaid": false,
+  "status": "tuition_started",
   "startDate": {
     "_seconds": 1789026575,
-    "_nanoseconds": 709000000
-  },
-  "status": "tuition_started"
+    "_nanoseconds": 0
+  }
 }
 ```
 
@@ -94,10 +94,6 @@ This file contains the raw data from all documents in the database to help trace
 ### Document: `E3BBBHUMIY5Ypo5BmBG3`
 ```json
 {
-  "studentDocIds": [
-    "YTuHh83hmE6j5qcBxFXa",
-    "Py6laeTf2k0IdXVJ8Mma"
-  ],
   "groupId": "MTGUBFH3G",
   "teacherGenderPreference": "No Preference",
   "groupDocId": "E3BBBHUMIY5Ypo5BmBG3",
@@ -114,7 +110,40 @@ This file contains the raw data from all documents in the database to help trace
   "city": "",
   "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
   "createdAt": 1788855295067,
-  "mode": "Online"
+  "mode": "Online",
+  "studentDocIds": [
+    "Py6laeTf2k0IdXVJ8Mma",
+    "YTuHh83hmE6j5qcBxFXa"
+  ]
+}
+```
+
+### Document: `X49IiepR5EGJ8sTM7fDd`
+```json
+{
+  "specificDays": [
+    "Saturday",
+    "Sunday"
+  ],
+  "groupId": "MTG6OBI26",
+  "groupDocId": "X49IiepR5EGJ8sTM7fDd",
+  "status": "active",
+  "createdAt": 1789037548885,
+  "longitude": null,
+  "preferredTimeRange": "Evening (4 PM - 8 PM)",
+  "daysPerWeek": "2 Days/Week",
+  "latitude": null,
+  "teacherGenderPreference": "Female",
+  "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "city": "560076",
+  "studentDocIds": [
+    "jIG8TaCcfV3KdUnb2EyZ",
+    "Z8SqaGMd7RMHl35wJxMK"
+  ],
+  "area": "177/A, First Floor, 2nd Cross, Surabhinagar, Bengaluru, 560076, 560076",
+  "mode": "Offline (Home Tuition)",
+  "parentId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "updatedAt": 1789045906883
 }
 ```
 
@@ -139,21 +168,21 @@ This file contains the raw data from all documents in the database to help trace
 ### Document: `student`
 ```json
 {
-  "lastValue": 3
+  "lastValue": 7
 }
 ```
 
 ### Document: `tuition_request`
 ```json
 {
-  "lastValue": 2
+  "lastValue": 6
 }
 ```
 
 ### Document: `tutor`
 ```json
 {
-  "lastValue": 2
+  "lastValue": 3
 }
 ```
 
@@ -463,6 +492,29 @@ This file contains the raw data from all documents in the database to help trace
 
 ## Collection: `payments`
 
+### Document: `13Aa6JfM6m7wMoS22NNr`
+```json
+{
+  "razorpayOrderId": "order_TaIEUGeZjsPr0i",
+  "applicationDocId": "HBMTd1d4yjfAC976JEKS",
+  "userId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "amount": 7080,
+  "walletDiscountApplied": 0,
+  "currency": "INR",
+  "status": "created",
+  "type": "tuition",
+  "isRemoval": false,
+  "createdAt": {
+    "_seconds": 1789034365,
+    "_nanoseconds": 900000000
+  },
+  "updatedAt": {
+    "_seconds": 1789034365,
+    "_nanoseconds": 900000000
+  }
+}
+```
+
 ### Document: `BjR0LhRmmLPueU3eLwZZ`
 ```json
 {
@@ -488,6 +540,29 @@ This file contains the raw data from all documents in the database to help trace
   "updatedAt": {
     "_seconds": 1789026137,
     "_nanoseconds": 298000000
+  }
+}
+```
+
+### Document: `L6xTFolHvUB8HQLKBIVm`
+```json
+{
+  "razorpayOrderId": "order_TaHr15pct63TeU",
+  "applicationDocId": "HBMTd1d4yjfAC976JEKS",
+  "userId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "amount": 7080,
+  "walletDiscountApplied": 0,
+  "currency": "INR",
+  "status": "created",
+  "type": "tuition",
+  "isRemoval": false,
+  "createdAt": {
+    "_seconds": 1789033032,
+    "_nanoseconds": 748000000
+  },
+  "updatedAt": {
+    "_seconds": 1789033032,
+    "_nanoseconds": 748000000
   }
 }
 ```
@@ -620,42 +695,182 @@ This file contains the raw data from all documents in the database to help trace
 }
 ```
 
+### Document: `Z8SqaGMd7RMHl35wJxMK`
+```json
+{
+  "guardianName": "Ramachandran M M",
+  "whatsappNumber": "9148018041",
+  "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "budget": 3000,
+  "subjects": [
+    "Mathematics"
+  ],
+  "createdAt": 1789038896481,
+  "isAvailable": true,
+  "studentId": "MTSRO671D",
+  "id": "Z8SqaGMd7RMHl35wJxMK",
+  "dob": "",
+  "gender": "Female",
+  "board": "CBSE",
+  "languages": [],
+  "technologies": [],
+  "email": "nikhil.4002.50.82@gmail.com",
+  "studentType": "School Student",
+  "classLevel": "6th Standard",
+  "phoneNumber": "9148018041",
+  "name": "Kushi",
+  "category": "school",
+  "platformUserId": "MTS000005",
+  "groupDocId": "X49IiepR5EGJ8sTM7fDd"
+}
+```
+
+### Document: `jIG8TaCcfV3KdUnb2EyZ`
+```json
+{
+  "email": "nikhil.4002.50.82@gmail.com",
+  "category": "school",
+  "languages": [],
+  "gender": "Female",
+  "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "id": "jIG8TaCcfV3KdUnb2EyZ",
+  "guardianName": "Ramachandran M M",
+  "studentType": "School Student",
+  "whatsappNumber": "9148018041",
+  "subjects": [
+    "Mathematics",
+    "Science"
+  ],
+  "technologies": [],
+  "isAvailable": true,
+  "name": "Chinju",
+  "classLevel": "10th Standard",
+  "createdAt": 1789037547470,
+  "board": "CBSE",
+  "phoneNumber": "9148018041",
+  "dob": "",
+  "budget": 4000,
+  "studentId": "MTS8HFZ7L",
+  "groupDocId": "X49IiepR5EGJ8sTM7fDd",
+  "platformUserId": "MTS000004"
+}
+```
+
 ---
 
 ## Collection: `tuition_requests`
+
+### Document: `3J5btPIz7UO8xDxveD5u`
+```json
+{
+  "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "city": "560076",
+  "longitude": null,
+  "latitude": null,
+  "specificDays": [
+    "Saturday",
+    "Sunday"
+  ],
+  "requestId": "REQ2WCF5P",
+  "mode": "Offline",
+  "daysPerWeek": "2 Days/Week",
+  "combinedSubjects": [
+    "Mathematics",
+    "Science"
+  ],
+  "category": "school",
+  "area": "177/A, First Floor, 2nd Cross, Surabhinagar, Bengaluru, 560076",
+  "preferredTimeRange": "Evening (4 PM - 8 PM)",
+  "status": "open",
+  "combinedLanguages": [],
+  "combinedTechnologies": [],
+  "teacherGenderPreference": "Female",
+  "groupDocId": "X49IiepR5EGJ8sTM7fDd",
+  "createdAt": 1789037549035,
+  "acceptedTutorId": "",
+  "trackingId": "REQ000003",
+  "parentId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "studentsDetails": [
+    {
+      "languages": [],
+      "id": "Z8SqaGMd7RMHl35wJxMK",
+      "technologies": [],
+      "board": "CBSE",
+      "budget": 3000,
+      "name": "Kushi",
+      "classLevel": "6th Standard",
+      "subjects": [
+        "Mathematics"
+      ]
+    },
+    {
+      "classLevel": "10th Standard",
+      "budget": 4000,
+      "id": "jIG8TaCcfV3KdUnb2EyZ",
+      "languages": [],
+      "board": "CBSE",
+      "name": "Chinju",
+      "subjects": [
+        "Mathematics",
+        "Science"
+      ],
+      "technologies": []
+    }
+  ],
+  "combinedBudget": 7000
+}
+```
+
+### Document: `5oDB5h3FuLajYqeF71us`
+```json
+{
+  "longitude": null,
+  "combinedSubjects": [
+    "Mathematics",
+    "Science"
+  ],
+  "parentDocId": "YY1TJevQdyQcv3G9I4STyxTnaAj1",
+  "specificDays": [],
+  "combinedBudget": 3000,
+  "status": "open",
+  "daysPerWeek": "",
+  "combinedLanguages": [],
+  "teacherGenderPreference": "No Preference",
+  "studentsDetails": [
+    {
+      "name": "Manish",
+      "budget": 3000,
+      "subjects": [
+        "Mathematics",
+        "Science"
+      ],
+      "languages": [],
+      "id": "y3el5qzAsTvZ0xBWjoIL",
+      "classLevel": "8th Standard",
+      "technologies": [],
+      "board": "CBSE"
+    }
+  ],
+  "groupDocId": "fxh5gz6tGcHJvUKel7Tc",
+  "mode": "",
+  "city": "",
+  "createdAt": 1789039052138,
+  "area": "",
+  "acceptedTutorId": "",
+  "latitude": null,
+  "requestId": "REQLLS5JO",
+  "preferredTimeRange": "",
+  "combinedTechnologies": [],
+  "category": "school",
+  "trackingId": "REQ000005"
+}
+```
 
 ### Document: `ftw9DBYaWYePz6pKvIfR`
 ```json
 {
   "city": "",
   "category": "school",
-  "studentsDetails": [
-    {
-      "id": "YTuHh83hmE6j5qcBxFXa",
-      "languages": [],
-      "classLevel": "8th Standard",
-      "budget": 3000,
-      "technologies": [],
-      "board": "ICSE",
-      "name": "Nikhil R Nambiar",
-      "subjects": [
-        "Mathematics"
-      ]
-    },
-    {
-      "languages": [],
-      "classLevel": "6th Standard",
-      "technologies": [],
-      "name": "Abhilash V",
-      "subjects": [
-        "Mathematics",
-        "Science"
-      ],
-      "id": "Py6laeTf2k0IdXVJ8Mma",
-      "board": "CBSE",
-      "budget": 3000
-    }
-  ],
   "createdAt": 1788855295232,
   "mode": "Online",
   "specificDays": [
@@ -680,7 +895,35 @@ This file contains the raw data from all documents in the database to help trace
   "preferredTimeRange": "Evening (4 PM - 8 PM)",
   "status": "open",
   "combinedTechnologies": [],
-  "trackingId": "REQ000002"
+  "trackingId": "REQ000002",
+  "studentsDetails": [
+    {
+      "board": "CBSE",
+      "languages": [],
+      "id": "Py6laeTf2k0IdXVJ8Mma",
+      "name": "Abhilash V",
+      "classLevel": "6th Standard",
+      "subjects": [
+        "Mathematics",
+        "Science"
+      ],
+      "technologies": [],
+      "budget": 3000
+    },
+    {
+      "subjects": [
+        "Mathematics"
+      ],
+      "technologies": [],
+      "name": "Nikhil R Nambiar",
+      "budget": 3000,
+      "languages": [],
+      "board": "ICSE",
+      "classLevel": "8th Standard",
+      "id": "YTuHh83hmE6j5qcBxFXa"
+    }
+  ],
+  "parentId": "YY1TJevQdyQcv3G9I4STyxTnaAj1"
 }
 ```
 
@@ -759,6 +1002,84 @@ This file contains the raw data from all documents in the database to help trace
 }
 ```
 
+### Document: `u2X0Y9VX8CQJU3xJoFQfWhBKfqE2`
+```json
+{
+  "whatsapp": "8618242887",
+  "studentCount": "4",
+  "occupation": "Full-Time Teacher",
+  "gender": "Female",
+  "city": "Bangalore",
+  "classes": [
+    "6th - 8th",
+    "9th - 10th",
+    "1st - 5th"
+  ],
+  "latitude": 0,
+  "rating": 0,
+  "boards": [
+    "ICSE",
+    "CBSE",
+    "State Board"
+  ],
+  "experience": "Less than 1 Year",
+  "knownLanguages": [],
+  "feeRange": "9000",
+  "mode": "Offline",
+  "resumeUrl": "https://firebasestorage.googleapis.com/v0/b/tutor-app-1e394.firebasestorage.app/o/tutor_documents%2Fu2X0Y9VX8CQJU3xJoFQfWhBKfqE2%2Fresume_1789046049463_Nikhil_R_Nambiar.pdf?alt=media&token=92e6deca-28bc-4535-8ff7-b27ff300655b",
+  "createdAt": 1789046053843,
+  "price": 0,
+  "travelDistance": "10km",
+  "hasProfile": true,
+  "preferredTimeRange": "",
+  "email": "varshinivarsh1304@gmail.com",
+  "schoolNames": "",
+  "longitude": 0,
+  "area": "No 8, Saraswathipuram Halasuru, 4th Main 4th Cross Shamanna Gowda Layout Bangalore North Bangalore Karnataka India, 560008",
+  "resume": {
+    "fileName": "Nikhil_R_Nambiar.pdf",
+    "uploadedAt": 1789046053842,
+    "url": "https://firebasestorage.googleapis.com/v0/b/tutor-app-1e394.firebasestorage.app/o/tutor_documents%2Fu2X0Y9VX8CQJU3xJoFQfWhBKfqE2%2Fresume_1789046049463_Nikhil_R_Nambiar.pdf?alt=media&token=92e6deca-28bc-4535-8ff7-b27ff300655b"
+  },
+  "tutorId": "MTTUB3F2T",
+  "address": "No 8, Saraswathipuram Halasuru, 4th Main 4th Cross Shamanna Gowda Layout Bangalore North Bangalore Karnataka India, 560008, Bangalore, 560008",
+  "verificationSubmittedAt": 1789046053843,
+  "verificationStatus": "unsubmitted",
+  "subjects": [
+    "Biology",
+    "Chemistry",
+    "Mathematics",
+    "Science",
+    "Physics",
+    "Social Science",
+    "Social Studies",
+    "Second Language",
+    "Kannada",
+    "Hindi/Third Language",
+    "Hindi",
+    "Geography",
+    "English Literature",
+    "English Language",
+    "English",
+    "Computer",
+    "Computer Applications",
+    "EVS",
+    "Civics"
+  ],
+  "languagesTaught": [],
+  "technologies": [],
+  "qualification": "B.E / B.Tech",
+  "verificationDocs": {},
+  "phone": "8618242887",
+  "name": "Varshini P",
+  "teachingApproach": "",
+  "preferredLocations": "J P Nagar",
+  "category": "school",
+  "authUid": "u2X0Y9VX8CQJU3xJoFQfWhBKfqE2",
+  "platformUserId": "MTT000003"
+}
+```
+
 ---
 
 ## Collection: `users`
@@ -795,6 +1116,22 @@ This file contains the raw data from all documents in the database to help trace
   "hasProfile": true,
   "platformUserId": "MTP000002",
   "upiId": "9148018043@kotakbank"
+}
+```
+
+### Document: `u2X0Y9VX8CQJU3xJoFQfWhBKfqE2`
+```json
+{
+  "id": "u2X0Y9VX8CQJU3xJoFQfWhBKfqE2",
+  "referredBy": "",
+  "name": "Varshini P",
+  "roles": [
+    "teacher"
+  ],
+  "email": "varshinivarsh1304@gmail.com",
+  "referralCode": "VARS-Y9VX8C",
+  "hasProfile": true,
+  "platformUserId": "MTT000003"
 }
 ```
 

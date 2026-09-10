@@ -735,6 +735,10 @@ export default function TeacherDashboard() {
       preferredMode: primaryStudent.preferredMode || sourceApp.preferredMode || sourceApp.mode || matchedGroup?.preferredMode || matchedGroup?.mode || fallback.preferredMode || 'Online',
       address: primaryStudent.address || parentContact.address || matchedGroup?.address || fallback.address,
       area: primaryStudent.area || parentContact.area || matchedGroup?.area || fallback.area,
+      parentId: sourceApp.parentId || matchedGroup?.parentId || fallback.parentId || primaryStudent.parentId || fallback.parentDetails?.parentId || '',
+      groupId: sourceApp.groupId || matchedGroup?.groupId || fallback.groupId || primaryStudent.groupId || '',
+      parentDocId: sourceApp.parentDocId || matchedGroup?.parentDocId || fallback.parentDocId || primaryStudent.parentDocId || '',
+      groupDocId: sourceApp.groupDocId || matchedGroup?.groupDocId || fallback.groupDocId || primaryStudent.groupDocId || fallback.id || '',
     };
   };
 
@@ -1551,7 +1555,7 @@ export default function TeacherDashboard() {
                                     <h4 className="font-bold text-gray-900 text-sm truncate tracking-tight">{student.name || 'Student'}</h4>
                                     <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">{student.subjects ? student.subjects.join(', ') : student.category}</p>
                                   </div>
-                                  <button onClick={() => setSelectedViewUser(student)} className="text-emerald-700 font-bold text-xs bg-emerald-50/50 border border-emerald-100 px-4 py-2 rounded-full hover:bg-emerald-100 z-0 flex-shrink-0 transition-colors">
+                                  <button onClick={() => setSelectedViewUser(buildStudentViewUser(student, student))} className="text-emerald-700 font-bold text-xs bg-emerald-50/50 border border-emerald-100 px-4 py-2 rounded-full hover:bg-emerald-100 z-0 flex-shrink-0 transition-colors">
                                     View
                                   </button>
                                 </div>
@@ -1814,7 +1818,7 @@ export default function TeacherDashboard() {
                                       ) : (
                                         <div className="flex gap-2 mb-4">
                                           <button 
-                                            onClick={() => setSelectedViewUser(group)}
+                                            onClick={() => setSelectedViewUser(buildStudentViewUser(group, group))}
                                             className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
                                           >
                                             View

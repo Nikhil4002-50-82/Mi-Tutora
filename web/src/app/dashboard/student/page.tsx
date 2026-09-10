@@ -1742,7 +1742,7 @@ export default function StudentDashboard() {
                       const isPending = offerApp && ['demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booked', 'pending', 'accepted'].includes(offerApp.status);
                       const isHired = offerApp && ['tuition_started'].includes(offerApp.status);
                       
-                      const isLocked = !!lockedApp;
+                      const isLocked = !!lockedApp || (!!hiredAppForGroup && !isHired);
                       const isRed = !!lockedApp || (!!activeAppForGroup && !offerApp);
                       const isDemoPhase = offerApp && ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'].includes(offerApp.status);
                       
@@ -1760,18 +1760,6 @@ export default function StudentDashboard() {
                       
                       return (
                         <div key={teacher.id} className="bg-white rounded-3xl shadow-md border border-gray-100 hover:shadow-lg transition-all duration-300 flex flex-col h-full relative overflow-hidden group">
-                          
-
-                          {/* Locked overlay — mirrors teacher portal pattern. Shows when a declined
-                              application puts this tutor in a 7-day lock for the current group. */}
-                          {isLocked && (
-                            <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-10 flex items-center justify-end pr-4 rounded-3xl pointer-events-none">
-                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm bg-red-50 text-red-600 border-red-100">
-                                {labelText || 'LOCKED'}
-                              </span>
-                            </div>
-                          )}
-
                           {/* Header */}
                           <div className="bg-[#00a992] p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
@@ -1865,9 +1853,10 @@ export default function StudentDashboard() {
                                     <p className="text-[10px] text-gray-500 leading-tight mb-3">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
                                     <input 
                                       type="number"
+                                      disabled={isLocked}
                                       min={getTutorBasePrice(teacher) ? Math.ceil(getTutorBasePrice(teacher) * 0.6) : 0}
                                       max={getTutorBasePrice(teacher) || undefined}
-                                      className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                                      className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                                       placeholder={getTutorBasePrice(teacher) ? `e.g. ${getTutorBasePrice(teacher)}` : "Your Offer (₹/mo)"}
                                       value={negotiationOffer[teacher.id] || ''}
                                       onChange={(e) => setNegotiationOffer({...negotiationOffer, [teacher.id]: e.target.value})}
@@ -1902,7 +1891,7 @@ export default function StudentDashboard() {
                                           }}
                                           className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {isLocked ? 'Locked' : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer'))} <ArrowRight className="w-4 h-4" />
+                                          {isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer'))} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       ) : (
                                         <button
@@ -1917,7 +1906,7 @@ export default function StudentDashboard() {
                                           }}
                                           className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                         >
-                                          {isLocked ? 'Locked' : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo'))} <ArrowRight className="w-4 h-4" />
+                                          {isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo'))} <ArrowRight className="w-4 h-4" />
                                         </button>
                                       )}
                                     </div>
