@@ -130,9 +130,26 @@ function SignupContent() {
     const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
     const { doc, getDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
     
+    let focusTimer: any = null;
+    let authFinished = false;
+
+    const onWindowFocus = () => {
+      focusTimer = setTimeout(() => {
+        if (!authFinished && !auth.currentUser) {
+          setIsGoogleLoading(false);
+          window.removeEventListener('focus', onWindowFocus);
+        }
+      }, 600);
+    };
+
+    window.addEventListener('focus', onWindowFocus);
+
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      authFinished = true;
+      clearTimeout(focusTimer);
+      window.removeEventListener('focus', onWindowFocus);
       const user = result.user;
       
       const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -170,12 +187,17 @@ function SignupContent() {
         }
       }
     } catch (err: any) {
+      clearTimeout(focusTimer);
+      window.removeEventListener('focus', onWindowFocus);
       if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
         setIsGoogleLoading(false);
         return;
       }
       setError(getFriendlyAuthError(err));
       setIsGoogleLoading(false);
+    } finally {
+      clearTimeout(focusTimer);
+      window.removeEventListener('focus', onWindowFocus);
     }
   };
 
