@@ -218,8 +218,11 @@ export const deriveStudentDashboardState = (baseData: any) => {
       subject: app.category || 'General',
       teacher: app.tutorName || 'Assigned Tutor',
       studentDocId: app.studentDocId,
+      studentDocIds: app.studentDocIds || [app.studentDocId],
       studentName: app.studentName,
       date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
+      startDate: app.startDate,
+      feePaid: Boolean(app.feePaid),
       status: app.status,
       finalPrice: app.finalPrice || app.currentOffer || 4000,
       tutorDetails: app.tutorDetails
@@ -270,7 +273,8 @@ export const fetchTeacherDashboardData = async () => {
     studentsSnapResult,
     referralsSnap,
     pricingSnap,
-    lockedAppsSnap
+    lockedAppsSnap,
+    tutorPayoutsSnap
   ] = await Promise.all([
     getDocs(query(collection(db, 'applications'), where('tutorDocId', '==', tutorId))),
     getDocs(query(collection(db, 'students'), where('isAvailable', '==', true), limit(100))).catch(e => {
@@ -279,7 +283,11 @@ export const fetchTeacherDashboardData = async () => {
     }),
     getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid), limit(50))),
     getDocs(collection(db, 'marketplace_pricing')),
-    getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision'])))
+    getDocs(query(collection(db, 'applications'), where('status', 'in', ['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision']))),
+    getDocs(query(collection(db, 'tutor_payouts'), where('tutorDocId', '==', tutorId))).catch(e => {
+      console.warn("Failed to fetch tutor_payouts", e);
+      return { docs: [] };
+    })
   ]);
 
   const parseTimestamp = (val: any) => {
@@ -300,6 +308,19 @@ export const fetchTeacherDashboardData = async () => {
       updatedAt: parseTimestamp(data.updatedAt),
       declinedAt: parseTimestamp(data.declinedAt),
       startDate: parseTimestamp(data.startDate)
+    };
+  });
+
+  const tutorPayouts = tutorPayoutsSnap.docs.map((d: any) => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      ...data,
+      startDate: parseTimestamp(data.startDate),
+      paidByStudentAt: parseTimestamp(data.paidByStudentAt),
+      releaseEligibleAt: parseTimestamp(data.releaseEligibleAt),
+      paidAt: parseTimestamp(data.paidAt),
+      createdAt: parseTimestamp(data.createdAt)
     };
   });
   
@@ -421,6 +442,7 @@ export const fetchTeacherDashboardData = async () => {
     teacherCategories,
     globalLocks,
     applications: stitchedApplications,
+    tutorPayouts,
     referrals,
     marketplacePricing,
     availableStudentsRaw,
@@ -435,7 +457,7 @@ export const fetchTeacherDashboardData = async () => {
 export const deriveTeacherDashboardState = (baseData: any) => {
   const { 
     user, userData, tutorId, tutorData, teacherCategories, globalLocks, 
-    applications, referrals, marketplacePricing, 
+    applications, tutorPayouts = [], referrals, marketplacePricing, 
     availableStudentsRaw, availableStudents, studentsInfo, fetchedGroups 
   } = baseData;
 
@@ -589,6 +611,17 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     }
   });
 
+  let heldInEscrow = 0;
+  applicationsWithSubjects.forEach((app: any) => {
+    if (app.status === 'tuition_started' && app.feePaid) {
+      const payout = (tutorPayouts || []).find((p: any) => p.applicationId === app.id || p.id === `payout_${app.id}`);
+      if (!payout || payout.status !== 'paid') {
+        const tShare = payout?.tutorShare || Math.round((app.finalPrice || 0) * 0.60);
+        heldInEscrow += tShare;
+      }
+    }
+  });
+
   ledgerEntries.sort((a, b) => b.date - a.date);
 
   const earningsData = {
@@ -596,6 +629,7 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     demoFeesPaid,
     netRevenue: totalRevenue - demoFeesPaid,
     activeMRR,
+    heldInEscrow,
     ledgerEntries
   };
 
@@ -618,6 +652,7 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     allNotifications,
     recommendedNegotiations,
     earningsData,
+    tutorPayouts,
     demoClasses: applicationsWithSubjects.filter((app: any) => ['demo_booking_phase', 'demo_scheduled'].includes(app.status)).map((app: any) => ({
       id: app.id,
       app: app,
@@ -628,16 +663,32 @@ export const deriveTeacherDashboardState = (baseData: any) => {
       studentDetails: app.studentDetails,
       groupDetails: app.groupDetails
     })),
-    upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => ({
-      id: app.id,
-      app: app,
-      student: app.studentName || 'Assigned Student',
-      subject: app.category || 'General',
-      date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
-      status: app.status === 'tuition_started' ? 'confirmed' : 'pending',
-      studentDetails: app.studentDetails,
-      groupDetails: app.groupDetails
-    })),
+    upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => {
+      const payout = (tutorPayouts || []).find((p: any) => p.applicationId === app.id || p.id === `payout_${app.id}`);
+      const baseStart = app.startDate || app.updatedAt || app.createdAt || Date.now();
+      const day7DueDate = baseStart + (7 * 24 * 60 * 60 * 1000);
+      const day30PayoutDate = payout?.releaseEligibleAt || (baseStart + (30 * 24 * 60 * 60 * 1000));
+      const tutorShare = payout?.tutorShare || Math.round((app.finalPrice || 0) * 0.60);
+      const platformShare = payout?.platformShare || Math.round((app.finalPrice || 0) * 0.40);
+      const isMonth1 = !app.subsequentPayments || app.subsequentPayments.length === 0;
+
+      return {
+        id: app.id,
+        app: app,
+        student: app.studentName || 'Assigned Student',
+        subject: app.category || 'General',
+        date: app.nextPaymentDate || app.startDate || new Date().toISOString(),
+        status: app.status === 'tuition_started' ? 'confirmed' : 'pending',
+        studentDetails: app.studentDetails,
+        groupDetails: app.groupDetails,
+        day7DueDate,
+        day30PayoutDate,
+        tutorShare,
+        platformShare,
+        payoutRecord: payout || null,
+        isMonth1
+      };
+    }),
     _baseData: baseData
   };
 };

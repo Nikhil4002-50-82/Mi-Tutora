@@ -61,6 +61,7 @@ export default function StudentDashboard() {
   const [showCategoryPopup, setShowCategoryPopup] = useState(false);
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [hasDismissedReminder, setHasDismissedReminder] = useState(false);
+  const [hasDismissedGraceReminder, setHasDismissedGraceReminder] = useState(false);
   const [selectedViewUser, setSelectedViewUser] = useState<any>(null);
   const [selectedViewApp, setSelectedViewApp] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -317,31 +318,6 @@ export default function StudentDashboard() {
     }
   };
 
-  // Auto-trigger payment modal if 7-day trial expired and unpaid
-  useEffect(() => {
-    if (data?.upcomingClasses && !payingClass) {
-      const pendingClass = data.upcomingClasses.find((cls: any) => {
-        if (cls.status !== 'tuition_started') return false;
-        if (cls.feePaid === true) return false;
-        const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
-        return daysElapsed >= 7;
-      });
-
-      if (pendingClass) {
-        const displayNames = pendingClass.studentName || (pendingClass.studentDocIds?.length > 1 ? 'Group' : 'Student');
-        const monthlyFee = pendingClass.finalPrice || pendingClass.currentOffer || 0;
-        setPayingClass({ 
-          id: pendingClass.id, 
-          studentName: displayNames, 
-          finalPrice: monthlyFee, 
-          isProrated: false, 
-          isRemoval: false, 
-          studentsList: pendingClass.studentsList || (pendingClass.studentDetails ? [pendingClass.studentDetails] : []), 
-          tutorName: pendingClass.tutorName || pendingClass.teacher 
-        });
-      }
-    }
-  }, [data?.upcomingClasses, payingClass]);
 
   useEffect(() => {
     if (newlyCreatedGroupId && studentGroups && studentGroups.length > 0) {
@@ -1143,6 +1119,17 @@ export default function StudentDashboard() {
     }
   };
 
+  const lockedApplication = useMemo(() => {
+    return data?.applications?.find((app: any) => {
+      if (app.status === 'tuition_started' && !app.feePaid) {
+        const appStart = app.startDate || Date.now();
+        const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
+        return daysElapsed >= 10;
+      }
+      return false;
+    });
+  }, [data?.applications]);
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'new_tuition', label: 'New Tuition', icon: Globe },
@@ -1182,24 +1169,91 @@ export default function StudentDashboard() {
         setActiveTab={setActiveTab}
         setActiveRequestViewId={setActiveRequestViewId}
         hasProfile={hasProfile}
+        isAccountLocked={Boolean(lockedApplication)}
         navItems={navItems}
         userName={data?.profile?.name || data?.user?.displayName || ''}
       />
 
-      {/* MAIN CONTENT */}
+      {/* Days 7-9 Grace Period Reminder Modal (Dismissible, allows navigation) */}
       {(() => {
-        // Calculate Hard Lock State
-        const lockedApplication = data?.applications?.find((app: any) => {
-          if (app.status === 'tuition_started' && app.feePaid === false) {
-            const daysElapsed = Math.max(1, Math.ceil((Date.now() - (app.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
-            return daysElapsed >= 10;
+        const graceApp = data?.applications?.find((app: any) => {
+          if (app.status === 'tuition_started' && !app.feePaid) {
+            const appStart = app.startDate || Date.now();
+            const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
+            return daysElapsed >= 7 && daysElapsed < 10;
           }
           return false;
         });
 
+        if (!graceApp || hasDismissedGraceReminder) return null;
+
+        const monthlyFee = graceApp.finalPrice || graceApp.currentOffer || 0;
+        const displayNames = graceApp.studentName || (graceApp.studentDocIds?.length > 1 ? 'Group' : 'Student');
+        const teacherName = graceApp.tutorName || graceApp.teacher || 'your tutor';
+
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl max-w-lg w-full text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-3 bg-amber-400"></div>
+              <button 
+                onClick={() => setHasDismissedGraceReminder(true)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors z-10"
+                title="Dismiss reminder"
+              >
+                ✕
+              </button>
+              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-200/80 text-amber-600">
+                <Clock className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Monthly Tuition Fee Due</h2>
+              <p className="text-slate-600 font-medium text-sm mb-6 leading-relaxed">
+                Your 7-day free trial with <strong className="text-slate-900">{teacherName}</strong> has completed. You have an active 3-day grace period to pay your monthly fees and continue classes without interruption.
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 text-left">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 font-bold">Total Monthly Fee</span>
+                  <span className="text-lg font-black text-slate-900">₹{monthlyFee.toLocaleString()}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">For {displayNames}</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setHasDismissedGraceReminder(true)}
+                  className="flex-1 py-3.5 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors text-sm"
+                >
+                  Remind Me Later
+                </button>
+                <button 
+                  onClick={() => {
+                    setHasDismissedGraceReminder(true);
+                    setPayingClass({ 
+                      id: graceApp.id, 
+                      studentName: displayNames, 
+                      finalPrice: monthlyFee, 
+                      isProrated: false, 
+                      isRemoval: false, 
+                      studentsList: graceApp.studentsList || (graceApp.studentDetails ? [graceApp.studentDetails] : []), 
+                      tutorName: teacherName 
+                    });
+                  }}
+                  className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white py-3.5 px-4 rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Pay Monthly Fees
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MAIN CONTENT */}
+      {(() => {
         if (lockedApplication) {
           const monthlyFee = lockedApplication.finalPrice || lockedApplication.currentOffer || 0;
           const displayNames = lockedApplication.studentName || (lockedApplication.studentDocIds?.length > 1 ? 'Group' : 'Student');
+          const teacherName = lockedApplication.tutorName || lockedApplication.teacher || 'your tutor';
           
           return (
             <div className="flex-1 flex items-center justify-center p-6 bg-red-50/50 backdrop-blur-sm z-50">
@@ -1220,8 +1274,10 @@ export default function StudentDashboard() {
                       finalPrice: monthlyFee, 
                       isProrated: false, 
                       isRemoval: false, 
+                      studentDocIds: lockedApplication.studentDocIds || (lockedApplication.studentDocId ? [lockedApplication.studentDocId] : []),
+                      studentDocId: lockedApplication.studentDocId,
                       studentsList: lockedApplication.studentsList || (lockedApplication.studentDetails ? [lockedApplication.studentDetails] : []), 
-                      tutorName: lockedApplication.tutorName || lockedApplication.teacher 
+                      tutorName: teacherName 
                     });
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-red-600/20 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-3"
@@ -2664,11 +2720,12 @@ export default function StudentDashboard() {
                             </div>
                           )}
                           {cls.status === 'tuition_started' && (() => {
-                            const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
+                            const appStartDate = cls.startDate || cls.app?.startDate || Date.now();
+                            const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStartDate) / (1000 * 60 * 60 * 24)));
                             const monthlyFee = cls.finalPrice || cls.currentOffer || 0;
                             const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
                             const proratedFee = Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
-                            const isPaid = cls.feePaid === true;
+                            const isPaid = (cls.feePaid === true) || (cls.app?.feePaid === true);
                             const displayNames = cls.studentName || (cls.studentDocIds?.length > 1 ? 'Group' : 'Student');
 
                             return (
@@ -3068,89 +3125,6 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* PAYMENT MODAL */}
-            {payingClass && (() => {
-              const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
-              const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
-              
-              return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
-                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to hire <span className="font-bold text-gray-900">{payingClass.tutorName || payingClass.teacher}</span> and start tuition.</p>
-                  
-                  <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
-                    <div className="space-y-3 mb-4">
-                      <div className="flex justify-between items-center text-sm font-bold text-gray-500">
-                        <div className="flex flex-col">
-                          <span className="text-gray-900">Tuition Fee {payingClass.finalPrice ? '(Negotiated)' : '(Original)'}</span>
-                          <span className="text-xs font-medium">Agreed monthly fee</span>
-                        </div>
-                        <span className="text-gray-900">₹{coursePrice}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm font-bold text-gray-500">
-                        <div className="flex flex-col">
-                          <span className="text-gray-900">GST (18%)</span>
-                        </div>
-                        <span className="text-gray-900">₹{Math.round(coursePrice * 0.18)}</span>
-                      </div>
-                    </div>
-                    
-                    {(data?.userData?.walletBalance || 0) > 0 && (
-                      <div className="flex items-start gap-3 mb-4 pt-4 border-t border-gray-200">
-                        <input
-                          type="checkbox"
-                          id="useWallet"
-                          checked={useWallet}
-                          onChange={(e) => setUseWallet(e.target.checked)}
-                          className="mt-1 w-4 h-4 text-[#00a992] rounded border-gray-300 focus:ring-[#00a992]"
-                        />
-                        <div className="flex-1">
-                          <label htmlFor="useWallet" className="text-sm font-bold text-gray-900 cursor-pointer block">
-                            Apply Wallet Balance
-                          </label>
-                          <p className="text-xs text-gray-500 font-medium">Available: ₹{data?.userData?.walletBalance}</p>
-                        </div>
-                        <span className="text-emerald-600 font-bold text-sm">
-                          -₹{useWallet ? Math.min(totalToPay, data?.userData?.walletBalance) : 0}
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
-                      <span>Total to Pay</span>
-                      <span className="text-[#00a992]">
-                        ₹{useWallet ? Math.max(0, totalToPay - (data?.userData?.walletBalance || 0)) : totalToPay}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-4 relative z-10">
-                    <button
-                      onClick={() => { setPayingClass(null); setUseWallet(false); }}
-                      className="flex-1 py-3.5 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                      disabled={paymentLoading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handlePaymentSubmit}
-                      disabled={paymentLoading}
-                      className="flex-1 py-3.5 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                      {paymentLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        'Pay Securely'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              );
-            })()}
-
             {/* WITHDRAW MODAL */}
             {withdrawModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -3519,6 +3493,91 @@ export default function StudentDashboard() {
       <WhatsAppButton />
         </>
       )}
+
+      {/* PAYMENT MODAL (Root Level for instant accessibility from any state including hard lock) */}
+      {payingClass && (() => {
+        const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
+        const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
+        
+        return (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
+              <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
+              <p className="text-gray-500 mb-6 font-medium relative z-10">
+                You are paying tuition fee for <span className="font-bold text-gray-900">{payingClass.tutorName || payingClass.teacher}</span>.
+              </p>
+              
+              <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100 relative z-10">
+                <div className="space-y-3 mb-4">
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">Tuition Fee {payingClass.finalPrice ? '(Negotiated)' : '(Original)'}</span>
+                      <span className="text-xs font-medium">Agreed monthly fee</span>
+                    </div>
+                    <span className="text-gray-900">₹{coursePrice.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">GST (18%)</span>
+                    </div>
+                    <span className="text-gray-900">₹{Math.round(coursePrice * 0.18).toLocaleString()}</span>
+                  </div>
+                </div>
+                
+                {(data?.userData?.walletBalance || 0) > 0 && (
+                  <div className="flex items-start gap-3 mb-4 pt-4 border-t border-gray-200">
+                    <input
+                      type="checkbox"
+                      id="useWallet"
+                      checked={useWallet}
+                      onChange={(e) => setUseWallet(e.target.checked)}
+                      className="mt-1 w-4 h-4 text-[#00a992] rounded border-gray-300 focus:ring-[#00a992]"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="useWallet" className="text-sm font-bold text-gray-900 cursor-pointer block">
+                        Apply Wallet Balance
+                      </label>
+                      <p className="text-xs text-gray-500 font-medium">Available: ₹{data?.userData?.walletBalance}</p>
+                    </div>
+                    <span className="text-emerald-600 font-bold text-sm">
+                      -₹{useWallet ? Math.min(totalToPay, data?.userData?.walletBalance) : 0}
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
+                  <span>Total to Pay</span>
+                  <span className="text-[#00a992]">
+                    ₹{useWallet ? Math.max(0, totalToPay - (data?.userData?.walletBalance || 0)).toLocaleString() : totalToPay.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 relative z-10">
+                <button
+                  onClick={() => { setPayingClass(null); setUseWallet(false); }}
+                  className="flex-1 py-3.5 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                  disabled={paymentLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePaymentSubmit}
+                  disabled={paymentLoading}
+                  className="flex-1 py-3.5 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {paymentLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Pay Securely'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -16,6 +16,7 @@ interface DashboardSidebarProps {
   setActiveTab: (tab: string) => void;
   setActiveRequestViewId: (id: string | null) => void;
   hasProfile: boolean;
+  isAccountLocked?: boolean;
   navItems: NavItem[];
   userName: string;
 }
@@ -28,6 +29,7 @@ export function DashboardSidebar({
   setActiveTab,
   setActiveRequestViewId,
   hasProfile,
+  isAccountLocked = false,
   navItems,
   userName
 }: DashboardSidebarProps) {
@@ -66,13 +68,17 @@ export function DashboardSidebar({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-            const isLocked = !hasProfile && item.id !== 'profile';
+            const isLocked = (!hasProfile && item.id !== 'profile') || isAccountLocked;
             return (
               <button
                 key={item.id}
                 onClick={() => {
                   if (isLocked) {
-                    toast.error("Please complete your profile first!");
+                    if (isAccountLocked) {
+                      toast.error("Account locked. Please clear pending tuition fees to unlock your dashboard.");
+                    } else {
+                      toast.error("Please complete your profile first!");
+                    }
                     return;
                   }
                   setActiveTab(item.id);

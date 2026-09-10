@@ -15,13 +15,15 @@ graph TD
     C -->|Sets status: tuition_started| D(7-Day Trial Begins)
     C -->|Sets startDate: serverTimestamp| D
     
-    D --> E{Student Action}
+    D --> E{Timeline & Action}
     
     E -->|Clicks 'Remove' < Day 7| F[UI requests Prorated Checkout]
-    E -->|Wait until Day 7| G[UI locks: 'Pay Monthly Fees']
+    E -->|Days 7 to 9: Grace Period| G[Dismissible Pop-Up: 'Pay Monthly Fees']
+    E -->|Day 10+: Post-Grace Period| G2[Hard Lock Screen: 'Pay Monthly Fees Securely']
     
     F --> H[API: /create-order]
-    G -->|Clicks Pay Securely| I[API: /create-order]
+    G -->|Clicks Pay Monthly Fees| I[API: /create-order]
+    G2 -->|Clicks Pay Monthly Fees Securely| I
     
     H -->|isRemoval: true| J[Backend strictly calculates daysElapsed via server clock. Computes prorated fee.]
     I -->|isRemoval: false| K[Backend fetches 100% full monthly fee from Database.]
@@ -31,7 +33,7 @@ graph TD
     
     L -->|Payment Success| M[API: /verify-payment]
     M --> N[(Ledger Updated)]
-    N -->|type: tuition| O[Transaction finalized. Referrals Paid.]
+    N -->|type: tuition| O[Transaction finalized. Escrow Created. Referrals Paid.]
 ```
 
 ---
@@ -73,17 +75,23 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 ### Phase 2: The 3-Day Grace Period (Days 7 to 9)
 **Trigger:** 7 full days have elapsed (`daysElapsed >= 7` but `< 10`) and the fee is still unpaid (`feePaid: false`).
 
-*   **Status:** The trial period has officially ended, but the student is in a temporary grace period.
-*   **Student View:** A mandatory **"Pay Monthly Fees"** button appears. They can still browse their dashboard, but are visibly warned to pay.
-*   **Teacher View:** The teacher sees a yellow warning indicating the student is in their 3-day grace period.
+*   **Status:** The trial period has officially ended, but the student is in an active 3-day grace period.
+*   **Student View (Dismissible Pop-Up):**
+    *   Every time the student opens or refreshes the portal, an amber **"Monthly Tuition Fee Due"** reminder pop-up appears displaying the tutor name, monthly fee, and active grace window.
+    *   The student can click **"Remind Me Later"** or **`✕`** to dismiss the pop-up and freely browse and use all dashboard tabs without lockout.
+    *   Clicking **"Pay Monthly Fees"** opens the Root-Level Payment Modal to settle fees via Razorpay.
+*   **Teacher View:** The teacher sees an amber status indicating the student's trial is completed and they are in their 3-day grace period awaiting fee collection.
 *   **Late Cancellation Penalty:** If the student attempts to click "Remove Teacher" at this stage without having paid, the platform backend denies the prorated discount. They are forced to pay the 100% full monthly fee as a penalty to clear their dues before the teacher is removed.
 
 ### Phase 3: The Hard Lock (Day 10+)
 **Trigger:** 10 full days have elapsed (`daysElapsed >= 10`) and the fee is still unpaid (`feePaid: false`).
 
-*   **Status:** The grace period has expired.
-*   **Student View:** The student's entire dashboard is overlaid with a fullscreen, non-dismissible modal. They are completely locked out of the platform until they click "Pay Securely" to clear their dues.
-*   **Teacher View:** The teacher sees a red "STOP CLASSES" alert on their dashboard instructing them to halt tuitions until the student pays the platform.
+*   **Status:** The 3-day grace period has expired without payment.
+*   **Student View (Full Account Lockout):**
+    *   The entire main dashboard area is replaced with a dedicated red **"Account Locked"** screen.
+    *   **Sidebar Navigation Locked:** All sidebar tabs (Dashboard, New Tuition, Requests & Offers, Notifications, My Teachers, Referrals) display a lock icon (`🔒`), are dimmed with `opacity-50 cursor-not-allowed`, and disabled. Clicking any tab shows a toast warning: *"Account locked. Please clear pending tuition fees to unlock your dashboard."*
+    *   The student must click **"Pay Monthly Fees Securely"** on the lock card, which mounts the root-level payment modal and opens the Razorpay checkout overlay.
+*   **Teacher View:** The teacher sees a red alert on their dashboard instructing them to halt tuitions until the student pays the platform.
 
 ### Phase 4: Post-Payment (Escrow Holding & Strict Zero Refund)
 **Trigger:** The student has successfully paid the full monthly fee via Razorpay (`feePaid: true`).

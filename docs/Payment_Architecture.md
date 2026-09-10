@@ -64,8 +64,11 @@ All payment calculations and verifications happen securely on the backend.
 ## 4. Frontend Integration Points
 
 ### A. Student Portal (`web/src/app/dashboard/student/page.tsx`)
-*   **Trigger:** Paying the tuition fee.
-*   **Flow:** Call `/api/create-order` -> Open Razorpay Widget -> Send signature to `/api/verify-payment` -> UI refreshes to show `tuition_started`.
+*   **Trigger Entry Points:** Paying the tuition fee can be initiated from:
+    1.  **Grace Period Reminder Pop-Up (Days 7–9):** Dismissible modal prompting payment on load with "Pay Monthly Fees" button.
+    2.  **My Teachers Tab:** Direct "Pay Monthly Fees" button on the active teacher card.
+    3.  **Account Locked Screen (Day 10+):** Fullscreen lock card with "Pay Monthly Fees Securely" button.
+*   **Flow:** Call `/api/create-order` -> Open Root-Level Razorpay Widget (`payingClass`) -> Send signature to `/api/verify-payment` -> UI refreshes to show `feePaid: true`.
 *   **Instant Remove Teacher Flow:** If a student has already paid (`isPaid === true`), clicking "Remove Teacher" instantly terminates the tuition by calling the `executeDeclineOffer` utility. This completely bypasses the Razorpay checkout modal to mathematically prevent double-charging.
 
 ### B. Teacher Portal (`web/src/app/dashboard/teacher/page.tsx`)

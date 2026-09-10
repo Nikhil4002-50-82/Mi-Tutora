@@ -50,7 +50,7 @@ sequenceDiagram
     Platform->>Platform: Sets status: tuition_started, startDate: now()
     Tutor->>Parent: Conducts trial classes (Days 1 to 7)
 
-    Note over Parent, Platform: Milestone 2: Day 7 (Mandatory Fee Settlement)
+    Note over Parent, Platform: Milestone 2: Days 7 to 9 (Fee Settlement & Grace Window)
     Parent->>Razorpay: Pays 100% Gross Monthly Fee (₹6,000)
     Razorpay->>Platform: Webhook confirms payment (/verify-payment)
     Platform->>Platform: Records gross payment in 'payments'

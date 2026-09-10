@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2 } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -3012,11 +3012,19 @@ export default function TeacherDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Net Revenue */}
                   <div className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100/50 text-emerald-600 flex items-center justify-center border border-emerald-100 mb-4">
-                      <IndianRupee className="w-6 h-6" />
+                    <div>
+                      <div className="w-12 h-12 rounded-xl bg-emerald-100/50 text-emerald-600 flex items-center justify-center border border-emerald-100 mb-4">
+                        <IndianRupee className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
+                      <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
                     </div>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
-                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
+                    {Boolean(data?.earningsData?.heldInEscrow && data.earningsData.heldInEscrow > 0) && (
+                      <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200/60 px-2.5 py-1 rounded-lg">
+                        <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                        <span>₹{data.earningsData.heldInEscrow.toLocaleString()} in Day 30 Escrow</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* First Month Gross */}
@@ -3085,41 +3093,159 @@ export default function TeacherDashboard() {
                   {/* Active Tuitions */}
                   <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                      <h3 className="font-bold text-gray-900 text-lg">Active Tuitions</h3>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-lg">Active Tuitions</h3>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">Track student fee collection and your scheduled UPI payouts.</p>
+                      </div>
                     </div>
-                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto custom-scrollbar">
+                    <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto custom-scrollbar">
                       {data?.upcomingClasses?.length > 0 ? (
-                        data.upcomingClasses.map((cls: any) => (
-                          <div key={cls.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                            <div className="flex-1">
-                              <p className="font-bold text-gray-900 text-sm">{cls.student}</p>
-                              <p className="text-xs text-slate-500 font-medium mt-0.5 mb-2">{cls.subject} • ₹{cls.app.finalPrice}/mo</p>
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
-                                  Next Due: {cls.app.nextPaymentDate ? new Date(cls.app.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : new Date(cls.app.updatedAt + 7*24*60*60*1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </span>
-                                <span className="text-xs font-bold text-slate-500">
-                                  {cls.app.paymentHistory?.length || 0} Payments Received
-                                </span>
+                        data.upcomingClasses.map((cls: any) => {
+                          const isMonth1 = cls.isMonth1;
+                          const studentPaid = Boolean(cls.app.feePaid);
+                          const day7DateStr = new Date(cls.day7DueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                          const day30DateStr = new Date(cls.day30PayoutDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                          const payoutStatus = cls.payoutRecord?.status;
+                          const isPayoutComplete = payoutStatus === 'paid';
+
+                          return (
+                            <div key={cls.id} className="p-5 flex flex-col gap-4 hover:bg-slate-50 transition-colors">
+                              {/* Header Row: Student info & Actions */}
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-gray-900 text-base">{cls.student}</p>
+                                    {isMonth1 ? (
+                                      <span className="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-md">
+                                        Month 1 Escrow (60% Payout)
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+                                        Month 2+ Direct Tuition
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                    {cls.subject} • Total Fee: ₹{(cls.app.finalPrice || 0).toLocaleString()}/month
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => setSelectedPaymentHistoryApp(cls.app)}
+                                    className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                                  >
+                                    View History
+                                  </button>
+                                  {!isMonth1 && (
+                                    <button
+                                      onClick={() => handleMarkAsPaid(cls.app)}
+                                      disabled={actionLoading === cls.id}
+                                      className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                    >
+                                      {actionLoading === cls.id ? 'Marking...' : 'Mark Paid'}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
+
+                              {/* Milestone Status Tracker */}
+                              {isMonth1 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                  {/* Stage 1: Student Payment to Platform (Day 7) */}
+                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${studentPaid ? 'bg-emerald-50/60 border-emerald-200/80' : 'bg-amber-50/60 border-amber-200/80'}`}>
+                                    <div className="mt-0.5 shrink-0">
+                                      {studentPaid ? (
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      ) : (
+                                        <Clock className="w-4 h-4 text-amber-600" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        Stage 1: Student Fee (Platform)
+                                      </p>
+                                      {studentPaid ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-emerald-900 mt-0.5">
+                                            ₹{(cls.app.finalPrice || 0).toLocaleString()} Received by Platform
+                                          </p>
+                                          <p className="text-[11px] text-emerald-700 mt-0.5">
+                                            Student fee completed via online checkout.
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <p className="text-xs font-bold text-amber-900 mt-0.5">
+                                            Due on {day7DateStr} (Trial Day 7)
+                                          </p>
+                                          <p className="text-[11px] text-amber-700 mt-0.5">
+                                            Student 7-day trial in progress. Fee will be collected by platform.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Stage 2: Teacher Net Payout (Day 30) */}
+                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${isPayoutComplete ? 'bg-emerald-50/60 border-emerald-200/80' : studentPaid ? 'bg-teal-50/60 border-teal-200/80' : 'bg-slate-50 border-slate-200/80'}`}>
+                                    <div className="mt-0.5 shrink-0">
+                                      {isPayoutComplete ? (
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      ) : studentPaid ? (
+                                        <Lock className="w-4 h-4 text-teal-600" />
+                                      ) : (
+                                        <CalendarDays className="w-4 h-4 text-slate-500" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        Stage 2: Your Net Payout (60% Share)
+                                      </p>
+                                      {isPayoutComplete ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-emerald-900 mt-0.5">
+                                            ₹{cls.tutorShare.toLocaleString()} Disbursed to UPI
+                                          </p>
+                                          <p className="text-[11px] text-emerald-700 mt-0.5">
+                                            Payout sent directly to your registered UPI ID.
+                                          </p>
+                                        </div>
+                                      ) : studentPaid ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-teal-900 mt-0.5">
+                                            ₹{cls.tutorShare.toLocaleString()} Held in Platform Escrow
+                                          </p>
+                                          <p className="text-[11px] text-teal-700 mt-0.5">
+                                            Scheduled for automated UPI disbursement on {day30DateStr} (Day 30).
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <p className="text-xs font-bold text-slate-800 mt-0.5">
+                                            Expected: ₹{cls.tutorShare.toLocaleString()} on {day30DateStr}
+                                          </p>
+                                          <p className="text-[11px] text-slate-500 mt-0.5">
+                                            Awaiting student Day 7 fee payment to lock in escrow.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Month 2+ direct tuition layout */
+                                <div className="flex items-center gap-3 pt-1">
+                                  <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md">
+                                    Next Due: {cls.app.nextPaymentDate ? new Date(cls.app.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Pending schedule'}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-500">
+                                    {cls.app.subsequentPayments?.length || 0} Offline Payments Logged
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                              <button
-                                onClick={() => setSelectedPaymentHistoryApp(cls.app)}
-                                className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                              >
-                                View History
-                              </button>
-                              <button
-                                onClick={() => handleMarkAsPaid(cls.app)}
-                                disabled={actionLoading === cls.id}
-                                className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                              >
-                                {actionLoading === cls.id ? 'Marking...' : 'Mark Paid'}
-                              </button>
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div className="p-8 text-center text-gray-500 font-medium text-sm">No active tuitions yet.</div>
                       )}
