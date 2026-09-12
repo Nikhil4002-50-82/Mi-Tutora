@@ -4,10 +4,11 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, LogIn, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-const logo = '/imports/logo.png';
 import { getFriendlyAuthError } from '@/utils/authErrors';
 import { generateCustomId } from '@/utils/idGenerator';
 
@@ -244,14 +245,14 @@ function LoginContent() {
       
 
       {/* LEFT COLUMN - BRANDING (Visible on Mobile as Banner) */}
-      <div className={`flex w-full lg:w-1/2 relative overflow-hidden flex-col justify-between p-6 pt-8 pb-16 lg:p-12 transition-colors duration-700
+      <div className={`flex w-full lg:w-1/2 relative overflow-hidden flex-col justify-between p-6 pt-8 pb-16 lg:p-12 transition-colors duration-200
         ${isTeacher ? 'bg-gradient-to-br from-[#04241f] to-[#021411]' : 'bg-gradient-to-br from-[#063831] to-[#04241f]'}
       `}>
         {/* Decorative Background Elements */}
-        <div className={`absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 translate-x-1/3 transition-colors duration-700
+        <div className={`absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 translate-x-1/3 transition-colors duration-200
           ${isTeacher ? 'bg-emerald-500/10' : 'bg-[#00a992]/20'}
         `} />
-        <div className={`absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full blur-[100px] pointer-events-none translate-y-1/2 -translate-x-1/3 transition-colors duration-700
+        <div className={`absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full blur-[100px] pointer-events-none translate-y-1/2 -translate-x-1/3 transition-colors duration-200
           ${isTeacher ? 'bg-orange-500/10' : 'bg-emerald-500/20'}
         `} />
         
@@ -260,20 +261,27 @@ function LoginContent() {
 
         {/* Logo & Role Selector Toggle */}
         <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-white font-black text-2xl tracking-wide">MiTutora</span>
-          </div>
+          <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <Image
+              src="/logo.png"
+              alt="MiTutora"
+              width={160}
+              height={50}
+              className="h-9 sm:h-10 w-auto object-contain"
+              priority
+            />
+          </Link>
 
           <div className="flex bg-white/10 p-1 rounded-xl backdrop-blur-md border border-white/10">
             <button
               onClick={() => router.push('/login?role=student')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${!isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-150 ${!isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
             >
               Student
             </button>
             <button
               onClick={() => router.push('/login?role=teacher')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-150 ${isTeacher ? 'bg-white text-[#063831] shadow-md' : 'text-white/70 hover:text-white'}`}
             >
               Teacher
             </button>
@@ -285,10 +293,10 @@ function LoginContent() {
           <AnimatePresence mode="wait">
             <motion.div
               key={role}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
             >
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mb-6 backdrop-blur-sm">
                 <Sparkles className={`w-4 h-4 ${isTeacher ? 'text-emerald-400' : 'text-[#00a992]'}`} />
@@ -348,7 +356,7 @@ function LoginContent() {
       <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0 -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-none">
         
         {/* Subtle mobile background glow */}
-        <div className={`lg:hidden absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 transition-colors duration-700
+        <div className={`lg:hidden absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 transition-colors duration-200
           ${isTeacher ? 'bg-emerald-500/5' : 'bg-[#00a992]/5'}
         `} />
 
@@ -356,7 +364,7 @@ function LoginContent() {
         <div className="w-full max-w-md flex justify-start mb-6 lg:mb-10 z-20 relative">
           <button 
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100 px-4 py-2 rounded-xl"
+            className="flex items-center gap-2 text-sm font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-sm hover:shadow-md px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home
@@ -365,9 +373,9 @@ function LoginContent() {
 
         <motion.div 
           key={role + '-form'}
-          initial={{ opacity: 0, x: 10 }}
+          initial={{ opacity: 0, x: 6 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
           className="w-full max-w-md relative z-10"
         >
           {/* Mobile Logo & Role Selector Removed (now in banner) */}
@@ -488,16 +496,6 @@ function LoginContent() {
                 </>
               )}
             </button>
-            
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => router.push(`/signup${searchParams.toString() ? '?' + searchParams.toString() : ''}`)}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-base font-bold text-gray-700"
-              >
-                Create a new account
-              </button>
-            </div>
           </form>
 
 

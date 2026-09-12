@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-const logo = '/imports/logo.png';
+const logo = '/logo.png';
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -77,10 +77,17 @@ export function Navbar() {
         {/* Logo */}
         <motion.div
           whileHover={{ scale: 1.02 }}
-          className="flex items-center cursor-pointer transition duration-300 py-4"
+          className="flex items-center cursor-pointer transition duration-300 py-1"
           onClick={() => scrollToSection('hero')}
         >
-          <span className="text-white font-black text-2xl tracking-wide">MiTutora</span>
+          <Image
+            src={logo}
+            alt="MiTutora"
+            width={160}
+            height={50}
+            className="h-9 sm:h-11 w-auto object-contain"
+            priority
+          />
         </motion.div>
 
         {/* Desktop Menu */}

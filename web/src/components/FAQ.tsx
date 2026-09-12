@@ -10,7 +10,7 @@ export function FAQ() {
   const faqs = [
     {
       question: 'How do I book a tutor?',
-      answer: 'Simply call us at +91 74830 34168 or +91 9773980489, or fill out the contact form on our website. Our team will help you find the perfect tutor based on your requirements within 24 hours.',
+      answer: 'Simply call us at +91 74830 34168, or fill out the contact form on our website. Our team will help you find the perfect tutor based on your requirements within 24 hours.',
     },
     {
       question: 'What are your charges?',

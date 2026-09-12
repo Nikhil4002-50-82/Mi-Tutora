@@ -28,6 +28,10 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
   openGraph: {
     title: "MiTutora - Transforming Education in India",
     description: "Connect with highly qualified tutors for offline and online classes.",
@@ -35,7 +39,7 @@ export const metadata: Metadata = {
     siteName: "MiTutora",
     images: [
       {
-        url: "/imports/logo.png",
+        url: "/logo.png",
         width: 800,
         height: 600,
         alt: "MiTutora Logo",
@@ -48,7 +52,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "MiTutora - Transforming Education",
     description: "India's fastest-growing platform connecting students with top tutors.",
-    images: ["/imports/logo.png"],
+    images: ["/logo.png"],
   },
   robots: {
     index: true,

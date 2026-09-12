@@ -167,18 +167,6 @@ export function Hero() {
                 className="rounded-3xl w-full h-[320px] sm:h-[400px] md:h-[500px] object-cover shadow-2xl border border-white/10 relative z-10"
               />
 
-              {/* 🔥 GLASSMORPHISM INFO CARD */}
-              <motion.div
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="absolute top-6 sm:top-10 -left-4 sm:-left-12 bg-white/10 backdrop-blur-xl border border-white/20 p-4 sm:p-5 rounded-2xl max-w-[240px] sm:max-w-[280px] text-white shadow-2xl z-20"
-              >
-                <p className="text-xs sm:text-sm text-gray-200 font-medium leading-relaxed">
-                  <span className="text-[#00a992] font-bold block mb-1">Personalized Learning</span>
-                  One-on-one sessions tailored to your unique learning style and pace.
-                </p>
-              </motion.div>
 
               {/* 🔥 EXPERIENCE BADGE */}
               <motion.div

@@ -16,7 +16,7 @@ export function TutorJoin() {
   ];
 
   const stats = [
-    { icon: DollarSign, value: '&#8377;25k-50k', label: 'Average Monthly Earnings' },
+    { icon: DollarSign, value: '₹25k-50k', label: 'Average Monthly Earnings' },
     { icon: Clock, value: 'Flexible', label: 'Working Hours' },
     { icon: Users, value: '500+', label: 'Active Tutors' },
     { icon: TrendingUp, value: '4.9/5', label: 'Average Rating' },
@@ -81,14 +81,6 @@ export function TutorJoin() {
                   Apply Now
                 </Link>
               </motion.div>
-              <motion.a
-                href="mailto:musharrafak06@gmail.com"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white border-2 border-white/30 rounded-full font-semibold text-lg hover:bg-white/20 transition-all text-center"
-              >
-                Learn More
-              </motion.a>
             </div>
           </motion.div>
 
