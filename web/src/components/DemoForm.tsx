@@ -20,7 +20,22 @@ import {
   Handshake,
   Settings,
   Building,
-  IndianRupee
+  IndianRupee,
+  Edit2,
+  Target,
+  Globe,
+  Clock,
+  Calendar,
+  CalendarDays,
+  Award,
+  Laptop,
+  Languages,
+  Check,
+  UserCheck,
+  UserPlus,
+  Phone,
+  MessageCircle,
+  Mail
 } from 'lucide-react';
 import { generateCustomId } from '@/utils/idGenerator';
 import { toast } from 'sonner';
@@ -856,14 +871,18 @@ export default function DemoForm({
       <div className="space-y-8 animate-in fade-in duration-300">
         <div className="flex justify-between items-center border-b border-slate-100 pb-6">
           <div>
-            <h2 className="text-3xl font-black text-black">👤 My Profile</h2>
+            <h2 className="text-3xl font-black text-black flex items-center gap-2.5">
+              <User className="w-7 h-7 text-[#00a992]" />
+              <span>My Profile</span>
+            </h2>
             <p className="text-slate-500 mt-1 font-medium">Your learning preferences and details.</p>
           </div>
           <button 
             onClick={() => setIsEditing(true)}
-            className="bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-700 px-5 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
+            className="bg-teal-50 text-[#00a992] hover:bg-teal-100 hover:text-[#008f7b] px-5 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
           >
-            ✏️ Edit Profile
+            <Edit2 className="w-4 h-4" />
+            <span>Edit Profile</span>
           </button>
         </div>
         
@@ -985,12 +1004,17 @@ export default function DemoForm({
           {(!hasProfile || parentOnly) && (
             <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
               <h3 className="text-xl font-bold text-slate-800 border-b pb-3 mb-4 flex items-center gap-2">
-                👤 Parent / Guardian Details
+                <User className="w-5 h-5 text-[#00a992]" />
+                <span>Parent / Guardian Details</span>
               </h3>
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Parent/Guardian Name *</label>
+                  <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4 text-[#00a992]" />
+                    <span>Parent/Guardian Name</span>
+                    <span className="text-red-500 font-bold ml-0.5">*</span>
+                  </label>
                   <input
                     type="text"
                     name="parentName"
@@ -1002,7 +1026,11 @@ export default function DemoForm({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Email Address *</label>
+                  <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-[#00a992]" />
+                    <span>Email Address</span>
+                    <span className="text-red-500 font-bold ml-0.5">*</span>
+                  </label>
                   <input
                     type="email"
                     name="email"
@@ -1019,7 +1047,11 @@ export default function DemoForm({
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Phone Number *</label>
+                  <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-[#00a992]" />
+                    <span>Phone Number</span>
+                    <span className="text-red-500 font-bold ml-0.5">*</span>
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">+91</span>
                     <input
@@ -1043,7 +1075,11 @@ export default function DemoForm({
                 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-semibold">WhatsApp Number *</label>
+                    <label className="text-sm font-semibold flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-[#00a992]" />
+                      <span>WhatsApp Number</span>
+                      <span className="text-red-500 font-bold ml-0.5">*</span>
+                    </label>
                     <label className="flex items-center gap-2 text-xs font-medium cursor-pointer text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors">
                       <input 
                         type="checkbox" 
@@ -1086,7 +1122,10 @@ export default function DemoForm({
           {!parentOnly && (
             <>
               <div>
-                <label className="block text-sm font-semibold mb-2">🎯 Learning Goal</label>
+                <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#00a992]" />
+                  <span>Learning Goal</span>
+                </label>
                 <textarea
                   name="goal"
                   value={formData.goal}
@@ -1178,7 +1217,11 @@ export default function DemoForm({
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold mb-3">👩‍🏫 Teacher Gender Preference *</label>
+                      <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-[#00a992]" />
+                        <span>Teacher Gender Preference</span>
+                        <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <div className="flex flex-wrap gap-3">
                         {['Male', 'Female', 'No Preference'].map((item) => (
                           <label key={item} className="flex items-center gap-2 font-medium cursor-pointer bg-white border border-slate-200 px-3 py-2 rounded-lg hover:border-purple-500 transition-colors">
@@ -1198,7 +1241,11 @@ export default function DemoForm({
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-semibold mb-3">🌐 Preferred Mode *</label>
+                      <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-[#00a992]" />
+                        <span>Preferred Mode</span>
+                        <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       {isProgramming ? (
                         <div className="border border-purple-200 bg-purple-50 rounded-xl px-4 py-3 flex items-center gap-3">
                           <input type="radio" checked readOnly className="accent-purple-500" />
@@ -1228,9 +1275,10 @@ export default function DemoForm({
                   {(pref.mode === 'Offline' && !isProgramming) && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
                       <div className="flex justify-between items-center">
-                        <label className="block text-sm font-semibold flex items-center gap-1.5">
-                          <MapPin className="w-4 h-4 text-emerald-600" />
-                          <span>Group Address *</span>
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-[#00a992]" />
+                          <span>Group Address</span>
+                          <span className="text-red-500 font-bold ml-0.5">*</span>
                         </label>
                         <button
                           type="button"
@@ -1273,7 +1321,11 @@ export default function DemoForm({
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold mb-2">⏱ Preferred Time Range *</label>
+                      <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-[#00a992]" />
+                        <span>Preferred Time Range</span>
+                        <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <select 
                         value={pref.hours || ''} 
                         onChange={(e) => handleGroupPrefChange(groupId, 'hours', e.target.value)} 
@@ -1288,7 +1340,11 @@ export default function DemoForm({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2">📅 Days per Week *</label>
+                      <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-[#00a992]" />
+                        <span>Days per Week</span>
+                        <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <select 
                         value={pref.days || ''} 
                         onChange={(e) => handleGroupPrefChange(groupId, 'days', e.target.value)} 
@@ -1309,7 +1365,10 @@ export default function DemoForm({
                   
                   {pref.days && (
                     <div>
-                      <label className="block text-sm font-semibold mb-3">📆 Specific Days of the Week (Optional)</label>
+                      <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4 text-[#00a992]" />
+                        <span>Specific Days of the Week (Optional)</span>
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                           const specificDays = pref.specificDays || [];
@@ -1354,7 +1413,10 @@ export default function DemoForm({
         
         {!hasProfile && sIndex === 0 && (
           <div className="my-6">
-            <label className="block text-sm font-semibold mb-2">🔢 Number of Students</label>
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#00a992]" />
+              <span>Number of Students</span>
+            </label>
             <input
               type="text"
               inputMode="numeric"
@@ -1374,9 +1436,10 @@ export default function DemoForm({
         )}
         
         <div className="mb-6">
-          <label className="block text-sm font-semibold mb-2 flex items-center">
-            <BookOpen className="w-4 h-4 mr-1.5 text-teal-600" />
-            <span>Category *</span>
+          <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[#00a992]" />
+            <span>Category</span>
+            <span className="text-red-500 font-bold ml-0.5">*</span>
           </label>
           <select
             name="category"
@@ -1394,9 +1457,10 @@ export default function DemoForm({
 
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold mb-2 flex items-center">
-              <User className="w-4 h-4 mr-1.5 text-teal-600" />
-              <span>Student Name *</span>
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-[#00a992]" />
+              <span>Student Name</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
             <input
               type="text"
@@ -1409,9 +1473,10 @@ export default function DemoForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-3 flex items-center">
-              <Users className="w-4 h-4 mr-1.5 text-teal-600" />
-              <span>Gender *</span>
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#00a992]" />
+              <span>Gender</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
             <div className="flex flex-wrap gap-4 sm:gap-6 pt-3">
               {['Female', 'Male', 'Other'].map((item) => (
@@ -1434,9 +1499,10 @@ export default function DemoForm({
 
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
           <label className="block text-sm font-semibold mb-2 flex justify-between items-center">
-            <span className="flex items-center">
-              <IndianRupee className="w-4 h-4 mr-1.5 text-emerald-600" />
-              <span>Expected Budget / Monthly Fee *</span>
+            <span className="flex items-center gap-1.5">
+              <IndianRupee className="w-4 h-4 text-[#00a992]" />
+              <span>Expected Budget / Monthly Fee</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </span>
             <span className="text-emerald-600 font-bold">&#8377;{student.budget}</span>
           </label>
@@ -1460,9 +1526,10 @@ export default function DemoForm({
           <>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold mb-2 flex items-center">
-                  <GraduationCap className="w-4 h-4 mr-1.5 text-teal-600" />
-                  <span>Student Type *</span>
+                <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-[#00a992]" />
+                  <span>Student Type</span>
+                  <span className="text-red-500 font-bold ml-0.5">*</span>
                 </label>
                 <select
                   name="studentType"
@@ -1478,9 +1545,10 @@ export default function DemoForm({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2 flex items-center">
-                  <Building className="w-4 h-4 mr-1.5 text-teal-600" />
-                  <span>Class / Grade *</span>
+                <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-[#00a992]" />
+                  <span>Class / Grade</span>
+                  <span className="text-red-500 font-bold ml-0.5">*</span>
                 </label>
                 <select
                   name="classGrade"
@@ -1512,7 +1580,11 @@ export default function DemoForm({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-3">📚 Board *</label>
+              <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Award className="w-4 h-4 text-[#00a992]" />
+                <span>Board</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
               <div className="grid md:grid-cols-2 gap-3">
                 {['CBSE', 'ICSE', 'State Board', 'IB / IGCSE'].map((item) => (
                   <label key={item} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-4 cursor-pointer hover:border-purple-500">
@@ -1532,7 +1604,11 @@ export default function DemoForm({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-3">📘 Subjects *</label>
+              <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#00a992]" />
+                <span>Subjects</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
               {!student.board ? (
                 <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">Please select a board to see subjects.</p>
               ) : (
@@ -1556,7 +1632,11 @@ export default function DemoForm({
 
         {student.category === 'programming' && (
           <div>
-            <label className="block text-sm font-semibold mb-3">💻 Technologies *</label>
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Laptop className="w-4 h-4 text-[#00a992]" />
+              <span>Technologies</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
+            </label>
             <div className="grid md:grid-cols-2 gap-3">
               {['Python', 'Java', 'AI & ML', 'HTML & CSS', 'Data Analytics', 'Gen AI', 'Agentic AI'].map((item) => (
                 <label key={item} className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all cursor-pointer">
@@ -1575,7 +1655,11 @@ export default function DemoForm({
 
         {student.category === 'languages' && (
           <div>
-            <label className="block text-sm font-semibold mb-3">🌍 Languages *</label>
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Languages className="w-4 h-4 text-[#00a992]" />
+              <span>Languages</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
+            </label>
             <div className="grid md:grid-cols-2 gap-3">
               {['English', 'Arabic', 'German', 'Japanese', 'French', 'Spanish'].map((item) => (
                 <label key={item} className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all cursor-pointer">
@@ -1793,8 +1877,15 @@ export default function DemoForm({
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex justify-between items-start mb-8">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-black mb-2">
-                {activeStudentId === 'new' ? '👤 Add Student' : (hasProfile ? '👤 Edit Profile' : (isDashboard ? '🎓 Complete Demo Request' : '🎓 Book a Free Demo'))}
+              <h2 className="text-3xl md:text-4xl font-bold text-black mb-2 flex items-center gap-2.5">
+                {activeStudentId === 'new' ? (
+                  <UserPlus className="w-8 h-8 text-[#00a992] shrink-0" />
+                ) : hasProfile ? (
+                  <UserCheck className="w-8 h-8 text-[#00a992] shrink-0" />
+                ) : (
+                  <GraduationCap className="w-8 h-8 text-[#00a992] shrink-0" />
+                )}
+                <span>{activeStudentId === 'new' ? 'Add Student' : (hasProfile ? 'Edit Profile' : (isDashboard ? 'Complete Demo Request' : 'Book a Free Demo'))}</span>
               </h2>
               {activeStudentId !== 'new' && (
                 <p className="text-slate-500 text-base">
@@ -1836,9 +1927,9 @@ export default function DemoForm({
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
-                  className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95"
+                  className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95 flex items-center gap-1.5"
                 >
-                  ← Back
+                  <span>← Back</span>
                 </button>
               )}
               <button
@@ -1846,7 +1937,23 @@ export default function DemoForm({
                 disabled={loading || (!hasProfile && formData.step >= ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) && !acceptedLegal)}
                 className="flex-1 bg-gradient-to-r from-[#00a992] to-teal-500 hover:from-[#009b86] hover:to-teal-600 text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-teal-500/25 hover:-translate-y-1 active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
-                {loading ? 'Processing...' : (parentOnly ? '✅ Save Profile' : (formData.step < ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) ? 'Next Step →' : (hasProfile ? '✅ Save Changes' : '🚀 Submit Request')))}
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    {parentOnly || hasProfile ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <ArrowRight className="w-5 h-5" />
+                    )}
+                    <span>
+                      {parentOnly ? 'Save Profile' : (formData.step < ((formData.numberOfStudents || 1) > 1 ? (formData.numberOfStudents || 1) + 3 : (formData.numberOfStudents || 1) + 2) ? 'Next Step' : (hasProfile ? 'Save Changes' : 'Submit Request'))}
+                    </span>
+                  </div>
+                )}
               </button>
             </div>
 

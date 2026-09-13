@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star } from 'lucide-react';
+import { Star, Award } from 'lucide-react';
 
 interface StudentMotivationBannerProps {
   studentName: string;
@@ -13,11 +13,11 @@ export function StudentMotivationBanner({ studentName, onClick }: StudentMotivat
         <div className="w-16 h-16 relative flex-shrink-0 hidden sm:block">
           <div className="absolute inset-0 bg-emerald-200 rounded-full animate-pulse blur-xl opacity-50"></div>
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-emerald-100 shadow-sm relative z-10 text-2xl">
-            🏆
+            <Award className="w-8 h-8 text-amber-500" />
           </div>
         </div>
         <div>
-          <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {studentName}! 🎉</h3>
+          <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {studentName}!</h3>
           <p className="text-sm font-medium text-emerald-700 max-w-md">You're doing amazing! Keep up the excellent learning and inspiring your tutors.</p>
         </div>
       </div>

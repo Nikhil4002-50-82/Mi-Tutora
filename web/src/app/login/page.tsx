@@ -423,7 +423,7 @@ function LoginContent() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
-                Email<span className="text-[#00a992] ml-0.5">*</span>
+                Email<span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -446,7 +446,7 @@ function LoginContent() {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="text-xs sm:text-sm font-bold text-gray-700">
-                  Password<span className="text-[#00a992] ml-0.5">*</span>
+                  Password<span className="text-red-500 font-bold ml-0.5">*</span>
                 </label>
                 <a href="#" onClick={handleForgotPassword} className={`text-xs font-bold hover:text-emerald-700 transition-colors ${isTeacher ? 'text-emerald-500' : 'text-[#00a992]'}`}>
                   Forgot Password?

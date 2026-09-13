@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -1379,7 +1379,6 @@ export default function TeacherDashboard() {
                         {data?.profile?.aadharVerified && (
                           <ShieldCheck className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 drop-shadow-sm flex-shrink-0" />
                         )}
-                        <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
                       </h1>
                       <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
                     </div>
@@ -1508,12 +1507,12 @@ export default function TeacherDashboard() {
                          <div className="flex items-center gap-6">
                            <div className="w-16 h-16 relative flex-shrink-0 hidden sm:block">
                              <div className="absolute inset-0 bg-emerald-200 rounded-full animate-pulse blur-xl opacity-50"></div>
-                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-emerald-100 shadow-sm relative z-10 text-2xl">
-                               🏆
+                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-emerald-100 shadow-sm relative z-10">
+                               <Award className="w-8 h-8 text-amber-500" />
                              </div>
                            </div>
                            <div>
-                             <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}! 🎉</h3>
+                             <h3 className="text-lg font-black text-emerald-900 mb-1">Great work, {data?.profile?.name?.split(' ')[0] || data?.user?.displayName?.split(' ')[0] || 'Teacher'}!</h3>
                              <p className="text-sm font-medium text-emerald-700 max-w-md">You're doing amazing! Keep up the excellent teaching and inspiring your students.</p>
                            </div>
                          </div>
@@ -1946,8 +1945,9 @@ export default function TeacherDashboard() {
                         </div>
                       )}
                       {allFilteredStudents.length > 20 && visibleStudentsCount >= allFilteredStudents.length && (
-                        <div className="text-center py-6 text-sm text-gray-500 font-medium">
-                          🎉 You've viewed all {allFilteredStudents.length} matching student requests.
+                        <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500 font-medium">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>You've viewed all {allFilteredStudents.length} matching student requests.</span>
                         </div>
                       )}
                     </>
@@ -2843,7 +2843,7 @@ export default function TeacherDashboard() {
                 {data?.userData?.referrerName && (
                   <div className="mb-8 bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                     <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-xl">🤝</span>
+                      <Handshake className="w-5 h-5 text-[#00a992]" />
                     </div>
                     <div>
                       <h4 className="text-emerald-900 font-bold">Welcome to the community!</h4>
@@ -2899,8 +2899,8 @@ export default function TeacherDashboard() {
                         <div className="text-emerald-50/90 text-base sm:text-lg font-medium leading-relaxed space-y-3">
                           <p>Share your unique referral code and unlock exclusive rewards based on who joins!</p>
                           <ul className="text-sm sm:text-base space-y-2 mt-2 bg-black/20 p-4 rounded-xl border border-white/10">
-                            <li className="flex items-center gap-2"><span className="text-xl">🎓</span> <strong>Refer Students:</strong> Earn 25% of margin as Wallet Cash.</li>
-                            <li className="flex items-center gap-2"><span className="text-xl">👨‍🏫</span> <strong>Refer Teachers:</strong> Earn 1 Banked Token (Free Request).</li>
+                            <li className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-emerald-300 shrink-0" /> <strong>Refer Students:</strong> Earn 25% of margin as Wallet Cash.</li>
+                            <li className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-emerald-300 shrink-0" /> <strong>Refer Teachers:</strong> Earn 1 Banked Token (Free Request).</li>
                           </ul>
                         </div>
                       </div>
@@ -2978,7 +2978,7 @@ export default function TeacherDashboard() {
 
                       {isEditingPayoutUpi && (
                         <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 mb-2">
-                          <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Enter your UPI ID</label>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Enter your UPI ID <span className="text-red-500 font-bold ml-0.5">*</span></label>
                           <input
                             type="text"
                             value={payoutUpi}
@@ -3554,7 +3554,7 @@ export default function TeacherDashboard() {
                   <p className="text-gray-500 mb-6 font-medium relative z-10">You are withdrawing ₹{data?.userData?.walletBalance || 0} to your bank account.</p>
                   
                   <div className="mb-6 relative z-10">
-                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID</label>
+                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID <span className="text-red-500 font-bold ml-0.5">*</span></label>
                     <input
                       type="text"
                       value={upiId}

@@ -140,7 +140,7 @@ export default function ActionModal({
                     ) : (
                       <div className="flex flex-col gap-4">
                         <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Date</label>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Date <span className="text-red-500 font-bold ml-0.5">*</span></label>
                           <input
                             type="date"
                             min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
@@ -151,7 +151,7 @@ export default function ActionModal({
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Time</label>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Select Time <span className="text-red-500 font-bold ml-0.5">*</span></label>
                           <input
                             type="time"
                             value={timeValue}

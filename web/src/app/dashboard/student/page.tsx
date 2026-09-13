@@ -1425,8 +1425,8 @@ export default function StudentDashboard() {
                   {hasPendingDues && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-red-600 font-bold text-xl">
-                          ⚠️
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-red-600">
+                          <AlertTriangle className="w-5 h-5" />
                         </div>
                         <div>
                           <h3 className="font-bold text-red-900 text-sm">Action Required: Pending Dues</h3>
@@ -1445,7 +1445,7 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     <div className="lg:col-span-6 xl:col-span-7 flex flex-col justify-center">
                       <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-2">
-                        Hello {(data?.profile?.name || data?.userData?.name || data?.user?.displayName || 'Parent').trim().split(' ')[0]}! <span className="text-4xl md:text-5xl animate-bounce origin-bottom-right">👋</span>
+                        Hello {(data?.profile?.name || data?.userData?.name || data?.user?.displayName || 'Parent').trim().split(' ')[0]}!
                       </h1>
                       <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back, what an exciting day! Get ready to continue your learning journey.</p>
                     </div>
@@ -1996,8 +1996,9 @@ export default function StudentDashboard() {
                     </div>
                   )}
                   {allFilteredTutors.length > 20 && visibleTutorsCount >= allFilteredTutors.length && (
-                    <div className="text-center py-6 text-sm text-gray-500 font-medium">
-                      🎉 You've viewed all {allFilteredTutors.length} matching tutors.
+                    <div className="text-center py-6 text-sm text-gray-500 font-medium flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <span>You've viewed all {allFilteredTutors.length} matching tutors.</span>
                     </div>
                   )}
                 </>
@@ -2823,8 +2824,8 @@ export default function StudentDashboard() {
                 {/* "Invited By" Banner */}
                 {data?.userData?.referrerName && (
                   <div className="mb-8 bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-xl">🤝</span>
+                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0 text-emerald-600">
+                      <Handshake className="w-5 h-5" />
                     </div>
                     <div>
                       <h4 className="text-emerald-900 font-bold">Welcome to the community!</h4>

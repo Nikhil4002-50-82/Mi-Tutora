@@ -125,7 +125,6 @@ export interface Tutor {
   qualification?: string;
   rating?: number;
   role?: string;
-  schoolNames?: string;
   studentCount?: string;
   subjects?: string[];
   teachingApproach?: string;

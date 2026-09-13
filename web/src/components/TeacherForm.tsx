@@ -11,6 +11,7 @@ import {
   Loader2, 
   Edit2, 
   User, 
+  Users, 
   FileText, 
   CheckCircle, 
   CheckCircle2, 
@@ -20,7 +21,24 @@ import {
   X, 
   UploadCloud, 
   Clock, 
-  ShieldCheck 
+  ShieldCheck,
+  Phone,
+  MessageCircle,
+  Mail,
+  Globe,
+  Layers,
+  GraduationCap,
+  Briefcase,
+  BookOpen,
+  Award,
+  Laptop,
+  Languages,
+  Lightbulb,
+  Navigation,
+  IndianRupee,
+  Check,
+  ArrowRight,
+  UserCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '@/utils/firebase/client';
@@ -84,7 +102,6 @@ export default function TeacherForm({
     mode: initialData?.mode || '',
     description: initialData?.teachingApproach || '',
     studentsCount: initialData?.studentCount || '',
-    schoolNames: initialData?.schoolNames || '',
     locations: initialData?.preferredLocations || '',
     travelKm: initialData?.travelDistance || '',
     feeRange: initialData?.feeRange || '',
@@ -114,7 +131,6 @@ export default function TeacherForm({
         mode: initialData.mode || '',
         description: initialData.teachingApproach || '',
         studentsCount: initialData.studentCount || '',
-        schoolNames: initialData.schoolNames || '',
         locations: initialData.preferredLocations || '',
         travelKm: initialData.travelDistance || '',
         feeRange: initialData.feeRange || '',
@@ -455,7 +471,6 @@ export default function TeacherForm({
         subjects: formData.subjects,
         teachingApproach: formData.description,
         studentCount: formData.studentsCount,
-        schoolNames: formData.schoolNames,
         preferredLocations: formData.locations,
         travelDistance: formData.travelKm,
         feeRange: formData.feeRange,
@@ -646,7 +661,7 @@ export default function TeacherForm({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText className="w-4 h-4 text-[#00a992]" /> Resume / CV (Compulsory)
+                      <FileText className="w-4 h-4 text-[#00a992]" /> Resume / CV
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Verified educator resume uploaded to profile
@@ -765,8 +780,9 @@ export default function TeacherForm({
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex justify-between items-start mb-10">
             <div>
-              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4">
-                {hasProfile ? '👤 Edit Profile' : (isDashboard ? '👨‍🏫 Complete Teacher Profile' : '👨‍🏫 Teacher Information Form')}
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 flex items-center gap-3">
+                <UserCheck className="w-9 h-9 text-[#00a992] shrink-0" />
+                <span>{hasProfile ? 'Edit Profile' : (isDashboard ? 'Complete Teacher Profile' : 'Teacher Information Form')}</span>
               </h2>
               <p className="text-slate-500 text-lg">
                 {hasProfile 
@@ -790,7 +806,11 @@ export default function TeacherForm({
 
         {/* CATEGORY */}
         <div>
-          <label className="block text-sm font-semibold mb-2">📚 Selected Category *</label>
+          <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#00a992]" />
+            <span>Selected Category</span>
+            <span className="text-red-500 font-bold ml-0.5">*</span>
+          </label>
           <select
             name="category"
             value={formData.category}
@@ -810,8 +830,10 @@ export default function TeacherForm({
 
           {/* FULL NAME */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              👤 Full Name *
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-[#00a992]" />
+              <span>Full Name</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <input
@@ -827,8 +849,10 @@ export default function TeacherForm({
 
           {/* GENDER */}
           <div>
-            <label className="block text-sm font-semibold mb-3">
-              🚻 Gender *
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#00a992]" />
+              <span>Gender</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <div className="flex flex-wrap gap-4 sm:gap-6 pt-3">
@@ -867,8 +891,10 @@ export default function TeacherForm({
         <div className="grid md:grid-cols-2 gap-6">
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              📞 Phone Number *
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Phone className="w-4 h-4 text-[#00a992]" />
+              <span>Phone Number</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <input
@@ -886,8 +912,10 @@ export default function TeacherForm({
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-semibold">
-                💬 WhatsApp No. *
+              <label className="text-sm font-semibold flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-[#00a992]" />
+                <span>WhatsApp No.</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
                 <input type="checkbox" checked={sameAsPhone} onChange={handleSameAsPhone} /> Same as Phone
@@ -913,8 +941,10 @@ export default function TeacherForm({
         <div className="grid md:grid-cols-2 gap-6">
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              📧 Email ID *
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-[#00a992]" />
+              <span>Email ID</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <input
@@ -932,8 +962,10 @@ export default function TeacherForm({
 
         {/* MODE */}
         <div>
-          <label className="block text-sm font-semibold mb-3">
-            🌐 Preferred Mode *
+          <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-[#00a992]" />
+            <span>Preferred Mode</span>
+            <span className="text-red-500 font-bold ml-0.5">*</span>
           </label>
 
           {(formData.category ===('programming') ||
@@ -992,9 +1024,10 @@ export default function TeacherForm({
           {(formData.mode !== 'Online' && formData.category !== 'programming' && formData.category !== 'languages') && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <label className="block text-sm font-semibold flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-emerald-600" />
-                  <span>Residential Address *</span>
+                <label className="text-sm font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-[#00a992]" />
+                  <span>Residential Address</span>
+                  <span className="text-red-500 font-bold ml-0.5">*</span>
                 </label>
                 <button
                   type="button"
@@ -1046,21 +1079,19 @@ export default function TeacherForm({
 
         </div>
 
-        {/* COMPULSORY RESUME / CV */}
+        {/* RESUME / CV */}
         <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-5 md:p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
             <div>
-              <label className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+              <label className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#00a992]" />
-                Your Resume / CV <span className="text-rose-500 font-bold">* (Compulsory)</span>
+                <span>Your Resume / CV</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <p className="text-xs text-slate-500 mt-0.5">
                 Upload your detailed curriculum vitae or resume in <strong className="text-slate-700">PDF or Word format (.pdf, .doc, .docx)</strong> (max 5MB).
               </p>
             </div>
-            <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 self-start sm:self-auto">
-              Mandatory
-            </span>
           </div>
 
           <div className="p-4 rounded-xl border border-slate-200 bg-white transition-all hover:border-slate-300 shadow-2xs">
@@ -1129,7 +1160,7 @@ export default function TeacherForm({
                   </div>
                 ) : (
                   <label className="text-xs font-bold text-white bg-[#00a992] hover:bg-[#008f7b] px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all shadow-xs">
-                    <UploadCloud className="w-4 h-4" /> Upload Resume *
+                    <UploadCloud className="w-4 h-4" /> Upload Resume
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx"
@@ -1147,8 +1178,10 @@ export default function TeacherForm({
         <div className="grid md:grid-cols-2 gap-6">
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              🎓 Highest Qualification *
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-[#00a992]" />
+              <span>Highest Qualification</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <select
@@ -1173,8 +1206,10 @@ export default function TeacherForm({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              📖 Total Teaching Experience *
+            <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#00a992]" />
+              <span>Total Teaching Experience</span>
+              <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <select
@@ -1208,11 +1243,6 @@ export default function TeacherForm({
                 Optional: Upload your educational certificates/marksheets in <strong className="text-slate-700">PDF format</strong> (max 5MB each).
               </p>
             </div>
-            {formData.qualification && (
-              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 self-start sm:self-auto">
-                Optional for: {formData.qualification}
-              </span>
-            )}
           </div>
 
           {!formData.qualification ? (
@@ -1305,8 +1335,9 @@ export default function TeacherForm({
 
         {/* OCCUPATION */}
         <div>
-          <label className="block text-sm font-semibold mb-3">
-            💼 Current Occupation
+          <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-[#00a992]" />
+            <span>Current Occupation</span>
           </label>
 
           <input
@@ -1326,8 +1357,10 @@ export default function TeacherForm({
 
             {/* CLASSES */}
             <div>
-              <label className="block text-sm font-semibold mb-3">
-                🏫 Classes you Teach *
+              <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#00a992]" />
+                <span>Classes you Teach</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               <div className="grid md:grid-cols-2 gap-3">
@@ -1364,8 +1397,10 @@ export default function TeacherForm({
 
             {/* BOARD */}
             <div>
-              <label className="block text-sm font-semibold mb-3">
-                📚 Preferred Teaching Board *
+              <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Award className="w-4 h-4 text-[#00a992]" />
+                <span>Preferred Teaching Board</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               <div className="grid md:grid-cols-2 gap-3">
@@ -1399,8 +1434,10 @@ export default function TeacherForm({
 
           {/* SUBJECTS */}
             <div>
-              <label className="block text-sm font-semibold mb-2">
-                📘 Subjects you Teach *
+              <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#00a992]" />
+                <span>Subjects you Teach</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               {formData.boards.length === 0 || formData.classes.length === 0 ? (
@@ -1460,8 +1497,9 @@ export default function TeacherForm({
         {formData.category ===('programming') && (
 
           <div>
-            <label className="block text-sm font-semibold mb-3">
-              💻 Technologies you Teach
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Laptop className="w-4 h-4 text-[#00a992]" />
+              <span>Technologies you Teach</span>
             </label>
 
             <div className="grid md:grid-cols-2 gap-3">
@@ -1501,8 +1539,9 @@ export default function TeacherForm({
         {formData.category ===('languages') && (
 
           <div>
-            <label className="block text-sm font-semibold mb-3">
-              🌍 Languages you Teach
+            <label className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Languages className="w-4 h-4 text-[#00a992]" />
+              <span>Languages you Teach</span>
             </label>
 
             <div className="grid md:grid-cols-2 gap-3">
@@ -1538,8 +1577,9 @@ export default function TeacherForm({
 
         {/* DESCRIPTION */}
         <div>
-          <label className="block text-sm font-semibold mb-2">
-            📝 Teaching Approach
+          <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Lightbulb className="w-4 h-4 text-[#00a992]" />
+            <span>Teaching Approach</span>
           </label>
 
           <textarea
@@ -1552,39 +1592,21 @@ export default function TeacherForm({
           />
         </div>
 
-        {/* STUDENTS + SCHOOLS */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* CURRENT STUDENTS COUNT */}
+        <div>
+          <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#00a992]" />
+            <span>Current Students Count</span>
+          </label>
 
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              👨‍🎓 Current Students Count
-            </label>
-
-            <input
-              type="text"
-              name="studentsCount"
-              placeholder="No. of students"
-              value={formData.studentsCount}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              🏫 School Names
-            </label>
-
-            <input
-              type="text"
-              name="schoolNames"
-              placeholder="School names"
-              value={formData.schoolNames}
-              onChange={handleChange}
-              className="w-full border border-slate-300 rounded-xl px-4 py-4"
-            />
-          </div>
-
+          <input
+            type="text"
+            name="studentsCount"
+            placeholder="No. of students"
+            value={formData.studentsCount}
+            onChange={handleChange}
+            className="w-full border border-slate-300 rounded-xl px-4 py-4"
+          />
         </div>
 
         {/* LOCATION + KM */}
@@ -1592,8 +1614,10 @@ export default function TeacherForm({
           <div className="grid md:grid-cols-2 gap-6">
 
             <div>
-              <label className="block text-sm font-semibold mb-2">
-                📍 Preferred Locations *
+              <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#00a992]" />
+                <span>Preferred Locations</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               <input
@@ -1608,8 +1632,10 @@ export default function TeacherForm({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">
-                🚗 Willing to travel within KM *
+              <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-[#00a992]" />
+                <span>Willing to travel within KM</span>
+                <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               <input
@@ -1630,8 +1656,10 @@ export default function TeacherForm({
 
         {/* FEES */}
         <div>
-          <label className="block text-sm font-semibold mb-2">
-            💰 Expected Fee Range *
+          <label className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <IndianRupee className="w-4 h-4 text-[#00a992]" />
+            <span>Expected Fee Range</span>
+            <span className="text-red-500 font-bold ml-0.5">*</span>
           </label>
 
           <div className="flex justify-between items-center mb-2">
@@ -1688,7 +1716,10 @@ export default function TeacherForm({
               <span>{uploadProgressMsg || 'Processing...'}</span>
             </>
           ) : (
-            hasProfile ? '✅ Save Changes' : (isDashboard ? '✅ Save Profile' : '🚀 Continue to Apply')
+            <div className="flex items-center justify-center gap-2">
+              {hasProfile || isDashboard ? <Check className="w-5 h-5" /> : <ArrowRight className="w-5 h-5" />}
+              <span>{hasProfile ? 'Save Changes' : (isDashboard ? 'Save Profile' : 'Continue to Apply')}</span>
+            </div>
           )}
         </button>
 
