@@ -96,15 +96,24 @@ A teacher is completely hidden unless **100% of strict conditions match**:
 3. **Class Level:** Teacher must support student's grade level.
 4. **Gender Preference:** If parent specified Male/Female, teacher must match.
 5. **Subject Coverage:** Teacher must offer **100%** of subjects requested by the student group.
+6. **Delivery Mode:** Must match (`'Online'` vs `'Offline'`). Online educators will never see offline student inquiries in recommendations, and vice versa.
 
-### Layer 2: Suitability Scoring Matrix (Max 200+ Points)
+### Layer 2: Suitability Scoring Matrix (Max 230+ Points)
 Eligible teachers are ranked dynamically based on weighted parameters:
 *   **+50 points per matching subject**
 *   **+30 points for exact class level match**
 *   **+20 points for board match**
 *   **Up to +30 points for budget match:** Calculated as `30 * (1 - |TeacherFee - StudentBudget| / StudentBudget)`.
+*   **Offline Proximity Match (Up to +30 points, Offline Tuitions Only):** Calculates the geographic distance between tutor and student coordinates using the Haversine formula (geocoded via BigDataCloud Reverse Geocoding API):
+    *   $\le 3\text{ km}$: **+30 points**
+    *   $\le 5\text{ km}$: **+20 points**
+    *   $\le 10\text{ km}$: **+10 points**
+    *   $> 10\text{ km}$: **0 points** (Online tuitions bypass geographic distance scoring).
 *   **+20 points Trust Boost for Verified Aadhar KYC**
 *   **+20 points Visibility Boost for Active Pro Subscription**
+
+### Discovery Cards: Google Maps View for Offline Tuitions
+For offline inquiries/tutors, cards feature a clean **"View on Google Maps"** external navigation link positioned prominently above action buttons. It uses universal browser query navigation (`https://www.google.com/maps/search/?api=1&query=...`) without consuming Google Maps JavaScript API quotas, and is strictly hidden for online tuitions.
 
 ### Server-Side Ranking Engine & 20-Card Lazy Loading
 To ensure instantaneous page loads and eliminate browser lag without exposing proprietary ranking algorithms:
@@ -362,7 +371,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 19 test suites (172 unit, integration & ranking pagination tests)
+# Run all 19 test suites (182 unit, integration & ranking pagination tests)
 cd web
 npx playwright test
 
@@ -374,5 +383,5 @@ cd ../functions
 npm run build
 ```
 
-*All 172 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+*All 182 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
 

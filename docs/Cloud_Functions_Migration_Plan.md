@@ -39,8 +39,8 @@ All heavy mathematical calculations, ranking algorithms, escrow disbursements, h
 | **Scheduled** | `expireDemosAndDecisions` | `functions/src/scheduled/expireDemos.ts` | Hourly (`0 * * * *`, IST) | Auto-completes expired demo sessions (>24h past scheduled time) and auto-declines 48h inactive hiring decisions. |
 | **Callable** | `redeemBankedToken` | `functions/src/callable/redeemToken.ts` | `onCall` (Auth required) | Converts 1 referral banked token into an active weekly proposal credit. Atomic Firestore transaction. |
 | **Callable** | `deleteUserAccount` | `functions/src/callable/deleteAccount.ts` | `onCall` (Auth required) | Safely anonymizes account, deletes personal data, but blocks deletion if active tuition exists. |
-| **Callable** | `getRankedTutors` | `functions/src/callable/getRankedTutors.ts` | `onCall` (Public/Auth) | Evaluates 100% of tutors, applies strict filters & suitability scoring, returns 20-card slices with `hasMore`. |
-| **Callable** | `getRankedStudents` | `functions/src/callable/getRankedStudents.ts` | `onCall` (Tutor Auth) | Evaluates 100% of student posts, applies subject/board/budget scoring, returns 20-card slices with `hasMore`. |
+| **Callable** | `getRankedTutors` | `functions/src/callable/getRankedTutors.ts` | `onCall` (Public/Auth) | Evaluates 100% of tutors, applies strict filters (including Delivery Mode) & suitability scoring (with offline proximity), returns 20-card slices with `hasMore`. |
+| **Callable** | `getRankedStudents` | `functions/src/callable/getRankedStudents.ts` | `onCall` (Tutor Auth) | Evaluates 100% of student posts, applies strict filters (including Delivery Mode) & suitability scoring (with offline proximity), returns 20-card slices with `hasMore`. |
 | **Reactive Trigger** | `onUserCreated` | `functions/src/triggers/onUserCreated.ts` | `auth.user().onCreate` | Validates referral codes upon signup, prevents self-referrals, and creates tracking records in Firestore. |
 | **Reactive Trigger** | `onReviewCreated` | `functions/src/triggers/onReviewCreated.ts` | `firestore.onDocumentCreated` | Recalculates rolling star average on tutor profile atomically when a review is submitted. |
 | **Reactive Trigger** | `onApplicationWritten` | `functions/src/triggers/onApplicationWritten.ts` | `firestore.onDocumentWritten` | Auto-declines competing applications when a tutor is hired; decrements active queues. |
@@ -51,7 +51,7 @@ All heavy mathematical calculations, ranking algorithms, escrow disbursements, h
 ## 3. Server-Side Ranking Engine & 20-Card Lazy Loading
 
 ### Implementation Details (`functions/src/utils/matchingEngine.ts`)
-- **Global Rank #1 Guarantee:** Rather than limiting Firestore queries with arbitrary limits that miss the best match, the engine queries all candidate profiles, runs strict filtering (`isStrictMatch`) and multi-factor suitability scoring (+50/subject, +30 class, +20 board, 0-30 budget, +20 KYC, +20 Pro), and sorts the entire candidate pool by score descending.
+- **Global Rank #1 Guarantee:** Rather than limiting Firestore queries with arbitrary limits that miss the best match, the engine queries all candidate profiles, runs strict filtering (`isStrictMatch` including Category, Board, Class, Gender, 100% Subjects, and Delivery Mode) and multi-factor suitability scoring (+50/subject, +30 class, +20 board, 0-30 budget, +10 to +30 offline proximity via Haversine formula, +20 KYC, +20 Pro), and sorts the entire candidate pool by score descending.
 - **20-Card Paginated Delivery:**
   The callable functions accept `{ page: number, pageSize: 20 }` and return `{ items, total, page, pageSize, hasMore }`.
 - **Client Integration:**

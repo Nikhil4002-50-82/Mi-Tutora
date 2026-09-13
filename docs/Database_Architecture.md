@@ -90,7 +90,7 @@ erDiagram
 | `technologies` | `string[]` | Programming languages/frameworks | Used when category is `programming`. +50 pts per match. | `web/src/utils/matching.ts:L78` |
 | `languagesTaught` | `string[]` | Spoken/written languages taught | Used when category is `languages`. +50 pts per match. | `web/src/utils/matching.ts:L85` |
 | `feeRange` | `string` \| `number` | Monthly tuition rate in INR (e.g. `"8000"`, `8000`) | Proximity to student budget scores up to +30 pts in ranking. | `web/src/utils/matching.ts:L89` |
-| `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Tuition delivery preference. | `web/src/app/dashboard/teacher/page.tsx` |
+| `mode` | `string` | `'Online'` \| `'Offline'` | Tuition delivery preference (Programming & Languages enforced as `'Online'`). | `web/src/components/TeacherForm.tsx` |
 | `area` | `string` | Neighborhood / street (e.g. `'Indiranagar'`) | Locality of tutor. Populated via BigDataCloud reverse geocode. | `web/src/components/TeacherForm.tsx` |
 | `city` | `string` | City name (e.g. `'Bengaluru'`) | City of tutor residence. | `web/src/components/TeacherForm.tsx` |
 | `pincode` | `string` | 6-digit postal code (e.g. `'560038'`) | Locality pincode. | `web/src/components/TeacherForm.tsx` |
@@ -150,7 +150,7 @@ erDiagram
 | `groupId` | `string` | `MTG` + 6 alphanumeric (`MTGXXXXXX`) | Public group identifier. | `web/src/utils/idGenerator.ts` |
 | `parentDocId` | `string` | Parent's Auth UID | Foreign key identifying group creator. | `web/src/utils/groupUtils.ts:L60` |
 | `studentDocIds` | `string[]` | Array of `students.id` | List of student foreign keys belonging to this group. | `web/src/utils/groupUtils.ts:L13` |
-| `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
+| `mode` | `string` | `'Online'` \| `'Offline'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
 | `area` | `string` | Address string (e.g. `'Indiranagar'`) | Physical home address for offline classes. Blank for online. | `web/src/components/DemoForm.tsx` |
 | `city` | `string` | City name or postal locality | Tuition city. | `web/src/components/DemoForm.tsx` |
 | `latitude` | `number` \| `null` | Float (e.g. `12.9716`) or `null` | GPS latitude. Used for Haversine proximity scoring (+10 to +30 pts). `null` for online. | `web/src/utils/matching.ts` |
@@ -177,7 +177,7 @@ erDiagram
 | `groupDocId` | `string` | Foreign key to `groups.groupDocId` | 1:1 relationship with parent group. | `web/src/utils/groupUtils.ts:L59` |
 | `parentId` | `string` | Parent's Auth UID | Creator of the request. | `web/src/utils/groupUtils.ts:L60` |
 | `category` | `string` | `'school'`, `'competitive'`, etc. | Aggregated category from member students. | `web/src/utils/groupUtils.ts:L61` |
-| `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
+| `mode` | `string` | `'Online'` \| `'Offline'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
 | `area` | `string` | Address string | Physical locality for offline classes. | `web/src/components/DemoForm.tsx` |
 | `city` | `string` | City name | City of tuition. | `web/src/components/DemoForm.tsx` |
 | `latitude` | `number` \| `null` | Float or `null` | Aggregated GPS latitude for proximity scoring. | `web/src/components/DemoForm.tsx` |

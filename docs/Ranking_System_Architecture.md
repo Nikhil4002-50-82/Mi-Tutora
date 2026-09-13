@@ -44,14 +44,23 @@ Points are awarded based on how well the Teacher and Student match:
 - **+0 to +30 Points** based on Budget. If the student's budget exactly matches the teacher's fee, they get 30 points. As the price gap widens, the points decrease.
 
 ### Offline Proximity Scoring (Haversine Formula)
-For offline and hybrid home tuition inquiries, physical distance matters significantly to both parents and tutors. When either party requests in-person tuition (`mode: 'offline'` or `'both'`), the platform calculates the great-circle geographic distance using the Haversine formula between the student's group location and the tutor's registered coordinates:
+For offline home tuition inquiries, physical distance matters significantly to both parents and tutors. When offline tuition is requested (`mode: 'offline'`), the platform calculates the great-circle geographic distance using the Haversine formula between the student's group location and the tutor's registered coordinates:
 - **$\le 3$ km:** **+30 Points** (Neighborhood tier — minimal commute)
 - **$3.1$ to $6$ km:** **+20 Points** (Local tier — comfortable commute)
 - **$6.1$ to $10$ km:** **+10 Points** (Extended city radius)
 - **$> 10$ km:** **+0 Points** (Beyond reasonable local radius)
 
 > [!NOTE]
-> **Pure Online Isolation:** If a student requests pure `'online'` tuition, the proximity engine is completely bypassed (`+0` points), ensuring online recommendations remain 100% focused on academic fit regardless of geographic distance. Profiles with missing coordinates or zeroed values (`0.0`) safely default to `+0` points without penalty.
+> **Pure Online Isolation:** If pure `'online'` tuition is requested, the proximity engine is completely bypassed (`+0` points), ensuring online recommendations remain 100% focused on academic fit regardless of geographic distance. Profiles with missing coordinates or zeroed values (`0.0`) safely default to `+0` points without penalty.
+
+### Google Maps Location View (Strictly Offline Tuitions)
+For offline tuitions, parents and educators need to quickly assess physical transit feasibility before requesting a demo or making an offer:
+- **Button Placement (Option B):** Positioned directly above the action buttons (`[ View ]` and `[ Request Demo / Make Offer ]`) on cards in the **New Tuition** tab.
+- **Strictly Offline Gate:** Evaluates `mode?.toLowerCase().trim() === 'offline'`. Excluded entirely from `'Online'` tuitions.
+- **Zero API Cost Universal Query Link:** Opens directly in Google Maps in a new browser tab (`_blank`, `noopener,noreferrer`):
+  - With GPS coordinates: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+  - Text fallback: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${area}, ${city}`)}`
+- **Clean Icon Styling:** Utilizes Lucide React icons (`MapPin` and `ExternalLink`) with zero emojis.
 
 ### Trust & Premium Bonuses
 To reward our most trusted and active teachers without breaking the organic matchmaking system:

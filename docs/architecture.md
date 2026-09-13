@@ -96,6 +96,7 @@ A teacher is completely hidden unless **100% of strict conditions match**:
 3. **Class Level:** Teacher must support student's grade level.
 4. **Gender Preference:** If parent specified Male/Female, teacher must match.
 5. **Subject Coverage:** Teacher must offer **100%** of subjects requested by the student group.
+6. **Delivery Mode:** Must match (`'Online'` vs `'Offline'`). Online educators will never see offline student inquiries in recommendations, and vice versa.
 
 ### Layer 2: Suitability Scoring Matrix (Max 230+ Points)
 Eligible teachers are ranked dynamically based on weighted parameters:
@@ -104,7 +105,7 @@ Eligible teachers are ranked dynamically based on weighted parameters:
 *   **+20 points for board match**
 *   **Up to +30 points for budget match:** Calculated as `30 * (1 - |TeacherFee - StudentBudget| / StudentBudget)`.
 *   **+10 to +30 points Offline Proximity Match (Haversine Formula):**
-    For in-person tuition (`mode: 'offline'` or `'both'`), geographic distance between student group coordinates and teacher coordinates is computed:
+    For in-person tuition (`mode: 'offline'`), geographic distance between student group coordinates and teacher coordinates is computed:
     - $\le 3$ km: **+30 points** (Neighborhood tier)
     - $3.1 - 6$ km: **+20 points** (Local tier)
     - $6.1 - 10$ km: **+10 points** (Extended city radius)
@@ -113,6 +114,12 @@ Eligible teachers are ranked dynamically based on weighted parameters:
     - *Location Detection Engine:* Client-side auto-detect leverages the zero-setup, zero-cost **BigDataCloud Free Reverse Geocoding API** for high-accuracy locality mapping, with OpenStreetMap Nominatim search serving as the fallback when addresses are typed manually.
 *   **+20 points Trust Boost for Verified Aadhar KYC**
 *   **+20 points Visibility Boost for Active Pro Subscription**
+
+### Discovery Cards: Google Maps View for Offline Tuitions
+To allow instant physical feasibility assessment without opening cards:
+*   **Strictly Offline Gate:** Evaluates `mode === 'offline'`. Excluded entirely for online tuitions.
+*   **Option B Placement:** Positioned directly above the action buttons (`[ View ]` and `[ Request Demo / Make Offer ]`) as a full-width pill button.
+*   **Universal Direct Search:** Launches Google Maps in a new tab via exact coordinates (`query=${lat},${lng}`) or geocoded locality text (`query=${encodeURIComponent(`${area}, ${city}`)}`) at zero API cost. Styled cleanly with Lucide icons (`MapPin`, `ExternalLink`) and zero emojis.
 
 ### Server-Side Ranking Engine & 20-Card Lazy Loading
 To ensure instantaneous page loads and eliminate browser lag without exposing proprietary ranking algorithms:
