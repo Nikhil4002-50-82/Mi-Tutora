@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { calculateSuitabilityScore, isStrictMatch } from '../src/utils/matching';
+import { calculateSuitabilityScore, isStrictMatch, calculateDistanceKm } from '../src/utils/matching';
 
 test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)', () => {
 
@@ -38,6 +38,51 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'] };
       const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science', 'English'] };
       expect(isStrictMatch(student, teacher)).toBe(true);
+    });
+
+    test('Returns false if Teacher is Online and Student is Offline', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Offline' };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Online' };
+      expect(isStrictMatch(student, teacher)).toBe(false);
+    });
+
+    test('Returns false if Teacher is Offline and Student is Online', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Online' };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Offline' };
+      expect(isStrictMatch(student, teacher)).toBe(false);
+    });
+
+    test('Returns true if both Teacher and Student are Online', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Online' };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Online' };
+      expect(isStrictMatch(student, teacher)).toBe(true);
+    });
+
+    test('Returns true if both Teacher and Student are Offline', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Offline (Home Tuition)' };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Offline' };
+      expect(isStrictMatch(student, teacher)).toBe(true);
+    });
+
+    test('Returns false if Teacher is Offline for programming student (forced online category)', () => {
+      const student = { category: 'programming', technologies: ['Python'] };
+      const teacher = { category: 'programming', technologies: ['Python'], mode: 'Offline' };
+      expect(isStrictMatch(student, teacher)).toBe(false);
+    });
+  });
+
+  test.describe('Haversine Distance (calculateDistanceKm)', () => {
+    test('Returns Infinity if any coordinate is 0 or invalid', () => {
+      expect(calculateDistanceKm(0, 0, 12.9716, 77.5946)).toBe(Infinity);
+      expect(calculateDistanceKm(12.9716, 77.5946, 0, 0)).toBe(Infinity);
+      expect(calculateDistanceKm(NaN, 77.5946, 12.9716, 77.5946)).toBe(Infinity);
+    });
+
+    test('Accurately computes distance between coordinates', () => {
+      // Bangalore Center (12.9716, 77.5946) to Indiranagar (12.9784, 77.6408) is approx ~5.1 km
+      const distance = calculateDistanceKm(12.9716, 77.5946, 12.9784, 77.6408);
+      expect(distance).toBeGreaterThan(4.5);
+      expect(distance).toBeLessThan(5.5);
     });
   });
 
@@ -109,6 +154,74 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       
       expect(calculateSuitabilityScore(student, teacherPro)).toBe(20);
       expect(calculateSuitabilityScore(student, teacherSubscribed)).toBe(20);
+    });
+
+    test('Awards offline proximity points correctly', () => {
+      // Base student in Koramangala
+      const baseStudent = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 12.9352,
+        longitude: 77.6245
+      };
+
+      // Teacher 1: ~1.5km away (<= 3km -> +30 points)
+      const closeTeacher = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 12.9380,
+        longitude: 77.6320
+      };
+      expect(calculateSuitabilityScore(baseStudent, closeTeacher)).toBe(30);
+
+      // Teacher 2: ~5.1km away (> 3km && <= 6km -> +20 points)
+      const midTeacher = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 12.9716,
+        longitude: 77.5946
+      };
+      expect(calculateSuitabilityScore(baseStudent, midTeacher)).toBe(20);
+
+      // Teacher 3: ~8.5km away (> 6km && <= 10km -> +10 points)
+      const farTeacher = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 13.0068,
+        longitude: 77.6006
+      };
+      expect(calculateSuitabilityScore(baseStudent, farTeacher)).toBe(10);
+
+      // Teacher 4: ~25km away (> 10km -> +0 points)
+      const veryFarTeacher = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 13.1986,
+        longitude: 77.7066
+      };
+      expect(calculateSuitabilityScore(baseStudent, veryFarTeacher)).toBe(0);
+    });
+
+    test('Does not award proximity points for online mode', () => {
+      const studentOnline = {
+        category: 'school',
+        mode: 'online',
+        latitude: 12.9352,
+        longitude: 77.6245
+      };
+      const closeTeacher = {
+        category: 'school',
+        mode: 'offline',
+        latitude: 12.9380,
+        longitude: 77.6320
+      };
+      expect(calculateSuitabilityScore(studentOnline, closeTeacher)).toBe(0);
+    });
+
+    test('Does not crash or award points when coordinates are missing or 0', () => {
+      const student = { category: 'school', mode: 'offline', latitude: 0, longitude: 0 };
+      const teacher = { category: 'school', mode: 'offline' };
+      expect(calculateSuitabilityScore(student, teacher)).toBe(0);
     });
 
     test('Calculates scores for Programming category', () => {

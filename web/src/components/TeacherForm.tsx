@@ -92,9 +92,11 @@ export default function TeacherForm({
     phone: initialData?.phone || '',
     whatsapp: initialData?.whatsapp || '',
     email: initialData?.email || (typeof window !== 'undefined' ? localStorage.getItem('signup_email') || '' : ''),
-    street: initialData?.address ? initialData.address.split(',')[0]?.trim() : '',
-    city: initialData?.address ? initialData.address.split(',')[1]?.trim() : '',
-    pincode: initialData?.address ? initialData.address.split(',')[2]?.trim() : '',
+    street: initialData?.area || '',
+    city: initialData?.city || '',
+    pincode: initialData?.pincode || '',
+    latitude: initialData?.latitude || 0.0,
+    longitude: initialData?.longitude || 0.0,
     qualification: initialData?.qualification || '',
     experience: initialData?.experience || '',
     occupation: initialData?.occupation || '',
@@ -121,9 +123,11 @@ export default function TeacherForm({
         phone: initialData.phone || '',
         whatsapp: initialData.whatsapp || '',
         email: initialData.email || (typeof window !== 'undefined' ? localStorage.getItem('signup_email') || '' : ''),
-        street: initialData.address ? initialData.address.split(',')[0]?.trim() : '',
-        city: initialData.address ? initialData.address.split(',')[1]?.trim() : '',
-        pincode: initialData.address ? initialData.address.split(',')[2]?.trim() : '',
+        street: initialData.area || '',
+        city: initialData.city || '',
+        pincode: initialData.pincode || '',
+        latitude: initialData.latitude || 0.0,
+        longitude: initialData.longitude || 0.0,
         qualification: initialData.qualification || '',
         experience: initialData.experience || '',
         occupation: initialData.occupation || '',
@@ -249,6 +253,10 @@ export default function TeacherForm({
       if (name === 'phone' && sameAsPhone) {
         next.whatsapp = val;
       }
+      if (name === 'street' || name === 'city' || name === 'pincode') {
+        next.latitude = 0.0;
+        next.longitude = 0.0;
+      }
       return next;
     });
   };
@@ -278,7 +286,7 @@ export default function TeacherForm({
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         const { latitude, longitude } = position.coords;
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`, {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -287,15 +295,17 @@ export default function TeacherForm({
         
         const data = await res.json();
         
-        const street = data.address?.road || data.address?.suburb || data.address?.neighbourhood || '';
-        const city = data.address?.city || data.address?.town || data.address?.state_district || '';
-        const pincode = data.address?.postcode || '';
+        const street = data.locality || '';
+        const city = data.city || '';
+        const pincode = data.postcode || '';
         
         setFormData((prev: any) => ({
           ...prev,
           street: street || prev.street,
           city: city || prev.city,
-          pincode: pincode || prev.pincode
+          pincode: pincode || prev.pincode,
+          latitude,
+          longitude
         }));
         toast.success('Location detected and address updated successfully!');
       } catch (err: any) {
@@ -453,6 +463,35 @@ export default function TeacherForm({
       // Update the existing tutor record
       const isOnlineOnlyCategory = formData.category === 'programming' || formData.category === 'languages';
       const actualMode = isOnlineOnlyCategory ? 'Online' : formData.mode;
+      const combinedAddress = (actualMode?.toLowerCase() === 'online') ? '' : [formData.street, formData.city, formData.pincode].filter(Boolean).join(', ');
+
+      let finalLat = typeof formData.latitude === 'number' ? formData.latitude : 0.0;
+      let finalLng = typeof formData.longitude === 'number' ? formData.longitude : 0.0;
+
+      // If offline/both and coordinates were not captured via auto-detect, forward-geocode the typed address
+      if (actualMode?.toLowerCase() !== 'online' && (finalLat === 0.0 || finalLng === 0.0) && combinedAddress) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(combinedAddress)}&limit=1`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              finalLat = parseFloat(data[0].lat) || 0.0;
+              finalLng = parseFloat(data[0].lon) || 0.0;
+            }
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+            console.error('Forward geocoding request timed out');
+          } else {
+            console.error('Forward geocoding failed during teacher save:', err);
+          }
+        }
+      }
       
       await setDoc(doc(db, 'tutors', tutorDocId), {
         tutorId: existingTutorId,
@@ -464,7 +503,6 @@ export default function TeacherForm({
         phone: formData.phone,
         whatsapp: formData.whatsapp,
         mode: actualMode,
-        address: (actualMode?.toLowerCase() === 'online') ? '' : [formData.street, formData.city, formData.pincode].filter(Boolean).join(', '),
         qualification: formData.qualification,
         experience: formData.experience,
         occupation: formData.occupation,
@@ -484,8 +522,9 @@ export default function TeacherForm({
         rating: 0.0,
         area: (actualMode?.toLowerCase() === 'online') ? '' : (formData.street || ''),
         city: (actualMode?.toLowerCase() === 'online') ? '' : (formData.city || ''),
-        latitude: 0.0,
-        longitude: 0.0,
+        pincode: (actualMode?.toLowerCase() === 'online') ? '' : (formData.pincode || ''),
+        latitude: (actualMode?.toLowerCase() === 'online') ? 0.0 : finalLat,
+        longitude: (actualMode?.toLowerCase() === 'online') ? 0.0 : finalLng,
         hasProfile: true,
         resume: finalResume,
         resumeUrl: finalResume?.url || '',

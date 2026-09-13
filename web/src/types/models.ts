@@ -97,12 +97,12 @@ export interface Student {
 export interface Tutor {
   id: string;
   accountStatus?: string;
-  address?: string;
   area?: string;
   authUid: string;
   boards?: string[];
   category?: string;
   city?: string;
+  pincode?: string;
   classes?: string[];
   dailyUsage?: { count?: number; date?: string };
   email?: string;

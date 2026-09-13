@@ -91,6 +91,11 @@ erDiagram
 | `languagesTaught` | `string[]` | Spoken/written languages taught | Used when category is `languages`. +50 pts per match. | `web/src/utils/matching.ts:L85` |
 | `feeRange` | `string` \| `number` | Monthly tuition rate in INR (e.g. `"8000"`, `8000`) | Proximity to student budget scores up to +30 pts in ranking. | `web/src/utils/matching.ts:L89` |
 | `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Tuition delivery preference. | `web/src/app/dashboard/teacher/page.tsx` |
+| `area` | `string` | Neighborhood / street (e.g. `'Indiranagar'`) | Locality of tutor. Populated via BigDataCloud reverse geocode. | `web/src/components/TeacherForm.tsx` |
+| `city` | `string` | City name (e.g. `'Bengaluru'`) | City of tutor residence. | `web/src/components/TeacherForm.tsx` |
+| `pincode` | `string` | 6-digit postal code (e.g. `'560038'`) | Locality pincode. | `web/src/components/TeacherForm.tsx` |
+| `latitude` | `number` | Float (e.g. `12.9716`) or `0.0` | GPS latitude. Used for Haversine proximity scoring (+10 to +30 pts). `0.0` for online-only. | `web/src/utils/matching.ts` |
+| `longitude` | `number` | Float (e.g. `77.5946`) or `0.0` | GPS longitude. Used for Haversine proximity scoring (+10 to +30 pts). `0.0` for online-only. | `web/src/utils/matching.ts` |
 | `weeklyQuota` | `map` | `{ weekStartDate: string, tokensUsed: number, lastUpdated: Timestamp }` | Quota engine: 5 tokens/week (Free) or 15 tokens/week (Pro). Resets on Monday. | `web/src/app/api/transactions/request/route.ts` |
 | `isSubscribed` | `boolean` | `true` \| `false` | Legacy boolean for Pro membership. | `web/src/utils/matching.ts:L101` |
 | `subscriptionPlan` | `string` | `'free'` \| `'pro'` | Active subscription tier. Pro awards +20 ranking boost. | `web/src/utils/matching.ts:L101` |
@@ -146,6 +151,10 @@ erDiagram
 | `parentDocId` | `string` | Parent's Auth UID | Foreign key identifying group creator. | `web/src/utils/groupUtils.ts:L60` |
 | `studentDocIds` | `string[]` | Array of `students.id` | List of student foreign keys belonging to this group. | `web/src/utils/groupUtils.ts:L13` |
 | `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
+| `area` | `string` | Address string (e.g. `'Indiranagar'`) | Physical home address for offline classes. Blank for online. | `web/src/components/DemoForm.tsx` |
+| `city` | `string` | City name or postal locality | Tuition city. | `web/src/components/DemoForm.tsx` |
+| `latitude` | `number` \| `null` | Float (e.g. `12.9716`) or `null` | GPS latitude. Used for Haversine proximity scoring (+10 to +30 pts). `null` for online. | `web/src/utils/matching.ts` |
+| `longitude` | `number` \| `null` | Float (e.g. `77.5946`) or `null` | GPS longitude. Used for Haversine proximity scoring (+10 to +30 pts). `null` for online. | `web/src/utils/matching.ts` |
 | `daysPerWeek` | `string` | e.g. `'5 Days/Week'`, `'3 Days/Week'` | Frequency of tuition classes. | `web/src/utils/groupUtils.ts:L69` |
 | `specificDays` | `string[]` | e.g. `['Monday', 'Tuesday', ...]` | Specified schedule days. | `web/src/utils/groupUtils.ts:L70` |
 | `preferredTimeRange`| `string` | e.g. `'Evening (4 PM - 8 PM)'` | Preferred time window for sessions. | `web/src/utils/groupUtils.ts:L68` |
@@ -168,6 +177,11 @@ erDiagram
 | `groupDocId` | `string` | Foreign key to `groups.groupDocId` | 1:1 relationship with parent group. | `web/src/utils/groupUtils.ts:L59` |
 | `parentId` | `string` | Parent's Auth UID | Creator of the request. | `web/src/utils/groupUtils.ts:L60` |
 | `category` | `string` | `'school'`, `'competitive'`, etc. | Aggregated category from member students. | `web/src/utils/groupUtils.ts:L61` |
+| `mode` | `string` | `'Online'` \| `'Offline'` \| `'Both'` | Delivery mode requested for group. | `web/src/utils/groupUtils.ts:L62` |
+| `area` | `string` | Address string | Physical locality for offline classes. | `web/src/components/DemoForm.tsx` |
+| `city` | `string` | City name | City of tuition. | `web/src/components/DemoForm.tsx` |
+| `latitude` | `number` \| `null` | Float or `null` | Aggregated GPS latitude for proximity scoring. | `web/src/components/DemoForm.tsx` |
+| `longitude` | `number` \| `null` | Float or `null` | Aggregated GPS longitude for proximity scoring. | `web/src/components/DemoForm.tsx` |
 | `combinedSubjects` | `string[]` | Deduplicated subject set | Union of all subjects across group members. | `web/src/utils/groupUtils.ts:L72` |
 | `combinedTechnologies` | `string[]` | Deduplicated technology set | Union of all technologies across group members. | `web/src/utils/groupUtils.ts:L73` |
 | `combinedLanguages` | `string[]` | Deduplicated language set | Union of all languages across group members. | `web/src/utils/groupUtils.ts:L74` |

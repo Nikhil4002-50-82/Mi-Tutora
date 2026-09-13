@@ -24,7 +24,7 @@ The architecture is driven by three distinct collections in Firestore, tied toge
 
 *   **`parents` Collection:** Represents the overarching account. Contains the wallet balance and daily usage limits.
 *   **`students` Collection:** Represents the individual learners. Each document contains personal details (name, age) and a crucial `groupDocId` field.
-*   **`groups` Collection:** Represents the shared requirements. Contains arrays of requested subjects, combined budgets, and teacher preferences.
+*   **`groups` Collection:** Represents the shared requirements. Contains arrays of requested subjects, combined budgets, teacher preferences, and physical location details (`mode`, `area`, `city`, `latitude`, `longitude`) used for proximity matching.
 
 ### The Glue (`groupDocId`)
 The `groupDocId` field on the `students` document is the physical link. If two siblings (Alice and Bob) both have `groupDocId: "group_math_101"`, the system knows they are taking that class together.
@@ -85,6 +85,9 @@ erDiagram
         string parentDocId FK
         string[] subjects
         string teacherGenderPreference
+        string mode
+        float latitude
+        float longitude
     }
     
     STUDENTS {

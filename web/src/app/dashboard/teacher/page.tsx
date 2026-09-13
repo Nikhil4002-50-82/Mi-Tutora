@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck } from 'lucide-react';
+import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -1721,6 +1721,20 @@ export default function TeacherDashboard() {
                                 ? 'Online' 
                                 : `Offline • ${firstStudent.area || firstStudent.address || 'Location Hidden'}`;
                           const numStudents = group.students?.length || 1;
+                          const isStrictlyOffline = (group.mode || firstStudent.preferredMode || '').toLowerCase().trim() === 'offline';
+                          const mapsUrl = (() => {
+                            if (!isStrictlyOffline) return null;
+                            const lat = group.latitude || group.requestDoc?.latitude || firstStudent.latitude;
+                            const lng = group.longitude || group.requestDoc?.longitude || firstStudent.longitude;
+                            if (lat && lng && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                              return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                            }
+                            const addressText = [group.area || firstStudent.area, group.city || firstStudent.city].filter(Boolean).join(', ');
+                            if (addressText) {
+                              return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
+                            }
+                            return null;
+                          })();
 
                           const lockedApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === group.id && (app.status === 'locked' || (app.status === 'declined' && app.declinedAt && (Date.now() - app.declinedAt < 7 * 24 * 60 * 60 * 1000))));
                           const offerApp = data?.applications?.find((app: any) => (app.groupDocId || app.studentDocId) === group.id && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
@@ -1832,53 +1846,69 @@ export default function TeacherDashboard() {
                                           Active Student
                                         </button>
                                       ) : (
-                                        <div className="flex gap-2 mb-4">
-                                          <button 
-                                            onClick={() => setSelectedViewUser(buildStudentViewUser(group, group))}
-                                            className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
-                                          >
-                                            View
-                                          </button>
-                                          {negotiationOffer[group.id] ? (
-                                            <button 
-                                              onClick={() => {
-                                                if (tokensUsed >= quotaLimit) {
-                                                  toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
-                                                  setActiveTab('subscriptions');
-                                                  return;
-                                                }
-                                                if (!!offerApp) {
-                                                  toast.error("You already have an active request or offer sent to this group.");
-                                                  return;
-                                                }
-                                                handleSendOffer(group);
-                                              }}
-                                              disabled={(offerLoading && !offerApp) || isLocked}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
-                                            >
-                                              {isLocked ? 'Locked' : (offerLoading && !offerApp ? 'Sending...' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
-                                            </button>
-                                          ) : (
+                                        <>
+                                          {isStrictlyOffline && mapsUrl && (
                                             <button
-                                              onClick={() => {
-                                                if (tokensUsed >= quotaLimit) {
-                                                  toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
-                                                  setActiveTab('subscriptions');
-                                                  return;
-                                                }
-                                                if (!!offerApp) {
-                                                  toast.error("You already have an active request or offer sent to this group.");
-                                                  return;
-                                                }
-                                                handleDirectRequestDemo(group);
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                window.open(mapsUrl, '_blank', 'noopener,noreferrer');
                                               }}
-                                              disabled={!!offerApp || isLocked}
-                                              className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              className="w-full mb-3 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-sm"
                                             >
-                                              {isLocked ? 'Locked' : 'Request Demo'} <ArrowRight className="w-4 h-4" />
+                                              <MapPin className="w-3.5 h-3.5 text-[#00a992]" />
+                                              <span>View on Google Maps</span>
+                                              <ExternalLink className="w-3 h-3 text-emerald-600 opacity-80" />
                                             </button>
                                           )}
-                                        </div>
+                                          <div className="flex gap-2 mb-4">
+                                            <button 
+                                              onClick={() => setSelectedViewUser(buildStudentViewUser(group, group))}
+                                              className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
+                                            >
+                                              View
+                                            </button>
+                                            {negotiationOffer[group.id] ? (
+                                              <button 
+                                                onClick={() => {
+                                                  if (tokensUsed >= quotaLimit) {
+                                                    toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                                                    setActiveTab('subscriptions');
+                                                    return;
+                                                  }
+                                                  if (!!offerApp) {
+                                                    toast.error("You already have an active request or offer sent to this group.");
+                                                    return;
+                                                  }
+                                                  handleSendOffer(group);
+                                                }}
+                                                disabled={(offerLoading && !offerApp) || isLocked}
+                                                className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              >
+                                                {isLocked ? 'Locked' : (offerLoading && !offerApp ? 'Sending...' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => {
+                                                  if (tokensUsed >= quotaLimit) {
+                                                    toast.error("You have reached your weekly token quota. Upgrade to Pro for more tokens!");
+                                                    setActiveTab('subscriptions');
+                                                    return;
+                                                  }
+                                                  if (!!offerApp) {
+                                                    toast.error("You already have an active request or offer sent to this group.");
+                                                    return;
+                                                  }
+                                                  handleDirectRequestDemo(group);
+                                                }}
+                                                disabled={!!offerApp || isLocked}
+                                                className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                              >
+                                                {isLocked ? 'Locked' : 'Request Demo'} <ArrowRight className="w-4 h-4" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </>
                                       )}
                                       <button className="w-full text-center text-sm font-bold text-emerald-700 flex items-center justify-center gap-2 hover:text-emerald-800 transition-colors">
                                         <Bookmark className="w-4 h-4" /> Save for later

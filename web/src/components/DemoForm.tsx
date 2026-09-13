@@ -296,7 +296,7 @@ export default function DemoForm({
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         const { latitude, longitude } = position.coords;
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`, {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -305,9 +305,9 @@ export default function DemoForm({
         
         const data = await res.json();
         
-        const street = data.address?.road || data.address?.suburb || data.address?.neighbourhood || '';
-        const city = data.address?.city || data.address?.town || data.address?.state_district || '';
-        const pincode = data.address?.postcode || '';
+        const street = data.locality || '';
+        const city = data.city || '';
+        const pincode = data.postcode || '';
         
         setFormData((prev: any) => ({
           ...prev,

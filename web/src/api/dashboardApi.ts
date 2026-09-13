@@ -514,6 +514,8 @@ export const deriveTeacherDashboardState = (baseData: any) => {
         mode: groupDoc?.mode || student.preferredMode || '',
         area: groupDoc?.area || student.area || '',
         city: groupDoc?.city || student.city || '',
+        latitude: groupDoc?.latitude || student.latitude || null,
+        longitude: groupDoc?.longitude || student.longitude || null,
         teacherGenderPreference: groupDoc?.teacherGenderPreference || 'No Preference'
       };
     }

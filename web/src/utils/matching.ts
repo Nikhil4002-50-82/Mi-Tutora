@@ -47,6 +47,29 @@ export function matchesSubjectToken(need: string, offer: string): boolean {
   return false;
 }
 
+export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (
+    typeof lat1 !== 'number' || typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' || typeof lon2 !== 'number' ||
+    isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2) ||
+    lat1 === 0 || lon1 === 0 || lat2 === 0 || lon2 === 0
+  ) {
+    return Infinity;
+  }
+  const R = 6371; // Earth's radius in kilometers
+  const toRad = (val: number) => (val * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export function calculateSuitabilityScore(studentGroup: any, teacher: any): number {
   if (!studentGroup || !teacher) return 0;
   
@@ -109,6 +132,29 @@ export function calculateSuitabilityScore(studentGroup: any, teacher: any): numb
     score += budgetPoints;
   }
 
+  // Offline Proximity Scoring (Haversine Formula: +0 to +30 points)
+  const groupMode = (getAcademicDetail(studentGroup, 'mode') || studentGroup?.mode || '').toLowerCase().trim();
+  const teacherMode = (teacher?.mode || '').toLowerCase().trim();
+  const isOfflineRelevant = groupMode !== 'online' && (groupMode === 'offline' || groupMode === 'both' || teacherMode === 'offline' || teacherMode === 'both');
+
+  if (isOfflineRelevant) {
+    const sLat = parseFloat(getAcademicDetail(studentGroup, 'latitude') ?? studentGroup?.latitude ?? 0);
+    const sLon = parseFloat(getAcademicDetail(studentGroup, 'longitude') ?? studentGroup?.longitude ?? 0);
+    const tLat = parseFloat(teacher?.latitude ?? 0);
+    const tLon = parseFloat(teacher?.longitude ?? 0);
+
+    if (sLat !== 0 && sLon !== 0 && tLat !== 0 && tLon !== 0 && !isNaN(sLat) && !isNaN(sLon) && !isNaN(tLat) && !isNaN(tLon)) {
+      const distanceKm = calculateDistanceKm(sLat, sLon, tLat, tLon);
+      if (distanceKm <= 3) {
+        score += 30;
+      } else if (distanceKm <= 6) {
+        score += 20;
+      } else if (distanceKm <= 10) {
+        score += 10;
+      }
+    }
+  }
+
   // Aadhar Verification Boost (Trust & Safety)
   if (teacher.aadharVerified === true) {
     score += 20;
@@ -167,6 +213,23 @@ export function isStrictMatch(studentGroup: any, teacher: any): boolean {
       return teacherOffers.some((offer: string) => matchesSubjectToken(need, offer));
     });
     if (!allSubjectsMatched) return false;
+  }
+
+  // Rule 6: Delivery Mode Match (Online vs Offline)
+  const isStudentOnlineCat = studentCat === 'programming' || studentCat === 'languages';
+  const studentModeRaw = (getAcademicDetail(studentGroup, 'mode') || getAcademicDetail(studentGroup, 'preferredMode') || studentGroup?.mode || '').toLowerCase().trim();
+  const studentMode = studentModeRaw
+    ? (studentModeRaw.includes('both') ? 'both' : (studentModeRaw.includes('online') ? 'online' : (studentModeRaw.includes('offline') ? 'offline' : '')))
+    : (isStudentOnlineCat ? 'online' : '');
+
+  const isTeacherOnlineCat = teacherCats.includes('programming') || teacherCats.includes('languages');
+  const teacherModeRaw = (teacher?.mode || '').toLowerCase().trim();
+  const teacherMode = teacherModeRaw
+    ? (teacherModeRaw.includes('both') ? 'both' : (teacherModeRaw.includes('online') ? 'online' : (teacherModeRaw.includes('offline') ? 'offline' : '')))
+    : (isTeacherOnlineCat ? 'online' : '');
+
+  if (studentMode && teacherMode && studentMode !== 'both' && teacherMode !== 'both' && studentMode !== teacherMode) {
+    return false;
   }
 
   return true;

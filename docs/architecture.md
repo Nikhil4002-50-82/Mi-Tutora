@@ -97,12 +97,20 @@ A teacher is completely hidden unless **100% of strict conditions match**:
 4. **Gender Preference:** If parent specified Male/Female, teacher must match.
 5. **Subject Coverage:** Teacher must offer **100%** of subjects requested by the student group.
 
-### Layer 2: Suitability Scoring Matrix (Max 200+ Points)
+### Layer 2: Suitability Scoring Matrix (Max 230+ Points)
 Eligible teachers are ranked dynamically based on weighted parameters:
 *   **+50 points per matching subject**
 *   **+30 points for exact class level match**
 *   **+20 points for board match**
 *   **Up to +30 points for budget match:** Calculated as `30 * (1 - |TeacherFee - StudentBudget| / StudentBudget)`.
+*   **+10 to +30 points Offline Proximity Match (Haversine Formula):**
+    For in-person tuition (`mode: 'offline'` or `'both'`), geographic distance between student group coordinates and teacher coordinates is computed:
+    - $\le 3$ km: **+30 points** (Neighborhood tier)
+    - $3.1 - 6$ km: **+20 points** (Local tier)
+    - $6.1 - 10$ km: **+10 points** (Extended city radius)
+    - $> 10$ km: **+0 points**
+    - *Pure Online Isolation:* If a student requests `'Online'` tuition, proximity calculation is completely bypassed (`+0` points), keeping online recommendations 100% academic-focused.
+    - *Location Detection Engine:* Client-side auto-detect leverages the zero-setup, zero-cost **BigDataCloud Free Reverse Geocoding API** for high-accuracy locality mapping, with OpenStreetMap Nominatim search serving as the fallback when addresses are typed manually.
 *   **+20 points Trust Boost for Verified Aadhar KYC**
 *   **+20 points Visibility Boost for Active Pro Subscription**
 
