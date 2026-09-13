@@ -18,8 +18,12 @@ When a new user successfully authenticates, their data is split across specializ
 1. User enters Email and Password on `signup/page.tsx`.
 2. `createUserWithEmailAndPassword` is called.
 3. The system executes database writes. **(Safety Mechanism: If the database write fails, the system automatically deletes the newly created Firebase Auth user to prevent "ghost accounts").**
-4. The system sends an **Email Verification** link and forces the user to sign out.
-5. The user cannot access the dashboard until they click the verification link.
+4. The system dispatches an **Email Verification** link via `sendEmailVerification(user)`.
+5. **Interactive Verification & Spam Notice Modal:** Instead of an abrupt auto-redirect, an interactive modal popup appears:
+   - Displays the registered recipient email address.
+   - Highlights a prominent **Spam / Junk Alert** notifying the user that automated verification emails often land in Spam, Junk, or Promotions, and instructs them to mark the email as "Report Not Spam" to ensure future lesson links arrive safely.
+   - Features a **"Proceed to Login"** button that redirects the user to `/login?role=${role}` after clean session sign-out.
+6. The user cannot access the dashboard until they click the verification link. Attempting to log in with an unverified account triggers a toast reminder advising them to check their Spam/Junk folder if not found in their primary inbox.
 
 ## 5. Google OAuth Flow (The "Post-Auth Intercept")
 The Google flow is highly optimized and unified across both the `login` and `signup` pages to prevent user error.

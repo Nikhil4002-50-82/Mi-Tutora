@@ -197,7 +197,9 @@ function LoginContent() {
       if (user) {
         if (!user.emailVerified) {
           await auth.signOut();
-          toast.error("Please verify your email before logging in. Check your inbox.");
+          toast.error("Please verify your email before logging in. If you can't find it, check your Spam or Junk folder!", {
+            duration: 6000,
+          });
           return;
         }
 

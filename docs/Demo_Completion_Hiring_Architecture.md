@@ -14,8 +14,13 @@ To maintain strict state integrity and avoid assumptions based purely on the clo
 
 Once the negotiation phase successfully ends with the `demo_scheduled` state, the following workflow activates:
 
-### A. Teacher Confirmation
-The application remains in `demo_scheduled` indefinitely until the teacher explicitly logs into their dashboard and clicks the **"Mark Demo as Finished"** button. This design prevents premature transitions in case the demo is delayed or the student refreshes their page during the meeting.
+### A. Teacher Confirmation & Start-Time Lock
+The application remains in `demo_scheduled` until the teacher explicitly logs into their dashboard and clicks the **"Mark Demo as Finished"** button. 
+
+To prevent tutors from prematurely or accidentally marking a demo as completed before it actually occurs, this button is protected by a **Start-Time Lock**:
+- **Before Demo Start Time (`trustedNow < demoStartTime`):** The button is **disabled and grayed out** with a lock indicator: `<Lock /> Available once demo starts`.
+- **At/After Demo Start Time (`trustedNow >= demoStartTime`):** A real-time 10-second ticker automatically transitions the button into its active clickable state (`Mark Demo as Finished`) without requiring a page refresh.
+- **Server-Trusted Time:** The lock is evaluated against `trustedNow` (backed by Firestore server timestamps), protecting against client clock tampering.
 
 ### B. State Transition
 Clicking this button fires the `demo_finished` transaction action:

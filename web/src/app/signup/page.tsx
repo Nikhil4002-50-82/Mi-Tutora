@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, UserPlus, Sparkles, BookOpen, Users, Award, Briefcase, GraduationCap, ArrowLeft, Eye, EyeOff, AlertTriangle, ArrowRight, CheckCircle2, Lightbulb } from 'lucide-react';
 import { getFriendlyAuthError } from '@/utils/authErrors';
 import { generateCustomId } from '@/utils/idGenerator';
 import { generateReferralCode } from '@/utils/referral';
@@ -33,11 +33,20 @@ function SignupContent() {
   const isAnyLoading = isEmailLoading || isGoogleLoading;
   const [showGoogleRefModal, setShowGoogleRefModal] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
-  
+
+  // Email Verification Modal & Spam Warning State
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+
   const router = useRouter();
   const urlRole = searchParams.get('role');
   const role = ['student', 'teacher', 'parent'].includes(urlRole as string) ? (urlRole as string) : 'student';
   const isTeacher = role === 'teacher';
+
+  const handleProceedToLogin = () => {
+    setShowVerifyModal(false);
+    router.push(`/login?role=${role}`);
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,10 +107,8 @@ function SignupContent() {
         
         await auth.signOut();
         localStorage.removeItem('mitutora_ref');
-        setSuccessMsg('Account created successfully! Please check your email to verify your account before logging in.');
-        setTimeout(() => {
-          router.push(`/login?role=${role}`);
-        }, 3000);
+        setRegisteredEmail(email);
+        setShowVerifyModal(true);
       }
     } catch (err: any) {
       if (createdUser) {
@@ -609,6 +616,110 @@ function SignupContent() {
                     className="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-70 disabled:cursor-not-allowed text-gray-700 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center"
                   >
                     Skip, I don't have one
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Email Verification Spam Notice Modal */}
+      <AnimatePresence>
+        {showVerifyModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm"
+              onClick={handleProceedToLogin}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: "spring", duration: 0.4, bounce: 0.1 }}
+              className="relative bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 z-10 my-auto"
+            >
+              {/* Header Gradient Accent Strip */}
+              <div className="h-2 w-full bg-gradient-to-r from-[#00a992] via-emerald-400 to-teal-500" />
+
+              <div className="p-6 sm:p-8">
+                {/* Icon Badge with gentle pulse indicator */}
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4 relative shadow-sm">
+                  <Mail className="w-8 h-8 text-[#00a992]" />
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00a992] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-[#00a992]"></span>
+                  </span>
+                </div>
+
+                <h3 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                  Verify Your Email Address
+                </h3>
+                <p className="text-sm text-gray-600 text-center mb-5 leading-relaxed">
+                  We&apos;ve sent a verification link to{" "}
+                  <span className="font-semibold text-gray-900 underline decoration-[#00a992]/40 break-all">
+                    {registeredEmail || email}
+                  </span>
+                  . Please verify your email before logging in.
+                </p>
+
+                {/* Prominent Spam / Junk Alert Card */}
+                <div className="bg-amber-50/90 border-2 border-amber-300/80 rounded-2xl p-4 sm:p-5 mb-5 text-left shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5 text-amber-700">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-amber-950 mb-1">
+                        Can&apos;t find the email in your Inbox?
+                      </h4>
+                      <p className="text-xs text-amber-900/90 leading-relaxed font-medium">
+                        Automated verification emails frequently land in your{" "}
+                        <span className="font-bold underline text-amber-950">Spam</span>,{" "}
+                        <span className="font-bold underline text-amber-950">Junk</span>, or{" "}
+                        <span className="font-bold underline text-amber-950">Promotions</span> folder.
+                      </p>
+                      <div className="mt-2.5 pt-2.5 border-t border-amber-200/80 flex items-start gap-2 text-xs text-amber-800 font-medium">
+                        <Lightbulb className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Pro Tip:</strong> Open the email and click <strong>&ldquo;Report Not Spam&rdquo;</strong> or move it to your Primary Inbox so you never miss class reminders or session links!
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Steps Guide */}
+                <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 text-xs text-gray-600 space-y-2 text-left">
+                  <div className="font-semibold text-gray-800 text-[11px] tracking-wider uppercase">
+                    Next Steps
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#00a992] flex-shrink-0" />
+                    <span>Check your email (including Spam/Junk folder)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#00a992] flex-shrink-0" />
+                    <span>Click the verification link in the email</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#00a992] flex-shrink-0" />
+                    <span>Return here and log in to your account</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleProceedToLogin}
+                    className="w-full bg-[#00a992] hover:bg-emerald-600 active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Proceed to Login</span>
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>

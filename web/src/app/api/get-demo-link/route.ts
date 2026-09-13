@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     // Fetch the link from the vault
     const meetingSnap = await appRef.collection('privateData').doc('meeting').get();
     if (!meetingSnap.exists) {
-      return NextResponse.json({ error: 'The tutor has not added a Google Meet link yet. Please check back shortly.' }, { status: 404 });
+      return NextResponse.json({ error: 'The tutor has not added a meeting link yet. Please check back shortly.' }, { status: 404 });
     }
 
     const meetingData = meetingSnap.data();

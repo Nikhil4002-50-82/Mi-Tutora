@@ -100,6 +100,12 @@ export default function TeacherDashboard() {
   const [savingGmeetAppId, setSavingGmeetAppId] = useState<string | null>(null);
   const [hasFetchedLinks, setHasFetchedLinks] = useState(false);
   const [meetingPlatforms, setMeetingPlatforms] = useState<{ [key: string]: 'gmeet' | 'zoom' | 'teams' }>({});
+  const [nowTime, setNowTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
   
   // KYC State (PowerAPI integration - temporarily deactivated in Settings UI pending company license)
   const [kycStep, setKycStep] = useState<'input' | 'otp' | 'verified'>('input');
@@ -695,7 +701,7 @@ export default function TeacherDashboard() {
   }, 0) || 0;
 
   // Force the clock forward if they tried to rewind their device time
-  const trustedNow = Math.max(Date.now(), latestServerTime);
+  const trustedNow = Math.max(nowTime, latestServerTime);
 
   const isSubscribedFlags = data?.profile?.subscriptionPlan === 'pro' || data?.profile?.isSubscribed;
   const hasValidExpiry = data?.profile?.subscriptionExpiry ? data?.profile?.subscriptionExpiry > trustedNow : false;
@@ -2313,13 +2319,35 @@ export default function TeacherDashboard() {
                                         </button>
                                       </div>
                                     )}
-                                    <button 
-                                      onClick={() => handleNegotiationAction(neg.id, 'demo_finished')}
-                                      disabled={actionLoadingAppId === neg.id}
-                                      className={`w-full mt-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 px-5 py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === neg.id ? 'opacity-50 cursor-wait' : ''}`}
-                                    >
-                                      {actionLoadingAppId === neg.id ? 'Processing...' : 'Mark Demo as Finished'}
-                                    </button>
+                                    {(() => {
+                                      const dDate = neg.demoDate || neg.proposedDate;
+                                      const rawTime = (neg.demoTime || neg.proposedTime)?.split('||')[0]?.trim();
+                                      const dTime = rawTime?.length === 5 ? `${rawTime}:00` : rawTime;
+                                      const demoStartTime = (dDate && dTime) ? new Date(`${dDate}T${dTime}`).getTime() : 0;
+                                      const isDemoStarted = demoStartTime > 0 && !isNaN(demoStartTime) ? trustedNow >= demoStartTime : true;
+
+                                      return (
+                                        <button 
+                                          onClick={() => handleNegotiationAction(neg.id, 'demo_finished')}
+                                          disabled={!isDemoStarted || actionLoadingAppId === neg.id}
+                                          className={`w-full mt-3 px-5 py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                            !isDemoStarted
+                                              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                              : actionLoadingAppId === neg.id
+                                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 opacity-50 cursor-wait'
+                                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 active:scale-[0.98]'
+                                          }`}
+                                        >
+                                          {!isDemoStarted ? (
+                                            <><Lock className="w-4 h-4" /> Available once demo starts</>
+                                          ) : actionLoadingAppId === neg.id ? (
+                                            'Processing...'
+                                          ) : (
+                                            <><CheckCircle2 className="w-4 h-4" /> Mark Demo as Finished</>
+                                          )}
+                                        </button>
+                                      );
+                                    })()}
                                   </>
                                 )}
                                 {neg.status === 'waiting_for_parent_decision' && (
@@ -2473,15 +2501,35 @@ export default function TeacherDashboard() {
                             </div>
                           )}
 
-                          {cls.status === 'demo_scheduled' && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'demo_finished'); }}
-                              disabled={actionLoadingAppId === cls.id}
-                              className={`w-full mt-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 px-4 py-2.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${actionLoadingAppId === cls.id ? 'opacity-50 cursor-wait' : ''}`}
-                            >
-                              {actionLoadingAppId === cls.id ? 'Processing...' : 'Mark Demo as Finished'}
-                            </button>
-                          )}
+                          {cls.status === 'demo_scheduled' && (() => {
+                            const dDate = cls.demoDate || cls.app?.demoDate;
+                            const rawTime = (cls.demoTime || cls.app?.demoTime)?.split('||')[0]?.trim();
+                            const dTime = rawTime?.length === 5 ? `${rawTime}:00` : rawTime;
+                            const demoStartTime = (dDate && dTime) ? new Date(`${dDate}T${dTime}`).getTime() : 0;
+                            const isDemoStarted = demoStartTime > 0 && !isNaN(demoStartTime) ? trustedNow >= demoStartTime : true;
+
+                            return (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleNegotiationAction(cls.id, 'demo_finished'); }}
+                                disabled={!isDemoStarted || actionLoadingAppId === cls.id}
+                                className={`w-full mt-3 px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                  !isDemoStarted
+                                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                    : actionLoadingAppId === cls.id
+                                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 opacity-50 cursor-wait'
+                                      : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 hover:border-indigo-600 active:scale-[0.98]'
+                                }`}
+                              >
+                                {!isDemoStarted ? (
+                                  <><Lock className="w-3.5 h-3.5" /> Available once demo starts</>
+                                ) : actionLoadingAppId === cls.id ? (
+                                  'Processing...'
+                                ) : (
+                                  <><CheckCircle2 className="w-3.5 h-3.5" /> Mark Demo as Finished</>
+                                )}
+                              </button>
+                            );
+                          })()}
 
                           <div className="mt-4 flex gap-2">
                             <button

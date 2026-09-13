@@ -44,13 +44,15 @@ When the trigger conditions are met, the Teacher Portal displays an input field 
 To optimize the user experience, all of this UI is surfaced directly on the **Demo Classes** summary cards (and the Student's "Demo Teachers" tab) by accessing the nested `cls.app.mode` property. Teachers and students do not need to click "View Details" to access the meeting link; the input box and the live countdown timer are injected right above the "View Details" button for immediate access.
 
 ### D. Student JIT Retrieval (`/api/get-demo-link`)
-When the trigger conditions are met, the Student Portal displays a "Join Demo Room" button and a live countdown timer.
-1.  **Strict IST Timezone Offset:** Demo times are parsed with an explicit `+05:30` IST offset (`${demoDate}T${demoTime}:00+05:30`) to eliminate UTC discrepancies across devices located in different timezones.
-2.  **The Lock (Before T-5):** If current time is earlier than 5 minutes before class start (`now < demoStartTime - 5 * 60 * 1000`), the button remains disabled with a countdown timer.
-3.  **The Unlock Window [T-5 to T+90]:** At exactly **5 minutes before** the scheduled start, the button unlocks. The room remains accessible until **90 minutes after** the start time (`now <= demoStartTime + 90 * 60 * 1000`), ensuring comfortable class completion.
-4.  **The Post-Demo Lock (After T+90):** After 90 minutes have elapsed, the link is permanently locked from student access to prevent unauthorized room reuse.
-5.  **Secure Server Verification:** The backend API (`/api/get-demo-link`) re-verifies the exact same [T-5m, T+90m] window against the server clock. If a student attempts to bypass the client UI, the server returns `403 Forbidden`.
-6.  **Redirection:** Upon verified authorization, the server fetches the hidden link from the vault and sends it to the frontend, which invokes `window.open(link, '_blank')`.
+When the trigger conditions are met, the Student Portal surfaces a universal **"Join Demo Class"** button (or **"Join Live Class"** for ongoing tuitions) along with a live countdown timer.
+
+1.  **Universal Platform-Agnostic UI:** To eliminate provider mismatch across Google Meet, Zoom, and Microsoft Teams, the button uses the universal label **"Join Demo Class"** (rather than hardcoded "Join Google Meet"), seamlessly opening whatever platform link the tutor configured.
+2.  **Strict IST Timezone Offset:** Demo times are parsed with an explicit `+05:30` IST offset (`${demoDate}T${demoTime}:00+05:30`) to eliminate UTC discrepancies across devices located in different timezones.
+3.  **The Lock (Before T-5):** If current time is earlier than 5 minutes before class start (`trustedNow < demoStartTime - 5 * 60 * 1000`), the button remains disabled with a countdown timer. Client time evaluation is anchored to **`trustedNow`** (backed by Firestore server timestamps), preventing users from bypassing the lock by rewinding their computer clock.
+4.  **The Unlock Window [T-5 to T+90]:** At exactly **5 minutes before** the scheduled start, the button unlocks. The room remains accessible until **90 minutes after** the start time (`trustedNow <= demoStartTime + 90 * 60 * 1000`), ensuring comfortable class completion.
+5.  **The Post-Demo Lock (After T+90):** After 90 minutes have elapsed, the link is permanently locked from student access to prevent unauthorized room reuse.
+6.  **Secure Server Verification:** The backend API (`/api/get-demo-link`) re-verifies the exact same [T-5m, T+90m] window against the server clock. If a student attempts to bypass the client UI, the server returns `403 Forbidden`.
+7.  **Redirection:** Upon verified authorization, the server fetches the hidden link from the vault and sends it to the frontend, which invokes `window.open(link, '_blank')`.
 
 ---
 

@@ -156,6 +156,15 @@ export default function StudentDashboard() {
 
   const { data, error: swrError, isLoading: loading, mutate } = useStudentData();
 
+  // Find the most recent trusted server timestamp from their database documents
+  const latestServerTime = data?.applications?.reduce((max: number, app: any) => {
+    const appTime = app.updatedAt ? (typeof app.updatedAt === 'number' ? app.updatedAt : new Date(app.updatedAt).getTime()) : 0;
+    return Math.max(max, appTime || 0);
+  }, 0) || 0;
+
+  // Force the clock forward if they tried to rewind their device time
+  const trustedNow = Math.max(nowTime, latestServerTime);
+
   useEffect(() => {
     if (data?.userData?.upiId && !isEditingReferralUpi) {
       setReferralUpi(data.userData.upiId);
@@ -2374,7 +2383,7 @@ export default function StudentDashboard() {
                                     </div>
                                     {(neg.mode || 'Online').toLowerCase() === 'online' && neg.demoDate && neg.demoTime && (() => {
                                       const demoDateTime = new Date(`${neg.demoDate}T${neg.demoTime}:00`).getTime();
-                                      const timeDiff = demoDateTime - nowTime;
+                                      const timeDiff = demoDateTime - trustedNow;
                                       const isLocked = timeDiff > 5 * 60 * 1000;
                                       
                                       const formatTimeDiff = (ms: number) => {
@@ -2408,7 +2417,7 @@ export default function StudentDashboard() {
                                             ) : retrievingGmeetAppId === neg.id ? (
                                               'Retrieving Link...'
                                             ) : (
-                                              <><Video className="w-4 h-4" /> Join Google Meet</>
+                                              <><Video className="w-4 h-4" /> Join Demo Class</>
                                             )}
                                           </button>
                                         </div>
@@ -2526,7 +2535,7 @@ export default function StudentDashboard() {
                           
                           {cls.status === 'demo_scheduled' && (cls.app?.mode || 'Online').toLowerCase() === 'online' && cls.app?.demoDate && cls.app?.demoTime && (() => {
                             const demoDateTime = new Date(`${cls.app.demoDate}T${cls.app.demoTime}:00`).getTime();
-                            const timeDiff = demoDateTime - nowTime;
+                            const timeDiff = demoDateTime - trustedNow;
                             const isLocked = timeDiff > 5 * 60 * 1000;
                             
                             const formatTimeDiff = (ms: number) => {
@@ -2560,7 +2569,7 @@ export default function StudentDashboard() {
                                   ) : retrievingGmeetAppId === cls.id ? (
                                     'Retrieving...'
                                   ) : (
-                                    <><Video className="w-3.5 h-3.5" /> Join Meet</>
+                                    <><Video className="w-3.5 h-3.5" /> Join Live Class</>
                                   )}
                                 </button>
                               </div>
