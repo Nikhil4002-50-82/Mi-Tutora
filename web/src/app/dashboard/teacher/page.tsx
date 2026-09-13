@@ -1244,9 +1244,20 @@ export default function TeacherDashboard() {
       
       {/* MOBILE HEADER */}
       <div className="md:hidden bg-gradient-to-r from-[#063831] to-[#04241f] text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-8 h-8 text-emerald-400" />
-          <span className="font-black text-xl tracking-tight">Teacher</span>
+        <div className="flex items-center gap-2.5">
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <Image
+              src="/logo.png"
+              alt="MiTutora"
+              width={120}
+              height={36}
+              className="h-7 w-auto object-contain"
+              priority
+            />
+          </Link>
+          <span className="text-[#00a992] text-[9px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+            Teacher
+          </span>
         </div>
         <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -mr-2 text-white hover:bg-white/10 rounded-lg">
           <Menu className="w-6 h-6" />

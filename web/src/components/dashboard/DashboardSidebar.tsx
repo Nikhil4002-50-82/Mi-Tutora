@@ -1,5 +1,7 @@
 import React from 'react';
-import { BookOpen, GraduationCap, Lock, X } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Lock, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface NavItem {
@@ -33,7 +35,6 @@ export function DashboardSidebar({
   navItems,
   userName
 }: DashboardSidebarProps) {
-  const IconHeader = role === 'student' ? GraduationCap : BookOpen;
   const subtitle = role === 'student' ? 'Student' : 'Teacher';
   const defaultInitial = role === 'student' ? 'S' : 'T';
 
@@ -48,12 +49,20 @@ export function DashboardSidebar({
       <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
         <div className="h-[76px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
           <div className="flex w-full justify-between items-center">
-            <div className="flex items-center gap-3">
-              <IconHeader className="w-8 h-8 text-emerald-400" />
-              <div className="flex flex-col">
-                <span className="font-black text-xl tracking-tight leading-none">MiTutora</span>
-                <span className="text-[#00a992] text-[10px] font-bold uppercase tracking-widest mt-1">{subtitle}</span>
-              </div>
+            <div className="flex items-center gap-2.5">
+              <Link href="/" className="hover:opacity-90 transition-opacity">
+                <Image
+                  src="/logo.png"
+                  alt="MiTutora"
+                  width={130}
+                  height={38}
+                  className="h-8 w-auto object-contain"
+                  priority
+                />
+              </Link>
+              <span className="text-[#00a992] text-[9px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                {subtitle}
+              </span>
             </div>
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-2 text-white/70 hover:text-white bg-white/5 rounded-lg">
               <X className="w-5 h-5" />
