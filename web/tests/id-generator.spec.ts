@@ -8,11 +8,15 @@ test.describe('Custom Document ID Architecture (Document_ID.md)', () => {
     const studentId = generateCustomId('MTS');
     const parentId = generateCustomId('MTP');
     const tutorId = generateCustomId('MTT');
+    const groupId = generateCustomId('MTG');
+    const requestId = generateCustomId('REQ');
 
     expect(applicationId.startsWith('MTA')).toBe(true);
     expect(studentId.startsWith('MTS')).toBe(true);
     expect(parentId.startsWith('MTP')).toBe(true);
     expect(tutorId.startsWith('MTT')).toBe(true);
+    expect(groupId.startsWith('MTG')).toBe(true);
+    expect(requestId.startsWith('REQ')).toBe(true);
   });
 
   test('Generates IDs with exactly prefix length + 6 characters', () => {

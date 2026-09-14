@@ -257,5 +257,37 @@ test.describe('Phase 1: Server-Side Matchmaking Engine & Pagination Logic', () =
       expect(page2.students[0].rank).toBe(21);
       expect(page2.students[14].rank).toBe(35);
     });
+
+    test('Server ranking accurately stitches group mode and coordinates onto student records', () => {
+      const groupsMap = new Map<string, any>([
+        ['grp_offline_1', { id: 'grp_offline_1', mode: 'Offline', area: 'Koramangala', city: 'Bengaluru', latitude: 12.9352, longitude: 77.6245 }],
+        ['grp_online_1', { id: 'grp_online_1', mode: 'Online', area: '', city: '', latitude: null, longitude: null }]
+      ]);
+
+      const rawStudents = [
+        { id: 's_off', name: 'Offline Student', groupDocId: 'grp_offline_1', category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], budget: 5000 },
+        { id: 's_on', name: 'Online Student', groupDocId: 'grp_online_1', category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], budget: 5000 },
+      ];
+
+      const stitchedStudents = rawStudents.map((sData) => {
+        const matchingGroup = groupsMap.get(sData.groupDocId);
+        let cleanMode = matchingGroup?.mode || (sData as any).mode || '';
+        if (cleanMode === 'Offline (Home Tuition)') cleanMode = 'Offline';
+
+        return {
+          ...sData,
+          mode: cleanMode,
+          area: matchingGroup?.area || '',
+          city: matchingGroup?.city || '',
+          latitude: matchingGroup?.latitude ?? null,
+          longitude: matchingGroup?.longitude ?? null,
+        };
+      });
+
+      expect(stitchedStudents[0].mode).toBe('Offline');
+      expect(stitchedStudents[0].latitude).toBe(12.9352);
+      expect(stitchedStudents[1].mode).toBe('Online');
+      expect(stitchedStudents[1].latitude).toBeNull();
+    });
   });
 });

@@ -73,6 +73,29 @@ export default function DemoForm({
 
   const getInitialFormData = () => {
     if (initialData) {
+      const resolvedGroupDocId = initialData.groupDocId || initialData.groupId || `indv_${initialData.id || 'new'}`;
+      const groupPrefData = initialData.groupPref || {};
+      let cleanMode = groupPrefData.mode || initialData.mode || initialData.preferredMode;
+      if (cleanMode === 'Offline (Home Tuition)') cleanMode = 'Offline';
+      if (!cleanMode) cleanMode = 'Online';
+
+      const initialGroupPreferences: any = {
+        [resolvedGroupDocId]: {
+          mode: cleanMode,
+          specificDays: groupPrefData.specificDays || groupPrefData.preferredDays || initialData.specificDays || initialData.preferredDays || [],
+          hours: groupPrefData.hours || groupPrefData.preferredTimeRange || groupPrefData.hoursPerDay || initialData.hours || initialData.preferredTimeRange || initialData.hoursPerDay || '',
+          days: groupPrefData.days || groupPrefData.daysPerWeek || initialData.days || initialData.daysPerWeek || '',
+          teacherGenderPreference: groupPrefData.teacherGenderPreference || groupPrefData.genderPreference || initialData.teacherGenderPreference || initialData.genderPreference || 'No Preference',
+          addressFlat: groupPrefData.addressFlat || initialData.addressFlat || initialData.address?.split(', ')[0] || '',
+          addressStreet: groupPrefData.addressStreet || initialData.addressStreet || initialData.address?.split(', ')[1] || '',
+          addressPincode: groupPrefData.addressPincode || initialData.addressPincode || initialData.address?.split(', ')[2] || '',
+          area: groupPrefData.area || initialData.area || '',
+          city: groupPrefData.city || initialData.city || '',
+          latitude: groupPrefData.latitude || initialData.latitude || null,
+          longitude: groupPrefData.longitude || initialData.longitude || null,
+        }
+      };
+
       return {
         step: (hasProfile && !parentOnly) ? 2 : 1,
         numberOfStudents: 1,
@@ -85,7 +108,7 @@ export default function DemoForm({
         addressPincode: initialData.address?.split(', ')[2] || '',
         goal: initialData.learningGoal || '',
         requirements: initialData.specialRequirements || '',
-        groupPreferences: {} as any,
+        groupPreferences: initialGroupPreferences,
         students: [
           {
             id: initialData.id || 'new',
@@ -99,7 +122,7 @@ export default function DemoForm({
             technologies: initialData.technologies || [],
             languages: initialData.languages || [],
             budget: initialData.budget?.toString() || '4000',
-            groupId: initialData.groupId || `indv_${initialData.id || 'new'}`,
+            groupId: resolvedGroupDocId,
           }
         ]
       };
@@ -449,10 +472,16 @@ export default function DemoForm({
         return;
       }
       if (formData.step === formData.numberOfStudents + 1) {
+        if (activeStudentId && activeStudentId !== 'new') {
+           setFormData(prev => ({ ...prev, step: prev.step + 2 }));
+           return;
+        }
         if (formData.numberOfStudents === 1 && existingGroups.length === 0) {
            setFormData(prev => {
              const newStudents = [...prev.students];
-             newStudents[0].groupId = `indv_${newStudents[0].id || Date.now()}`;
+             newStudents[0].groupId = (newStudents[0].groupId && newStudents[0].groupId !== 'unassigned')
+               ? newStudents[0].groupId
+               : `indv_${newStudents[0].id || Date.now()}`;
              return { ...prev, students: newStudents, step: prev.step + 2 };
            });
            return;
@@ -532,14 +561,19 @@ export default function DemoForm({
 
       if (activeStudentId && activeStudentId !== 'new') {
         const s = formData.students[0];
-        const groupId = (s as any).groupId || `indv_${activeStudentId}`;
-        const groupPref = formData.groupPreferences?.[groupId] || {};
-        const combinedAddress = groupPref.mode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
+        const groupId = (s as any).groupDocId || (s as any).groupId || (initialData?.groupDocId) || (initialData?.groupId) || `indv_${activeStudentId}`;
+        const groupPref = formData.groupPreferences?.[groupId] || formData.groupPreferences?.[(s as any).groupId] || {};
+        
+        let targetMode = groupPref.mode;
+        if (targetMode === 'Offline (Home Tuition)') targetMode = 'Offline';
+        if (!targetMode) targetMode = 'Online';
 
-        let finalLat = groupPref.latitude || null;
-        let finalLng = groupPref.longitude || null;
+        const combinedAddress = targetMode === 'Online' ? '' : [groupPref.addressFlat, groupPref.addressStreet, groupPref.addressPincode].filter(Boolean).join(', ');
 
-        if (groupPref.mode === 'Offline' && (!finalLat || !finalLng) && combinedAddress) {
+        let finalLat = targetMode === 'Online' ? null : (groupPref.latitude || null);
+        let finalLng = targetMode === 'Online' ? null : (groupPref.longitude || null);
+
+        if (targetMode === 'Offline' && (!finalLat || !finalLng) && combinedAddress) {
           try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(combinedAddress)}&limit=1`);
             const data = await res.json();
@@ -552,7 +586,7 @@ export default function DemoForm({
           }
         }
 
-        const studentData = {
+        const studentData: any = {
           id: activeStudentId,
           guardianName: formData.parentName,
           category: s.category || '',
@@ -568,22 +602,31 @@ export default function DemoForm({
           technologies: s.technologies || [],
           languages: s.languages || [],
           budget: parseInt(s.budget) || 0,
-          groupId: groupId,
+          groupDocId: groupId,
         };
+        if (initialData?.groupId && !initialData.groupId.startsWith('indv_')) {
+          studentData.groupId = initialData.groupId;
+        }
 
         const studentRef = doc(db, 'students', activeStudentId);
         await updateDoc(studentRef, studentData);
 
         // Update Groups Doc
-        const groupRef = doc(db, 'groups', groupId); // groupId passed from frontend is now a UUID
+        const groupRef = doc(db, 'groups', groupId);
+        const groupSnap = await getDoc(groupRef);
+        const existingGroupData = groupSnap.exists() ? groupSnap.data() : null;
+        const currentStudentDocIds = existingGroupData?.studentDocIds || [];
+        const mergedStudentDocIds = Array.from(new Set([...currentStudentDocIds, activeStudentId]));
+
         await setDoc(groupRef, {
-           // groupDocId: groupId, - already handled by foreign keys
+           groupDocId: groupId,
            parentDocId: user.uid,
-           mode: groupPref.mode || '',
+           studentDocIds: mergedStudentDocIds,
+           mode: targetMode,
            area: combinedAddress,
-           city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-           latitude: groupPref.mode === 'Online' ? null : finalLat,
-           longitude: groupPref.mode === 'Online' ? null : finalLng,
+           city: targetMode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+           latitude: finalLat,
+           longitude: finalLng,
            teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
            preferredTimeRange: groupPref.hours || '',
            daysPerWeek: groupPref.days || '',
@@ -592,51 +635,9 @@ export default function DemoForm({
         }, { merge: true });
 
         // Update Aggregate Tuition Request
-        const groupStudentsSnap = await getDocs(query(collection(db, 'students'), where('groupDocId', '==', groupId)));
-        const groupStudents = groupStudentsSnap.docs.map(d => d.data());
-        const updatedIndex = groupStudents.findIndex((st: any) => st.id === activeStudentId);
-        if (updatedIndex > -1) {
-           groupStudents[updatedIndex] = { ...groupStudents[updatedIndex], ...studentData };
-        } else {
-           groupStudents.push(studentData);
-        }
+        const { syncTuitionRequestForGroup } = await import('@/utils/groupUtils');
+        await syncTuitionRequestForGroup(db, groupId, user.uid);
 
-        const combinedSubjects = Array.from(new Set(groupStudents.flatMap(st => st.subjects || [])));
-        const combinedTechnologies = Array.from(new Set(groupStudents.flatMap(st => st.technologies || [])));
-        const combinedLanguages = Array.from(new Set(groupStudents.flatMap(st => st.languages || [])));
-        const combinedBudget = groupStudents.reduce((acc, st) => acc + (st.budget || 0), 0);
-        const studentsDetails = groupStudents.map(st => ({
-           id: st.id,
-           name: st.name,
-           classLevel: st.classLevel || st.classGrade || '',
-           board: st.board || '',
-           subjects: st.subjects || [],
-           technologies: st.technologies || [],
-           languages: st.languages || [],
-           budget: st.budget || 0,
-        }));
-
-        const requestQuery = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupId));
-        const requestSnap = await getDocs(requestQuery);
-        if (!requestSnap.empty) {
-          await updateDoc(requestSnap.docs[0].ref, {
-            category: s.category || '',
-            mode: groupPref.mode || '',
-            area: combinedAddress,
-            city: groupPref.mode === 'Online' ? '' : (groupPref.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-            latitude: groupPref.mode === 'Online' ? null : finalLat,
-            longitude: groupPref.mode === 'Online' ? null : finalLng,
-            teacherGenderPreference: groupPref.teacherGenderPreference || 'No Preference',
-            preferredTimeRange: groupPref.hours || '',
-            daysPerWeek: groupPref.days || '',
-            specificDays: groupPref.specificDays || [],
-            studentsDetails,
-            combinedSubjects,
-            combinedTechnologies,
-            combinedLanguages,
-            combinedBudget,
-          });
-        }
         setSuccessMsg('Profile updated successfully!');
         toast.success("Profile saved successfully!", { description: "Student profile has been updated." });
       } else {

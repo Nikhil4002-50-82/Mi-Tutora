@@ -97,7 +97,7 @@ export default function GroupSettingsModal({
   useEffect(() => {
     if (initialData) {
       setFormData({
-        mode: initialData.mode || '',
+        mode: initialData.mode === 'Offline (Home Tuition)' ? 'Offline' : (initialData.mode || ''),
         addressFlat: initialData.addressFlat || '',
         addressStreet: initialData.addressStreet || initialData.area || '',
         addressPincode: initialData.addressPincode || initialData.city || '',
@@ -181,7 +181,7 @@ export default function GroupSettingsModal({
       let finalLat = formData.latitude;
       let finalLng = formData.longitude;
 
-      if (formData.mode === 'Offline (Home Tuition)' && (!finalLat || !finalLng) && combinedAddress) {
+      if ((formData.mode === 'Offline' || formData.mode === 'Offline (Home Tuition)') && (!finalLat || !finalLng) && combinedAddress) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
         try {
@@ -205,33 +205,45 @@ export default function GroupSettingsModal({
         }
       }
 
+      let cleanMode = formData.mode;
+      if (cleanMode === 'Offline (Home Tuition)') cleanMode = 'Offline';
+      if (!cleanMode) cleanMode = 'Online';
+
       const groupRef = doc(db, 'groups', groupId);
       await setDoc(groupRef, {
-        mode: formData.mode,
+        groupDocId: groupId,
+        mode: cleanMode,
         area: combinedAddress,
-        city: formData.mode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-        latitude: formData.mode === 'Online' ? null : finalLat,
-        longitude: formData.mode === 'Online' ? null : finalLng,
+        city: cleanMode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+        latitude: cleanMode === 'Online' ? null : finalLat,
+        longitude: cleanMode === 'Online' ? null : finalLng,
         teacherGenderPreference: formData.teacherGenderPreference,
         preferredTimeRange: formData.hours,
         daysPerWeek: formData.days,
         specificDays: formData.specificDays,
         parentId: parentId,
+        parentDocId: parentId,
         updatedAt: Date.now()
       }, { merge: true });
 
-      const q = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
-      const snap = await getDocs(q);
+      let q = query(collection(db, 'tuition_requests'), where('groupDocId', '==', groupId));
+      let snap = await getDocs(q);
+      if (snap.empty) {
+        const legacyQ = query(collection(db, 'tuition_requests'), where('groupId', '==', groupId));
+        snap = await getDocs(legacyQ);
+      }
 
       if (!snap.empty) {
         for (const requestDoc of snap.docs) {
           await updateDoc(requestDoc.ref, {
-            mode: formData.mode,
+            groupDocId: groupId,
+            parentDocId: parentId,
+            mode: cleanMode,
             teacherGenderPreference: formData.teacherGenderPreference,
             area: combinedAddress,
-            city: formData.mode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
-            latitude: formData.mode === 'Online' ? null : finalLat,
-            longitude: formData.mode === 'Online' ? null : finalLng,
+            city: cleanMode === 'Online' ? '' : (formData.addressPincode || combinedAddress.split(',').pop()?.trim() || ''),
+            latitude: cleanMode === 'Online' ? null : finalLat,
+            longitude: cleanMode === 'Online' ? null : finalLng,
             preferredTimeRange: formData.hours,
             daysPerWeek: formData.days,
             specificDays: formData.specificDays
@@ -286,16 +298,16 @@ export default function GroupSettingsModal({
                     <span className="font-bold">Online</span>
                   </label>
                   <label className={`cursor-pointer border-2 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-all ${
-                    formData.mode === 'Offline (Home Tuition)' ? 'border-[#00a992] bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 hover:border-emerald-200'
+                    (formData.mode === 'Offline' || formData.mode === 'Offline (Home Tuition)') ? 'border-[#00a992] bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 hover:border-emerald-200'
                   }`}>
-                    <input type="radio" name="mode" value="Offline (Home Tuition)" checked={formData.mode === 'Offline (Home Tuition)'} onChange={handleChange} className="sr-only" />
+                    <input type="radio" name="mode" value="Offline" checked={formData.mode === 'Offline' || formData.mode === 'Offline (Home Tuition)'} onChange={handleChange} className="sr-only" />
                     <span className="font-bold text-center">Offline<br/><span className="text-xs opacity-70">(Home Tuition)</span></span>
                   </label>
                 </div>
               </div>
             )}
 
-            {formData.mode === 'Offline (Home Tuition)' && (
+            {(formData.mode === 'Offline' || formData.mode === 'Offline (Home Tuition)') && (
               <div className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-2xl space-y-4">
                 <div className="flex justify-between items-center">
                   <h4 className="font-bold text-emerald-800 flex items-center gap-2"><MapPin className="w-4 h-4" /> Address for Home Tuition</h4>

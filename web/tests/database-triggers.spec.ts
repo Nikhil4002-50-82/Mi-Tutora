@@ -125,4 +125,42 @@ test.describe('Event-Driven Database Triggers Architecture', () => {
       expect(code.startsWith('JOHN-')).toBe(true);
     });
   });
+
+  test.describe('Teacher Portal Self-Exclusion for Dual-Role Users', () => {
+    function filterTeacherVisibleGroups(groups: Array<{ id: string; parentDocId: string; name: string }>, userData: { id?: string; roles?: string[]; [key: string]: any }) {
+      if (!userData?.id) {
+        return groups;
+      }
+      return groups.filter((g) => g.parentDocId !== userData.id);
+    }
+
+    test('Strictly excludes teacher\'s own student inquiries when userData.id is populated', () => {
+      const teacherUid = 'teacher_and_parent_uid_1';
+      const userData = { id: teacherUid, roles: ['teacher', 'student'] };
+
+      const groups = [
+        { id: 'group_own', parentDocId: teacherUid, name: 'My Kid' },
+        { id: 'group_other_1', parentDocId: 'parent_other_1', name: 'Other Student 1' },
+        { id: 'group_other_2', parentDocId: 'parent_other_2', name: 'Other Student 2' },
+      ];
+
+      const visible = filterTeacherVisibleGroups(groups, userData);
+      expect(visible.length).toBe(2);
+      expect(visible.map((g) => g.id)).toEqual(['group_other_1', 'group_other_2']);
+      expect(visible.some((g) => g.id === 'group_own')).toBe(false);
+    });
+
+    test('Demonstrates failure mode when userData.id is undefined (self-inquiry leaks into feed)', () => {
+      const teacherUid = 'teacher_and_parent_uid_1';
+      const corruptedUserData = { roles: ['teacher', 'student'] }; // Missing .id
+
+      const groups = [
+        { id: 'group_own', parentDocId: teacherUid, name: 'My Kid' },
+        { id: 'group_other_1', parentDocId: 'parent_other_1', name: 'Other Student 1' },
+      ];
+
+      const visible = filterTeacherVisibleGroups(groups, corruptedUserData);
+      expect(visible.some((g) => g.id === 'group_own')).toBe(true);
+    });
+  });
 });

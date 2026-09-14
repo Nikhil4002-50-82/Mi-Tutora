@@ -36,10 +36,11 @@ The `groupDocId` field on the `students` document is the physical link. If two s
 To minimize database reads and keep the UI blazing fast, the frontend dynamically aggregates the physical students into logical groups using React's `useMemo`.
 
 ### How Aggregation Works
-1.  **Bucketing:** The system loops through every student owned by the parent and buckets them by their `groupDocId`.
-2.  **Name Combining:** If a group has multiple students, the UI dynamically generates a plural name (e.g., `"Group: Alice, Bob"`). If it is a solo student, it just uses their name (`"Alice"`).
-3.  **Budget Summing:** The system mathematically sums the individual `budget` of each student into a single `totalBudget` for the group. (e.g., Alice's Rs. 500 + Bob's Rs. 500 = Group Budget of Rs. 1000).
-4.  **Virtual Groups:** If a student was created before groups existed and lacks a `groupDocId`, the engine safely wraps them in a virtual group called `indv_{student_id}` so the UI doesn't crash.
+1.  **Deduplication:** Before bucketing, the engine filters student records through a `seenStudentIds` Set, ensuring no learner appears in multiple groups simultaneously or generates duplicate cards if legacy duplicate/orphan records exist.
+2.  **Bucketing:** The system loops through every student owned by the parent and buckets them by their `groupDocId`.
+3.  **Name Combining:** If a group has multiple students, the UI dynamically generates a plural name (e.g., `"Group: Alice, Bob"`). If it is a solo student, it just uses their name (`"Alice"`).
+4.  **Budget Summing:** The system mathematically sums the individual `budget` of each student into a single `totalBudget` for the group. (e.g., Alice's Rs. 500 + Bob's Rs. 500 = Group Budget of Rs. 1000).
+5.  **Virtual Groups:** If a student was created before groups existed and lacks a `groupDocId`, the engine safely wraps them in a virtual group called `indv_{student_id}` so the UI doesn't crash.
 
 ---
 

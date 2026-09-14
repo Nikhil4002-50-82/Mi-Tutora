@@ -246,6 +246,7 @@ export const fetchTeacherDashboardData = async () => {
   const roles = userData?.roles || (userData?.role ? [userData.role] : []);
   if (userData) {
     userData.roles = roles;
+    userData.id = user.uid;
   }
   if (userData && !roles.includes('teacher')) {
     throw new Error('Unauthorized');
@@ -490,14 +491,26 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     parentCustomIdsMap = {}
   } = baseData;
 
-  // Group students first
-  const groupedStudentsMap = availableStudentsRaw.reduce((acc: any, student: any) => {
+  // Deduplicate students first by id
+  const deduplicatedStudentsRaw: any[] = [];
+  const seenStudentIds = new Set();
+  (availableStudentsRaw || []).forEach((student: any) => {
+    if (!student || !student.id || seenStudentIds.has(student.id)) return;
+    seenStudentIds.add(student.id);
+    deduplicatedStudentsRaw.push(student);
+  });
+
+  // Group students
+  const groupedStudentsMap = deduplicatedStudentsRaw.reduce((acc: any, student: any) => {
     const gId = student.groupDocId || student.groupId || `indv_${student.id}`;
     if (!acc[gId]) {
       const groupDoc = (fetchedGroups || []).find((g: any) => g.id === gId || g.groupDocId === gId || g.groupId === gId) || null;
       const pDocId = student.parentDocId || groupDoc?.parentDocId || student.parentId;
       const resolvedParentId = groupDoc?.parentId || student.parentId || (pDocId ? parentCustomIdsMap[pDocId] : '') || '';
       const resolvedGroupId = groupDoc?.groupId || student.groupId || (gId.startsWith('indv_') ? '' : gId);
+
+      let cleanMode = groupDoc?.mode || student.preferredMode || '';
+      if (cleanMode === 'Offline (Home Tuition)') cleanMode = 'Offline';
 
       acc[gId] = { 
         id: gId, 
@@ -511,7 +524,7 @@ export const deriveTeacherDashboardState = (baseData: any) => {
         daysPerWeek: groupDoc?.daysPerWeek || student.daysPerWeek || '',
         specificDays: groupDoc?.specificDays || student.specificDays || [],
         preferredTimeRange: groupDoc?.preferredTimeRange || student.preferredTimeRange || student.hours || '',
-        mode: groupDoc?.mode || student.preferredMode || '',
+        mode: cleanMode,
         area: groupDoc?.area || student.area || '',
         city: groupDoc?.city || student.city || '',
         latitude: groupDoc?.latitude || student.latitude || null,

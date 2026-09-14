@@ -30,7 +30,8 @@ import { toast } from 'sonner';
 import { executeDeclineOffer } from '@/hooks/useDashboardActions';
 import { useTeacherData } from '@/hooks/useDashboardData';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
-import { auth } from '@/utils/firebase/client';
+import { auth, functions } from '@/utils/firebase/client';
+import { httpsCallable } from 'firebase/functions';
 import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function TeacherDashboard() {
@@ -76,9 +77,6 @@ export default function TeacherDashboard() {
   const [activeRequestViewId, setActiveRequestViewId] = useState<string | null>(null);
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, type: 'price'|'timing'|'demo_booking', title: string, description: string, placeholder: string, initialValue: string, initialDate?: string, initialTime?: string, min?: number, max?: number, isOnline?: boolean, onSubmit: (val: string, date?: string, time?: string) => void }>({ isOpen: false, type: 'price', title: '', description: '', placeholder: '', initialValue: '', onSubmit: () => {} });
   const [messageModalConfig, setMessageModalConfig] = useState({ isOpen: false, title: '', message: '' });
-  const [withdrawModal, setWithdrawModal] = useState(false);
-  const [upiId, setUpiId] = useState('');
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [payoutUpi, setPayoutUpi] = useState('');
   const [isEditingPayoutUpi, setIsEditingPayoutUpi] = useState(false);
   const [savingPayoutUpi, setSavingPayoutUpi] = useState(false);
@@ -455,20 +453,10 @@ export default function TeacherDashboard() {
 
   const handleRedeemToken = async () => {
     try {
-      const { auth } = await import('@/utils/firebase/client');
-      const user = auth.currentUser;
-      if (!user) return;
-      const token = await user.getIdToken();
-      const res = await fetch('/api/tutors/redeem-token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.error || 'Failed to redeem token.');
+      const redeemFn = httpsCallable(functions, 'redeemBankedToken');
+      const res: any = await redeemFn();
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to redeem token.');
       }
       toast.success("Token redeemed! You have 1 extra request this week.");
       mutate();
@@ -1016,42 +1004,6 @@ export default function TeacherDashboard() {
 
   if (!data && swrError) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold">Error loading dashboard: {swrError.message}</div>;
   if (!data) return <LoadingScreen />;
-
-  const handleWithdrawSubmit = async () => {
-    if (!upiId.includes('@')) {
-      toast.error('Please enter a valid UPI ID');
-      return;
-    }
-    setWithdrawLoading(true);
-    try {
-      const { db } = await import('@/utils/firebase/client');
-      const { doc, addDoc, collection, updateDoc } = await import('firebase/firestore');
-      const currentBalance = data?.userData?.walletBalance || 0;
-      
-      if (currentBalance < 1000) {
-        throw new Error('Minimum withdrawal amount is ₹1000');
-      }
-      
-      await addDoc(collection(db, 'withdrawals'), {
-        userId: data?.user?.uid,
-        amount: currentBalance,
-        upiId: upiId,
-        status: 'pending',
-        createdAt: Date.now()
-      });
-      
-      await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: 0 });
-      
-      toast.success('Withdrawal request submitted successfully!');
-      setWithdrawModal(false);
-      setUpiId('');
-      mutate();
-    } catch (e: any) {
-      toast.error(e.message || 'Withdrawal failed');
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
 
   const handleUpgradeToPro = async () => {
     setUpgradeModalOpen(false);
@@ -1937,22 +1889,13 @@ export default function TeacherDashboard() {
                               setIsLoadingMoreStudents(true);
                               try {
                                 const nextPage = Math.floor(visibleStudentsCount / 20) + 1;
-                                const token = await auth.currentUser?.getIdToken();
-                                if (token) {
-                                  await fetch('/api/students/ranked', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Authorization': `Bearer ${token}`
-                                    },
-                                    body: JSON.stringify({
-                                      tab: tuitionSubTab,
-                                      page: nextPage,
-                                      limit: 20,
-                                      category: selectedCategory
-                                    })
-                                  }).catch(console.error);
-                                }
+                                const getStudentsFn = httpsCallable(functions, 'getRankedStudents');
+                                await getStudentsFn({
+                                  tab: tuitionSubTab,
+                                  page: nextPage,
+                                  limit: 20,
+                                  category: selectedCategory
+                                }).catch(console.error);
                               } catch (err) {
                                 console.error('Error fetching ranked students:', err);
                               } finally {
@@ -3619,48 +3562,6 @@ export default function TeacherDashboard() {
                     <Link href="/legal/terms-and-conditions" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
                     <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
                     <Link href="/legal/refund-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Refund Policy</Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WITHDRAW MODAL */}
-            {withdrawModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Withdraw Funds</h3>
-                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are withdrawing ₹{data?.userData?.walletBalance || 0} to your bank account.</p>
-                  
-                  <div className="mb-6 relative z-10">
-                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID <span className="text-red-500 font-bold ml-0.5">*</span></label>
-                    <input
-                      type="text"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      placeholder="e.g. 9876543210@ybl"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#00a992]/10 focus:border-[#00a992] transition-colors"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-4 relative z-10">
-                    <button
-                      onClick={() => { setWithdrawModal(false); setUpiId(''); }}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                      disabled={withdrawLoading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleWithdrawSubmit}
-                      disabled={withdrawLoading}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                      {withdrawLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        'Submit Request'
-                      )}
-                    </button>
                   </div>
                 </div>
               </div>

@@ -58,7 +58,13 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       expect(isStrictMatch(student, teacher)).toBe(true);
     });
 
-    test('Returns true if both Teacher and Student are Offline', () => {
+    test('Returns true if both Teacher and Student are Offline (Standardized)', () => {
+      const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Offline' };
+      const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Offline' };
+      expect(isStrictMatch(student, teacher)).toBe(true);
+    });
+
+    test('Returns true if both Teacher and Student are Offline (Legacy string backwards-compatibility)', () => {
       const student = { category: 'school', board: 'CBSE', classLevel: 'Class 10', subjects: ['Mathematics', 'Science'], mode: 'Offline (Home Tuition)' };
       const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Mathematics', 'Science'], mode: 'Offline' };
       expect(isStrictMatch(student, teacher)).toBe(true);

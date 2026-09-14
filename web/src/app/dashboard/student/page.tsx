@@ -33,7 +33,8 @@ const logo = '/imports/logo.png';
 import { useStudentData } from '@/hooks/useDashboardData';
 import { executeDeclineOffer, executeAppointTutor } from '@/hooks/useDashboardActions';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
-import { auth } from '@/utils/firebase/client';
+import { auth, functions } from '@/utils/firebase/client';
+import { httpsCallable } from 'firebase/functions';
 import { getStudentDemoFee } from '@/utils/pricing';
 
 export default function StudentDashboard() {
@@ -77,7 +78,6 @@ export default function StudentDashboard() {
   const [payingClass, setPayingClass] = useState<any>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [withdrawModal, setWithdrawModal] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState<string>('');
   const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [editingStudentId, setEditingStudentId] = useState<string>('');
@@ -85,8 +85,6 @@ export default function StudentDashboard() {
   const [visibleTutorsCount, setVisibleTutorsCount] = useState<number>(20);
   const [isLoadingMoreTutors, setIsLoadingMoreTutors] = useState<boolean>(false);
   const [isSwitchingTab, setIsSwitchingTab] = useState(false);
-  const [upiId, setUpiId] = useState('');
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [referralUpi, setReferralUpi] = useState('');
   const [isEditingReferralUpi, setIsEditingReferralUpi] = useState(false);
   const [savingReferralUpi, setSavingReferralUpi] = useState(false);
@@ -218,7 +216,16 @@ export default function StudentDashboard() {
     }
   };
 
-  const allStudents = data?.students || (data?.myStudent ? [data.myStudent] : []);
+  const allStudents = useMemo(() => {
+    const rawList = data?.students || (data?.myStudent ? [data.myStudent] : []);
+    const seen = new Set();
+    return rawList.filter((s: any) => {
+      if (!s || !s.id) return false;
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  }, [data?.students, data?.myStudent]);
   
   const initialTuitionTabSet = useRef(false);
   useEffect(() => {
@@ -241,7 +248,10 @@ export default function StudentDashboard() {
   
   const studentGroups = useMemo(() => {
     const acc: any = {};
+    const seenStudentIds = new Set();
     allStudents.forEach((student: any) => {
+      if (!student?.id || seenStudentIds.has(student.id)) return;
+      seenStudentIds.add(student.id);
       const gId = student.groupDocId || `indv_${student.id}`;
       if (!acc[gId]) acc[gId] = { id: gId, students: [], totalBudget: 0, categories: [] };
       acc[gId].students.push(student);
@@ -1116,42 +1126,6 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleWithdrawSubmit = async () => {
-    if (!upiId.includes('@')) {
-      toast.error('Please enter a valid UPI ID');
-      return;
-    }
-    setWithdrawLoading(true);
-    try {
-      const { db } = await import('@/utils/firebase/client');
-      const { doc, addDoc, collection, updateDoc } = await import('firebase/firestore');
-      const currentBalance = data?.userData?.walletBalance || 0;
-      
-      if (currentBalance < 1000) {
-        throw new Error('Minimum withdrawal amount is ₹1000');
-      }
-      
-      await addDoc(collection(db, 'withdrawals'), {
-        userId: data?.user?.uid,
-        amount: currentBalance,
-        upiId: upiId,
-        status: 'pending',
-        createdAt: Date.now()
-      });
-      
-      await updateDoc(doc(db, 'users', data?.user?.uid as string), { walletBalance: 0 });
-      
-      toast.success('Withdrawal request submitted successfully!');
-      setWithdrawModal(false);
-      setUpiId('');
-      mutate();
-    } catch (e: any) {
-      toast.error(e.message || 'Withdrawal failed');
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
-
   const lockedApplication = useMemo(() => {
     return data?.applications?.find((app: any) => {
       if (app.status === 'tuition_started' && !app.feePaid) {
@@ -1990,24 +1964,15 @@ export default function StudentDashboard() {
                           setIsLoadingMoreTutors(true);
                           try {
                             const nextPage = Math.floor(visibleTutorsCount / 20) + 1;
-                            const token = await auth.currentUser?.getIdToken();
-                            if (token) {
-                              await fetch('/api/tutors/ranked', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                  tab: tuitionSubTab,
-                                  page: nextPage,
-                                  limit: 20,
-                                  category: selectedCategory,
-                                  activeGroupId: activeGroup?.id,
-                                  scoringContext
-                                })
-                              }).catch(console.error);
-                            }
+                            const getTutorsFn = httpsCallable(functions, 'getRankedTutors');
+                            await getTutorsFn({
+                              tab: tuitionSubTab,
+                              page: nextPage,
+                              limit: 20,
+                              category: selectedCategory,
+                              activeGroupId: activeGroup?.id,
+                              scoringContext
+                            }).catch(console.error);
                           } catch (err) {
                             console.error('Error fetching ranked tutors:', err);
                           } finally {
@@ -3085,7 +3050,10 @@ export default function StudentDashboard() {
                       initialData={(() => {
                         const activeId = editingStudentId || activeStudentId;
                         if (activeId !== 'new' && activeId !== '') {
-                          return allStudents.find((s:any) => s.id === activeId);
+                          const s = allStudents.find((st: any) => st.id === activeId);
+                          if (!s) return null;
+                          const groupPref = (data?.groups || []).find((g: any) => g.id === s.groupDocId || g.groupDocId === s.groupDocId || g.id === s.groupId);
+                          return { ...s, groupPref };
                         } else {
                           return null;
                         }
@@ -3185,48 +3153,6 @@ export default function StudentDashboard() {
                     <Link href="/legal/terms-and-conditions" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Terms & Conditions</Link>
                     <span className="hidden sm:inline w-1 h-1 rounded-full bg-slate-300"></span>
                     <Link href="/legal/refund-policy" target="_blank" className="text-sm font-bold text-slate-600 hover:text-[#00a992] transition-colors">Refund Policy</Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WITHDRAW MODAL */}
-            {withdrawModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Withdraw Funds</h3>
-                  <p className="text-gray-500 mb-6 font-medium relative z-10">You are withdrawing ₹{data?.userData?.walletBalance || 0} to your bank account.</p>
-                  
-                  <div className="mb-6 relative z-10">
-                    <label className="text-sm font-bold text-gray-700 block mb-2">UPI ID</label>
-                    <input
-                      type="text"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      placeholder="e.g. 9876543210@ybl"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#00a992]/10 focus:border-[#00a992] transition-colors"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-4 relative z-10">
-                    <button
-                      onClick={() => { setWithdrawModal(false); setUpiId(''); }}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                      disabled={withdrawLoading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleWithdrawSubmit}
-                      disabled={withdrawLoading}
-                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-lg shadow-[#063831]/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                      {withdrawLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        'Submit Request'
-                      )}
-                    </button>
                   </div>
                 </div>
               </div>

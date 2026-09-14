@@ -65,9 +65,17 @@ export const getRankedStudents = onCall(async (request) => {
     const groupDocId = sData.groupDocId || sData.id;
     const matchingGroup = groupsMap.get(groupDocId);
 
+    let cleanMode = matchingGroup?.mode || sData.mode || "";
+    if (cleanMode === "Offline (Home Tuition)") cleanMode = "Offline";
+
     return {
       id: doc.id,
       ...sData,
+      mode: cleanMode,
+      area: matchingGroup?.area || sData.area || "",
+      city: matchingGroup?.city || sData.city || "",
+      latitude: matchingGroup?.latitude ?? sData.latitude ?? null,
+      longitude: matchingGroup?.longitude ?? sData.longitude ?? null,
       requestDoc: matchingGroup || null,
       teacherGenderPreference:
         matchingGroup?.teacherGenderPreference ||
