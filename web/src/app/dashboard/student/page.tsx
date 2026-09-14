@@ -2827,14 +2827,20 @@ export default function StudentDashboard() {
             {activeTab === 'referrals' && (
               <div>
                 {/* "Invited By" Banner */}
-                {data?.userData?.referrerName && (
+                {(data?.userData?.referrerName || data?.userData?.referredBy) && (
                   <div className="mb-8 bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                     <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0 text-emerald-600">
                       <Handshake className="w-5 h-5" />
                     </div>
                     <div>
                       <h4 className="text-emerald-900 font-bold">Welcome to the community!</h4>
-                      <p className="text-emerald-700 text-sm font-medium">You joined MiTutora via <span className="font-bold">{data.userData.referrerName}'s</span> invite link.</p>
+                      <p className="text-emerald-700 text-sm font-medium">
+                        You joined MiTutora via{' '}
+                        <span className="font-bold">
+                          {data?.userData?.referrerName ? `${data.userData.referrerName}'s` : `code ${data?.userData?.referredBy}`}
+                        </span>{' '}
+                        invite link.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -2982,7 +2988,11 @@ export default function StudentDashboard() {
 
                 {/* Referrals List */}
                 <div>
-                  <ReferralsList referrals={data?.referrals || []} />
+                  <ReferralsList 
+                    referrals={data?.referrals || []} 
+                    userUpiId={data?.userData?.upiId}
+                    onAddUpi={() => setIsEditingReferralUpi(true)}
+                  />
                 </div>
               </div>
             )}

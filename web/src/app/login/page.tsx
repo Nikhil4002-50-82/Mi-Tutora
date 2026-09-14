@@ -139,9 +139,13 @@ function LoginContent() {
       let finalReferrerName = '';
       if (referralCode.trim()) {
         try {
+          const token = await user.getIdToken();
           const trackRes = await fetch('/api/referrals/track', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
               referralCode: referralCode.trim(),
               refereeUid: user.uid,

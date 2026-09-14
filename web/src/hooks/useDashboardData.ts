@@ -154,6 +154,38 @@ export function useStudentData() {
     };
   }, [data?.user?.uid, mutate]);
 
+  useEffect(() => {
+    if (data?.user?.uid && data?.userData?.referredBy && !data?.userData?.referrerName) {
+      (async () => {
+        try {
+          const { auth } = await import('@/utils/firebase/client');
+          const token = await auth.currentUser?.getIdToken();
+          if (token) {
+            const res = await fetch('/api/referrals/track', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                referralCode: data.userData.referredBy,
+                refereeUid: data.user.uid,
+                refereeName: data.userData.name || '',
+                role: data.userData.role || 'student'
+              })
+            });
+            const resData = await res.json();
+            if (resData.success && resData.referrerName) {
+              mutate();
+            }
+          }
+        } catch (err) {
+          console.error('Referral auto-healing error:', err);
+        }
+      })();
+    }
+  }, [data?.user?.uid, data?.userData?.referredBy, data?.userData?.referrerName, mutate]);
+
   return { data, error, isLoading, mutate };
 }
 
@@ -290,6 +322,38 @@ export function useTeacherData() {
       if (unsubscribeReferrals) unsubscribeReferrals();
     };
   }, [data?.user?.uid, mutate]);
+
+  useEffect(() => {
+    if (data?.user?.uid && data?.userData?.referredBy && !data?.userData?.referrerName) {
+      (async () => {
+        try {
+          const { auth } = await import('@/utils/firebase/client');
+          const token = await auth.currentUser?.getIdToken();
+          if (token) {
+            const res = await fetch('/api/referrals/track', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                referralCode: data.userData.referredBy,
+                refereeUid: data.user.uid,
+                refereeName: data.userData.name || '',
+                role: data.userData.role || 'teacher'
+              })
+            });
+            const resData = await res.json();
+            if (resData.success && resData.referrerName) {
+              mutate();
+            }
+          }
+        } catch (err) {
+          console.error('Referral auto-healing error:', err);
+        }
+      })();
+    }
+  }, [data?.user?.uid, data?.userData?.referredBy, data?.userData?.referrerName, mutate]);
 
   return { data, error, isLoading, mutate };
 }

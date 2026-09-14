@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, X, CheckCircle2, CalendarDays } from 'lucide-react';
+import { Users, X, CheckCircle2, CalendarDays, ShieldCheck, Coins, Lock, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface StudentViewModalProps {
@@ -78,6 +78,16 @@ export function StudentViewModal({
   }, [selectedViewUser?.id, selectedViewUser?.parentId, selectedViewUser?.groupId, selectedViewUser?.parentDocId, selectedViewUser?.groupDocId]);
 
   if (!selectedViewUser) return null;
+
+  const enteredOffer = negotiationOffer[selectedViewUser?.id];
+  const effectiveBudget = (enteredOffer !== undefined && enteredOffer !== '')
+    ? Number(enteredOffer)
+    : (Number(selectedViewApp?.finalPrice) || Number(selectedViewApp?.currentOffer) || Number(selectedViewUser?.budget) || 0);
+
+  const hasNumericBudget = !isNaN(effectiveBudget) && effectiveBudget > 0;
+  const month1PlatformFee = Math.round(effectiveBudget * 0.40);
+  const month1TutorShare = Math.round(effectiveBudget * 0.60);
+  const month2TutorShare = effectiveBudget;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
@@ -266,6 +276,105 @@ export function StudentViewModal({
                 )}
               </div>
             </div>
+
+            {/* Tuition Fee Breakdown: Month 1 Escrow vs Month 2+ Direct */}
+            <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-200/80">
+              <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Earnings Transparency & Payout Structure
+                  </h4>
+                </div>
+                {enteredOffer && (
+                  <span className="text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Live Projected from Your Offer
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Month 1 Card */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" /> Month 1 (Trial & Escrow)
+                      </span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        60% Net Payout
+                      </span>
+                    </div>
+
+                    <div className="my-2">
+                      <p className="text-2xl font-black text-slate-900">
+                        {hasNumericBudget ? `₹${month1TutorShare.toLocaleString('en-IN')}` : '60% of fee'}
+                        <span className="text-xs font-semibold text-slate-500 ml-1.5">Take-Home</span>
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mt-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Gross Student Fee:</span>
+                        <span className="font-semibold text-slate-800">
+                          {hasNumericBudget ? `₹${effectiveBudget.toLocaleString('en-IN')}` : 'Tuition Fee'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Platform Matching & Escrow (40%):</span>
+                        <span className="font-semibold text-rose-600">
+                          {hasNumericBudget ? `-₹${month1PlatformFee.toLocaleString('en-IN')}` : '-40%'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-start gap-1.5 text-[11px] text-slate-500 leading-tight">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <span>Held in institutional escrow post 7-day trial and released to your UPI on Day 30.</span>
+                  </div>
+                </div>
+
+                {/* Month 2 & Beyond Card */}
+                <div className="bg-white rounded-xl p-4 border border-emerald-200 bg-emerald-50/20 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-emerald-600" /> Month 2 & Beyond
+                      </span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        100% Direct Retainer
+                      </span>
+                    </div>
+
+                    <div className="my-2">
+                      <p className="text-2xl font-black text-emerald-700">
+                        {hasNumericBudget ? `₹${month2TutorShare.toLocaleString('en-IN')}` : '100% of fee'}
+                        <span className="text-xs font-semibold text-emerald-600/80 ml-1.5">/month</span>
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-600 border-t border-emerald-100 pt-2.5 mt-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Platform Commission:</span>
+                        <span className="font-semibold text-emerald-600">₹0 (0% Commission)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Your Retainer:</span>
+                        <span className="font-semibold text-emerald-700">100% Full Fee</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 pt-2.5 border-t border-emerald-100 flex items-start gap-1.5 text-[11px] text-emerald-800/80 leading-tight">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <span>Zero platform deduction. Full monthly fee paid directly by the parent to you.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         
         {/* Actions */}
@@ -292,7 +401,7 @@ export function StudentViewModal({
             <div className="mt-6 pt-6 border-t border-gray-100">
               <div className="flex flex-col gap-3">
                 <div>
-                  <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate, or leave empty to request a demo at the original price.</p>
+                  <p className="text-[10px] text-gray-500 leading-tight mb-2">Type a value below to negotiate — earnings breakdown above will update automatically.</p>
                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Your Offer (₹/mo)</label>
                   <input 
                     type="number"

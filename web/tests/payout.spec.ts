@@ -169,4 +169,53 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
       expect(result.referrerDisbursement.status).toBe('action_required_missing_upi');
     });
   });
+
+  test.describe('Teacher Portal StudentViewModal Tuition Fee Transparency (Month 1 vs Month 2+)', () => {
+    function computeModalPayoutBreakdown(budget: any, counterOffer: string | undefined, finalPrice?: any) {
+      const enteredOffer = counterOffer;
+      const effectiveBudget = (enteredOffer !== undefined && enteredOffer !== '')
+        ? Number(enteredOffer)
+        : (Number(finalPrice) || Number(budget) || 0);
+
+      const hasNumericBudget = !isNaN(effectiveBudget) && effectiveBudget > 0;
+      const month1PlatformFee = Math.round(effectiveBudget * 0.40);
+      const month1TutorShare = Math.round(effectiveBudget * 0.60);
+      const month2TutorShare = effectiveBudget;
+
+      return {
+        effectiveBudget,
+        hasNumericBudget,
+        month1PlatformFee,
+        month1TutorShare,
+        month2TutorShare
+      };
+    }
+
+    test('Accurately projects Month 1 (60%/40%) and Month 2+ (100%/0%) for default student budget', () => {
+      const breakdown = computeModalPayoutBreakdown(5000, undefined);
+      expect(breakdown.hasNumericBudget).toBe(true);
+      expect(breakdown.effectiveBudget).toBe(5000);
+      expect(breakdown.month1TutorShare).toBe(3000); // 60% of 5000
+      expect(breakdown.month1PlatformFee).toBe(2000); // 40% of 5000
+      expect(breakdown.month2TutorShare).toBe(5000); // 100% of 5000
+    });
+
+    test('Dynamically updates breakdown when tutor inputs a counter-offer', () => {
+      const breakdown = computeModalPayoutBreakdown(5000, '7500');
+      expect(breakdown.hasNumericBudget).toBe(true);
+      expect(breakdown.effectiveBudget).toBe(7500);
+      expect(breakdown.month1TutorShare).toBe(4500); // 60% of 7500
+      expect(breakdown.month1PlatformFee).toBe(3000); // 40% of 7500
+      expect(breakdown.month2TutorShare).toBe(7500); // 100% of 7500
+    });
+
+    test('Handles Negotiable or non-numeric budgets gracefully without NaN', () => {
+      const breakdown = computeModalPayoutBreakdown('Negotiable', undefined);
+      expect(breakdown.hasNumericBudget).toBe(false);
+      expect(breakdown.effectiveBudget).toBe(0);
+      expect(breakdown.month1TutorShare).toBe(0);
+      expect(breakdown.month1PlatformFee).toBe(0);
+      expect(breakdown.month2TutorShare).toBe(0);
+    });
+  });
 });

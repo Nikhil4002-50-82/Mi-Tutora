@@ -520,9 +520,13 @@ export default function DemoForm({
         await setDoc(userDocRef, { hasProfile: true, referralCode: newCode, name: formData.parentName }, { merge: true });
 
         // Retroactively update pending referral tickets with formal name via secure server route
+        const token = await user.getIdToken();
         await fetch('/api/referrals/track', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({
             action: 'sync_name',
             refereeUid: user.uid,

@@ -64,9 +64,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Self-referral is not allowed' }, { status: 400 });
     }
 
+    let finalRefereeName = refereeName || '';
+    if (!finalRefereeName) {
+      const refereeDoc = await adminDb.collection('users').doc(refereeUid).get();
+      if (refereeDoc.exists) {
+        finalRefereeName = refereeDoc.data()?.name || '';
+      }
+    }
+
     // Check if referee already has a referral ticket (prevent duplicates)
     const existingRef = await adminDb.collection('referrals').where('referredUserId', '==', refereeUid).limit(1).get();
     if (!existingRef.empty) {
+      // Ensure user document has referrerName synced
+      await adminDb.collection('users').doc(refereeUid).set({
+        referrerName: referrerData.name || '',
+        referredBy: cleanCode
+      }, { merge: true });
+
       return NextResponse.json({ 
         success: true, 
         message: 'Referral already recorded',
@@ -79,13 +93,19 @@ export async function POST(req: NextRequest) {
       referrerId: referrerDoc.id,
       referrerName: referrerData.name || 'Referrer',
       referredUserId: refereeUid,
-      referredUserName: refereeName || '',
+      referredUserName: finalRefereeName,
       referralCode: cleanCode,
       referralType: role || 'student',
       status: 'pending',
       estimatedReward: 0,
       createdAt: Date.now()
     });
+
+    // Ensure users collection also has referrerName and referredBy persisted
+    await adminDb.collection('users').doc(refereeUid).set({
+      referrerName: referrerData.name || '',
+      referredBy: cleanCode
+    }, { merge: true });
 
     return NextResponse.json({
       success: true,
