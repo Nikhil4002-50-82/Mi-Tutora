@@ -85,6 +85,47 @@ test.describe('Cloud Scheduler & Time-Lock Architecture', () => {
     });
   });
 
+  test.describe('24-Hour Scheduled Demo Auto-Completion Engine (expireDemos)', () => {
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    function evaluateScheduledDemoTransition(demoDate: string, demoTime: string, now: number) {
+      if (!demoDate || !demoTime) return { shouldTransition: false, nextStatus: 'demo_scheduled' };
+      const cleanTime = demoTime.split('||')[0].trim();
+      const formattedTime = cleanTime.length === 5 ? `${cleanTime}:00` : cleanTime;
+      const demoTimeMs = new Date(`${demoDate}T${formattedTime}+05:30`).getTime();
+
+      if (!isNaN(demoTimeMs) && now - demoTimeMs > TWENTY_FOUR_HOURS_MS) {
+        return {
+          shouldTransition: true,
+          nextStatus: 'waiting_for_parent_decision',
+          hoursElapsed: (now - demoTimeMs) / (1000 * 60 * 60),
+        };
+      }
+      return {
+        shouldTransition: false,
+        nextStatus: 'demo_scheduled',
+        hoursElapsed: isNaN(demoTimeMs) ? 0 : (now - demoTimeMs) / (1000 * 60 * 60),
+      };
+    }
+
+    test('Keeps demo as demo_scheduled when less than 24 hours have elapsed since scheduled time', () => {
+      // Demo scheduled 12 hours ago
+      const mockNow = new Date('2026-09-10T22:00:00+05:30').getTime();
+      const res = evaluateScheduledDemoTransition('2026-09-10', '10:00', mockNow);
+      expect(res.shouldTransition).toBe(false);
+      expect(res.nextStatus).toBe('demo_scheduled');
+    });
+
+    test('Transitions unconfirmed demo to waiting_for_parent_decision when > 24 hours have elapsed', () => {
+      // Demo scheduled 24 hours and 5 minutes ago
+      const mockNow = new Date('2026-09-11T10:05:00+05:30').getTime();
+      const res = evaluateScheduledDemoTransition('2026-09-10', '10:00', mockNow);
+      expect(res.shouldTransition).toBe(true);
+      expect(res.nextStatus).toBe('waiting_for_parent_decision');
+      expect(res.hoursElapsed).toBeGreaterThan(24);
+    });
+  });
+
   test.describe('48-Hour Decision Window Expiry Engine', () => {
     const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 

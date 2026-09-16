@@ -64,6 +64,12 @@ export const processDailyPayouts = onSchedule(
       const payout = docSnap.data();
       const releaseEligibleAt = payout.releaseEligibleAt || 0;
 
+      // STRICT SAFETY GUARD: Payout only processes if student has verified paid their tuition fee
+      if (!payout.studentPaymentId || !payout.paidByStudentAt) {
+        console.warn(`[processDailyPayouts] Skipping tutor payout ${docSnap.id}: student payment verification missing.`);
+        continue;
+      }
+
       if (now < releaseEligibleAt) continue;
 
       let targetVpa = payout.payoutVpa || "";
@@ -103,6 +109,12 @@ export const processDailyPayouts = onSchedule(
       const reward = refData.reward || 0;
 
       if (reward <= 0 || now < releaseEligibleAt) continue;
+
+      // STRICT SAFETY GUARD: Referral reward only processes if qualified via verified payment
+      if (refData.status !== "qualified" || !refData.qualifiedAt) {
+        console.warn(`[processDailyPayouts] Skipping referral payout ${refSnap.id}: student fee payment qualification missing.`);
+        continue;
+      }
 
       let targetVpa = refData.payoutVpa || "";
       if (!targetVpa && refData.referrerId) {

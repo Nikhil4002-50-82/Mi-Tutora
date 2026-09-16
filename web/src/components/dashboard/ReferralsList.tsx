@@ -303,7 +303,7 @@ export function ReferralsList({ referrals, userUpiId, onAddUpi }: ReferralsListP
                               ? 'Escrow Matured' 
                               : isQualified 
                               ? `${daysLeft} Days Left` 
-                              : 'Day 30 Lock'}
+                              : 'Awaiting Fee'}
                           </p>
                         </div>
 
@@ -404,9 +404,9 @@ export function ReferralsList({ referrals, userUpiId, onAddUpi }: ReferralsListP
 
                         {/* Pending Friend Payment */}
                         {!isQualified && (
-                          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-medium text-slate-500">
-                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span>Reward will lock into 30-day escrow automatically once your friend pays Month 1 tuition.</span>
+                          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2 text-xs font-medium text-slate-600">
+                            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Reward locks into 30-day escrow only when your friend completes the 7-day trial and settles their tuition fee. No payout will occur if fee is unpaid.</span>
                           </div>
                         )}
                       </div>

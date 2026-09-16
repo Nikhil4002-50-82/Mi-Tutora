@@ -48,6 +48,7 @@ All payment calculations and verifications happen securely on the backend.
 
 ### F. Automated Day 30 Dual-Payout Engine (`dailyPayouts` Cloud Scheduler & `/api/payouts/process`)
 *   **Purpose:** Scheduled cron runner executing disbursements for all eligible Month 1 tuitions and qualified referral rewards reaching Day 30 (`releaseEligibleAt <= Date.now()`). Runs nightly at **00:00 IST** via Cloud Scheduler.
+*   **Strict Prerequisite Check (Double Defense):** Payouts are mathematically locked until the student has paid. The engine strictly verifies `studentPaymentId` and `paidByStudentAt` on `tutor_payouts`, and `status === 'qualified'` and `qualifiedAt` on `referrals`. Any record missing proof of student fee payment is skipped from disbursement.
 *   **Mechanism:** Queries both `tutor_payouts` (60% tuition share) and `referrals` (25% margin reward). Disburses funds simultaneously to both beneficiaries via Razorpay Payouts API (`POST /v1/payouts`) with `"queue_if_low_balance": true`. If UPI is missing, marks status as `'action_required_missing_upi'` independently.
 *   **Batch & Idempotency Safeguards:** Employs `BatchManager` (400-op chunks) and deterministic payout IDs (`payout_${applicationId}`).
 

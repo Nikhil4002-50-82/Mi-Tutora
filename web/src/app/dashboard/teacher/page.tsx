@@ -3168,6 +3168,15 @@ export default function TeacherDashboard() {
                           const payoutStatus = cls.payoutRecord?.status;
                           const isPayoutComplete = payoutStatus === 'paid';
 
+                          const startMs = cls.app.startDate 
+                            ? (typeof cls.app.startDate.toMillis === 'function' ? cls.app.startDate.toMillis() : (typeof cls.app.startDate === 'number' ? cls.app.startDate : new Date(cls.app.startDate).getTime())) 
+                            : (cls.app.createdAt || Date.now());
+                          const daysElapsed = Math.max(0, Math.floor((nowTime - startMs) / (24 * 60 * 60 * 1000)));
+
+                          const isInTrial = !studentPaid && daysElapsed < 7;
+                          const isGracePeriod = !studentPaid && daysElapsed >= 7 && daysElapsed < 10;
+                          const isLockedOverdue = !studentPaid && daysElapsed >= 10;
+
                           return (
                             <div key={cls.id} className="p-5 flex flex-col gap-4 hover:bg-slate-50 transition-colors">
                               {/* Header Row: Student info & Actions */}
@@ -3212,10 +3221,22 @@ export default function TeacherDashboard() {
                               {isMonth1 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                                   {/* Stage 1: Student Payment to Platform (Day 7) */}
-                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${studentPaid ? 'bg-emerald-50/60 border-emerald-200/80' : 'bg-amber-50/60 border-amber-200/80'}`}>
+                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${
+                                    studentPaid 
+                                      ? 'bg-emerald-50/60 border-emerald-200/80' 
+                                      : isGracePeriod 
+                                        ? 'bg-orange-50/70 border-orange-300' 
+                                        : isLockedOverdue 
+                                          ? 'bg-rose-50/70 border-rose-300' 
+                                          : 'bg-amber-50/60 border-amber-200/80'
+                                  }`}>
                                     <div className="mt-0.5 shrink-0">
                                       {studentPaid ? (
                                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      ) : isGracePeriod ? (
+                                        <AlertTriangle className="w-4 h-4 text-orange-600" />
+                                      ) : isLockedOverdue ? (
+                                        <AlertCircle className="w-4 h-4 text-rose-600" />
                                       ) : (
                                         <Clock className="w-4 h-4 text-amber-600" />
                                       )}
@@ -3233,13 +3254,31 @@ export default function TeacherDashboard() {
                                             Student fee completed via online checkout.
                                           </p>
                                         </div>
+                                      ) : isGracePeriod ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-orange-950 mt-0.5">
+                                            Payment Overdue (3-Day Grace Period)
+                                          </p>
+                                          <p className="text-[11px] text-orange-800 mt-0.5">
+                                            Trial ended on {day7DateStr}. Student in grace period awaiting payment.
+                                          </p>
+                                        </div>
+                                      ) : isLockedOverdue ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-rose-950 mt-0.5">
+                                            Overdue - Student Account Locked
+                                          </p>
+                                          <p className="text-[11px] text-rose-800 mt-0.5">
+                                            Student has not paid dues. Portal is locked. Pause classes until fee is paid.
+                                          </p>
+                                        </div>
                                       ) : (
                                         <div>
                                           <p className="text-xs font-bold text-amber-900 mt-0.5">
                                             Due on {day7DateStr} (Trial Day 7)
                                           </p>
                                           <p className="text-[11px] text-amber-700 mt-0.5">
-                                            Student 7-day trial in progress. Fee will be collected by platform.
+                                            Student 7-day trial in progress ({Math.max(0, 7 - daysElapsed)} days remaining). Fee will be collected by platform.
                                           </p>
                                         </div>
                                       )}
@@ -3247,20 +3286,42 @@ export default function TeacherDashboard() {
                                   </div>
 
                                   {/* Stage 2: Teacher Net Payout (Day 30) */}
-                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${isPayoutComplete ? 'bg-emerald-50/60 border-emerald-200/80' : studentPaid ? 'bg-teal-50/60 border-teal-200/80' : 'bg-slate-50 border-slate-200/80'}`}>
+                                  <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${
+                                    isPayoutComplete 
+                                      ? 'bg-emerald-50/60 border-emerald-200/80' 
+                                      : studentPaid 
+                                        ? 'bg-teal-50/60 border-teal-200/80' 
+                                        : isLockedOverdue 
+                                          ? 'bg-rose-50/50 border-rose-200/70' 
+                                          : isGracePeriod 
+                                            ? 'bg-amber-50/50 border-amber-200/70' 
+                                            : 'bg-slate-50 border-slate-200/80'
+                                  }`}>
                                     <div className="mt-0.5 shrink-0">
                                       {isPayoutComplete ? (
                                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                                       ) : studentPaid ? (
                                         <Lock className="w-4 h-4 text-teal-600" />
+                                      ) : isLockedOverdue ? (
+                                        <Lock className="w-4 h-4 text-rose-600" />
+                                      ) : isGracePeriod ? (
+                                        <Lock className="w-4 h-4 text-amber-600" />
                                       ) : (
                                         <CalendarDays className="w-4 h-4 text-slate-500" />
                                       )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                        Stage 2: Your Net Payout (60% Share)
-                                      </p>
+                                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                          Stage 2: Your Net Payout (60% Share)
+                                        </p>
+                                        {!studentPaid && (
+                                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200/60">
+                                            Student Fee Required
+                                          </span>
+                                        )}
+                                      </div>
+
                                       {isPayoutComplete ? (
                                         <div>
                                           <p className="text-xs font-bold text-emerald-900 mt-0.5">
@@ -3269,6 +3330,11 @@ export default function TeacherDashboard() {
                                           <p className="text-[11px] text-emerald-700 mt-0.5">
                                             Payout sent directly to your registered UPI ID.
                                           </p>
+                                          {cls.payoutRecord?.utrNumber && (
+                                            <p className="text-[10px] font-mono text-emerald-800 mt-0.5">
+                                              Bank UTR: {cls.payoutRecord.utrNumber}
+                                            </p>
+                                          )}
                                         </div>
                                       ) : studentPaid ? (
                                         <div>
@@ -3279,13 +3345,31 @@ export default function TeacherDashboard() {
                                             Scheduled for automated UPI disbursement on {day30DateStr} (Day 30).
                                           </p>
                                         </div>
+                                      ) : isLockedOverdue ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-rose-950 mt-0.5">
+                                            Payout Blocked (Student Fee Unpaid)
+                                          </p>
+                                          <p className="text-[11px] text-rose-700 mt-0.5">
+                                            Day 30 Razorpay transfer will NOT execute unless the student clears their tuition fee.
+                                          </p>
+                                        </div>
+                                      ) : isGracePeriod ? (
+                                        <div>
+                                          <p className="text-xs font-bold text-amber-950 mt-0.5">
+                                            Payout on Hold (Awaiting Student Fee)
+                                          </p>
+                                          <p className="text-[11px] text-amber-700 mt-0.5">
+                                            Day 30 transfer will only lock into escrow once the student settles their dues.
+                                          </p>
+                                        </div>
                                       ) : (
                                         <div>
                                           <p className="text-xs font-bold text-slate-800 mt-0.5">
                                             Expected: ₹{cls.tutorShare.toLocaleString()} on {day30DateStr}
                                           </p>
                                           <p className="text-[11px] text-slate-500 mt-0.5">
-                                            Awaiting student Day 7 fee payment to lock in escrow.
+                                            Day 30 payout locks into escrow automatically once student pays on Day 7.
                                           </p>
                                         </div>
                                       )}

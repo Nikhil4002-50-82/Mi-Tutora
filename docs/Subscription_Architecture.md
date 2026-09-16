@@ -13,7 +13,7 @@ To maximize paid upgrades, the platform uses an industry-standard "Strict Quota"
 
 ## 2. Subscription Tiers
 
-### Basic Plan (Free Tier)
+### Free Plan (Default Tier)
 - **Target Audience:** New teachers testing the platform.
 - **Quota:** 5 Tokens (Requests) per week.
 - **Limits:** Once 5 requests are sent, all "Send Offer" buttons are locked until the following Monday (or a rolling 7-day window).
@@ -34,30 +34,32 @@ To ensure the system is 100% hacker-proof, the quota limit will be strictly enfo
 
 ### Database Schema Updates
 The `tutors` collection maintains the following quota and subscription fields:
-- `subscriptionPlan`: String (`'basic'` or `'pro'`)
-- `subscriptionExpiresAt`: Timestamp (Enforced server-side via `verify-subscription-payment`)
-- `tokens`: Number of active proposal tokens available for the current week
+- `subscriptionPlan`: String (`'free'` or `'pro'`)
+- `subscriptionExpiry`: Number (Epoch timestamp in milliseconds, enforced server-side via `verify-subscription-payment` / Razorpay webhook)
+- `subscriptionUpdatedAt`: Timestamp (Firestore `serverTimestamp()`)
+- `isSubscribed`: Boolean (`true` if active Pro tier)
 - `bankedTokens`: Number of banked tokens accumulated via successful tutor referrals
 - `weeklyQuota`: Object tracking current usage
-  - `weekStartDate`: String (e.g., `'2026-08-17'`)
-  - `tokensUsed`: Number
+  - `tokensUsed`: Number (Count of tokens used in the current week; limit is 5 for Free, 15 for Pro)
+  - `lastReset`: Timestamp (Firestore `serverTimestamp()` recorded on Monday reset)
+  - `lastUpdated`: Timestamp (Firestore `serverTimestamp()` recorded on token usage)
 
 ### Weekly Quota Rollover via Cloud Scheduler (`weeklyQuotaReset`)
 - **Schedule:** Triggers every **Monday at 00:00 IST** (`0 0 * * 1`) via `functions/src/scheduled/weeklyQuotaReset.ts`.
 - **Batch Processing:** Utilizes `BatchManager` capping writes at 400 operations per batch to handle thousands of tutors safely without Firestore limits.
-- **Reset Logic:** Resets active `tokens` to `5` for Basic tutors and `15` for active Pro tutors (evaluating `subscriptionExpiresAt > now()`).
+- **Reset Logic:** Resets `weeklyQuota.tokensUsed` to `0` for all tutors. On proposal or demo request creation, available tokens are dynamically verified against the tier limit (`5` for Free, `15` for active Pro tutors where `subscriptionExpiry > Date.now()`).
 
 ### Banked Token Redemption (`redeemBankedToken`)
 - **Callable Cloud Function:** `functions/src/callable/redeemToken.ts` (`onCall`, authenticated tutor).
 - **Atomic Transaction:** Executes an atomic read-modify-write on `tutors/{tutorId}`:
   - Validates that `bankedTokens >= 1`.
   - Decrements `bankedTokens` by 1.
-  - Increments active proposal `tokens` by 1.
+  - Increments active proposal headroom by decrementing `tokensUsed` by 1 (or granting 1 bonus token).
   - Returns updated token counts, allowing the teacher to send proposals immediately.
 
 ### Secure Payment Integration (Razorpay)
 - **Order Creation (`/api/create-subscription-order`):** Generates a server-locked Razorpay order for ₹299.
-- **Verification (`/api/verify-subscription-payment`):** Verifies HMAC signature, upgrades `subscriptionPlan: 'pro'`, adds +10 tokens, and calculates `subscriptionExpiresAt = now + 30 days` using server-side timestamps.
+- **Verification (`/api/verify-subscription-payment`):** Verifies HMAC signature, upgrades `subscriptionPlan: 'pro'`, sets `isSubscribed: true`, credits 10 tokens to `weeklyQuota.tokensUsed` (`Math.max(0, currentTokensUsed - 10)`), and calculates `subscriptionExpiry = Math.max(now, currentExpiry) + 1 calendar month` using server-side timestamps.
 
 ---
 

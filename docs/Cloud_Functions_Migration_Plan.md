@@ -35,7 +35,7 @@ All heavy mathematical calculations, ranking algorithms, escrow disbursements, h
 | Category | Function Name | File Location | Trigger / Schedule | Responsibility |
 | :--- | :--- | :--- | :--- | :--- |
 | **Scheduled** | `weeklyQuotaReset` | `functions/src/scheduled/weeklyQuotaReset.ts` | Every Monday `00:00 IST` (`0 0 * * 1`) | Resets weekly proposal token quotas for all tutors (Free: 5, Pro: 15). Uses `BatchManager` (400-op chunks). |
-| **Scheduled** | `dailyPayouts` | `functions/src/scheduled/dailyPayouts.ts` | Every Night `00:00 IST` (`0 0 * * *`) | Processes Day 30 matured escrow payouts (Tutor 60%, Referrer 25%) via RazorpayX. Deterministic doc ID `payout_${appId}`. |
+| **Scheduled** | `dailyPayouts` | `functions/src/scheduled/dailyPayouts.ts` | Every Night `00:00 IST` (`0 0 * * *`) | Processes Day 30 matured escrow payouts (Tutor 60%, Referrer 25%) via RazorpayX. Enforces strict double-defense assertion verifying student payment before disbursement. Deterministic doc ID `payout_${appId}`. |
 | **Scheduled** | `expireDemosAndDecisions` | `functions/src/scheduled/expireDemos.ts` | Hourly (`0 * * * *`, IST) | Auto-completes expired demo sessions (>24h past scheduled time) and auto-declines 48h inactive hiring decisions. |
 | **Callable** | `redeemBankedToken` | `functions/src/callable/redeemToken.ts` | `onCall` (Auth required) | Converts 1 referral banked token into an active weekly proposal credit. Atomic Firestore transaction. |
 | **Callable** | `deleteUserAccount` | `functions/src/callable/deleteAccount.ts` | `onCall` (Auth required) | Safely anonymizes account, deletes personal data, but blocks deletion if active tuition exists. |
@@ -72,6 +72,8 @@ All heavy mathematical calculations, ranking algorithms, escrow disbursements, h
    - Reads `tutors/{tutorId}`
    - Verifies `bankedTokens > 0`
    - Decrements `bankedTokens` by 1 and increments `tokens` by 1 simultaneously.
+5. **Double-Defense Payout Verification Guard:**
+   `dailyPayouts` explicitly verifies that `studentPaymentId` and `paidByStudentAt` exist on `tutor_payouts`, and that `refData.status === 'qualified'` and `qualifiedAt` exist on `referrals`. Any document where student payment has not been recorded is automatically skipped from payout execution.
 
 ---
 

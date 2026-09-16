@@ -218,4 +218,136 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
       expect(breakdown.month2TutorShare).toBe(0);
     });
   });
+
+  test.describe('Student Fee Payment Prerequisite & Earnings Lifecycle Verification', () => {
+    function evaluatePayoutBackendGuard(payout: {
+      studentPaymentId?: string;
+      paidByStudentAt?: any;
+      releaseEligibleAt: number;
+      now: number;
+    }) {
+      if (!payout.studentPaymentId || !payout.paidByStudentAt) {
+        return { eligible: false, reason: 'student_payment_missing' };
+      }
+      if (payout.now < payout.releaseEligibleAt) {
+        return { eligible: false, reason: 'escrow_timelocked' };
+      }
+      return { eligible: true, reason: 'ready_for_payout' };
+    }
+
+    function evaluateTeacherEarningsMilestone(app: {
+      startDate: number;
+      feePaid: boolean;
+      payoutStatus?: string;
+      now: number;
+    }) {
+      const daysElapsed = Math.max(0, Math.floor((app.now - app.startDate) / (24 * 60 * 60 * 1000)));
+      const isPayoutComplete = app.payoutStatus === 'paid';
+
+      let stage1State: 'paid' | 'trial' | 'grace_period' | 'locked_overdue';
+      let stage2State: 'disbursed' | 'in_escrow' | 'locked_overdue' | 'locked_grace' | 'locked_trial';
+
+      if (app.feePaid) {
+        stage1State = 'paid';
+      } else if (daysElapsed >= 10) {
+        stage1State = 'locked_overdue';
+      } else if (daysElapsed >= 7) {
+        stage1State = 'grace_period';
+      } else {
+        stage1State = 'trial';
+      }
+
+      if (isPayoutComplete) {
+        stage2State = 'disbursed';
+      } else if (app.feePaid) {
+        stage2State = 'in_escrow';
+      } else if (daysElapsed >= 10) {
+        stage2State = 'locked_overdue';
+      } else if (daysElapsed >= 7) {
+        stage2State = 'locked_grace';
+      } else {
+        stage2State = 'locked_trial';
+      }
+
+      return { daysElapsed, stage1State, stage2State };
+    }
+
+    test('Strictly blocks Day 30 payout if student payment ID or payment timestamp is missing', () => {
+      const Day30 = 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      // Case 1: Unpaid (missing studentPaymentId and paidByStudentAt)
+      const resultUnpaid = evaluatePayoutBackendGuard({
+        releaseEligibleAt: now - 1000,
+        now,
+      });
+      expect(resultUnpaid.eligible).toBe(false);
+      expect(resultUnpaid.reason).toBe('student_payment_missing');
+
+      // Case 2: Verified student payment exists and Day 30 reached
+      const resultPaid = evaluatePayoutBackendGuard({
+        studentPaymentId: 'pay_12345678',
+        paidByStudentAt: now - Day30,
+        releaseEligibleAt: now - 1000,
+        now,
+      });
+      expect(resultPaid.eligible).toBe(true);
+      expect(resultPaid.reason).toBe('ready_for_payout');
+    });
+
+    test('Accurately evaluates Teacher Earnings lifecycle: Trial, Grace Period, Hard Lock, and Escrow', () => {
+      const ONE_DAY = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      // Day 3 (Trial in progress)
+      const day3 = evaluateTeacherEarningsMilestone({
+        startDate: now - (3 * ONE_DAY),
+        feePaid: false,
+        now,
+      });
+      expect(day3.daysElapsed).toBe(3);
+      expect(day3.stage1State).toBe('trial');
+      expect(day3.stage2State).toBe('locked_trial');
+
+      // Day 8 (3-day Grace Period)
+      const day8 = evaluateTeacherEarningsMilestone({
+        startDate: now - (8 * ONE_DAY),
+        feePaid: false,
+        now,
+      });
+      expect(day8.daysElapsed).toBe(8);
+      expect(day8.stage1State).toBe('grace_period');
+      expect(day8.stage2State).toBe('locked_grace');
+
+      // Day 12 (Hard Lock / Overdue)
+      const day12 = evaluateTeacherEarningsMilestone({
+        startDate: now - (12 * ONE_DAY),
+        feePaid: false,
+        now,
+      });
+      expect(day12.daysElapsed).toBe(12);
+      expect(day12.stage1State).toBe('locked_overdue');
+      expect(day12.stage2State).toBe('locked_overdue');
+
+      // Student Paid (Escrow Held)
+      const paidEscrow = evaluateTeacherEarningsMilestone({
+        startDate: now - (15 * ONE_DAY),
+        feePaid: true,
+        payoutStatus: 'escrow_held',
+        now,
+      });
+      expect(paidEscrow.stage1State).toBe('paid');
+      expect(paidEscrow.stage2State).toBe('in_escrow');
+
+      // Disbursed
+      const disbursed = evaluateTeacherEarningsMilestone({
+        startDate: now - (32 * ONE_DAY),
+        feePaid: true,
+        payoutStatus: 'paid',
+        now,
+      });
+      expect(disbursed.stage1State).toBe('paid');
+      expect(disbursed.stage2State).toBe('disbursed');
+    });
+  });
 });

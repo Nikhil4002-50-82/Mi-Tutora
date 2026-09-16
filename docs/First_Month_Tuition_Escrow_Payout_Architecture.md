@@ -32,6 +32,13 @@ $$\text{Platform Net Margin } = P - R = G \times 0.30 \quad (30\% \text{ net ret
 > [!NOTE]
 > **GST Billing Alignment:** In accordance with Indian taxation rules, 18% GST is collected on checkout from the parent (`coursePrice + 18% GST` via `/api/create-order`). The platform 40/60 escrow split and referral reward are computed strictly on the net base tuition fee (`rewardBase`), preserving educator and affiliate earnings.
 
+### 1.3 Teacher Proposal Breakdown (`StudentViewModal.tsx`)
+
+When a teacher reviews a student tuition inquiry or inputs a counter-offer in the **Student View Modal**, the modal features a dual-card earnings breakdown:
+- **Month 1 (Trial & Onboarding)**: Shows **60% Net Payout** with Day 30 automated escrow disbursement note, and clarifies the 40% platform fee covering trial guarantees and parent onboarding.
+- **Month 2+ (Ongoing Classes)**: Highlights **100% Direct Retainer** with 0% platform commission, coordinated directly between parent and tutor.
+- **Reactive Recalculation:** The numbers update reactively in real time as the tutor types in the *"Your Offer"* input field.
+
 ---
 
 ## 2. The 30-Day Milestone Journey
@@ -176,6 +183,40 @@ A critical architectural mandate is that introducing this escrow and payout syst
      - `status: 'paid'`
      - `utrNumber: payload.utr`
      - `paidAt: serverTimestamp()`
+
+### 5.1 Double-Defense Guard: Mandatory Student Fee Verification
+Under no circumstances does Day 30 payout execution disburse funds without verified student payment. Both the nightly Cloud Function `dailyPayouts.ts` and the Next.js API runner `/api/payouts/process/route.ts` enforce strict double-defense assertion guards:
+- **Tutor Payouts**: Verifies that both `studentPaymentId` (Razorpay payment receipt) and `paidByStudentAt` (payment timestamp) are present on the payout document:
+  ```typescript
+  if (!payout.studentPaymentId || !payout.paidByStudentAt) {
+    console.warn(`Skipping payout ${payout.id}: Student payment unverified.`);
+    continue;
+  }
+  ```
+- **Referral Payouts**: Verifies that the referee's status is strictly `'qualified'` and `qualifiedAt` is recorded:
+  ```typescript
+  if (refData.status !== 'qualified' || !refData.qualifiedAt) {
+    console.warn(`Skipping referral payout ${refDoc.id}: Referee has not completed fee payment.`);
+    continue;
+  }
+  ```
+
+### 5.2 Teacher Earnings Dashboard Lifecycle Transparency
+In [`web/src/app/dashboard/teacher/page.tsx`](file:///c:/Users/Dell/Desktop/mushi/web/src/app/dashboard/teacher/page.tsx), the **Active Tuitions** milestone status tracker provides complete real-time lifecycle transparency across both Stage 1 (Student Fee) and Stage 2 (Tutor Payout):
+1. **Trial in Progress (`daysElapsed < 7`, `!feePaid`)**:
+   - Stage 1: Amber clock badge `Due on [Day 7 Date] (Trial Day 7)` with days remaining countdown.
+   - Stage 2: Slate calendar badge `Expected: ₹Y on [Day 30 Date]` with `Student Fee Required` pill.
+2. **Overdue Grace Period (`7 <= daysElapsed < 10`, `!feePaid`)**:
+   - Stage 1: Orange alert badge `Payment Overdue (3-Day Grace Period)`.
+   - Stage 2: Amber lock badge `Payout on Hold (Awaiting Student Fee)`.
+3. **Hard Lock (`daysElapsed >= 10`, `!feePaid`)**:
+   - Stage 1: Red alert badge `Overdue - Student Account Locked` (instruction to pause classes).
+   - Stage 2: Rose lock badge `Payout Blocked (Student Fee Unpaid) - Day 30 Razorpay transfer will NOT execute unless student clears fee`.
+4. **Fee Paid by Student (`feePaid === true`)**:
+   - Stage 1: Green checkmark badge `₹X Received by Platform`.
+   - Stage 2: Teal lock badge `₹Y Held in Platform Escrow (releasing on Day 30)`.
+5. **Day 30 Disbursed**:
+   - Stage 2: Green checkmark badge `₹Y Disbursed to UPI` with bank UTR number.
 
 ---
 

@@ -144,7 +144,7 @@ graph TD
 
 ## 4. Server-Side Execution & 20-Card Lazy Loading
 
-To eliminate mobile browser lag and protect proprietary matchmaking formulas, 100% of candidate filtering, score calculation, and sorting occurs **server-side** (via Cloud Functions `getRankedTutors` / `getRankedStudents` and Next.js server routes `/api/tutors/ranked` / `/api/students/ranked`):
+To eliminate mobile browser lag and protect proprietary matchmaking formulas, 100% of candidate filtering, score calculation, and sorting occurs **server-side** (via 2nd Gen Firebase Cloud Functions `getRankedTutors` / `getRankedStudents` invoked via `dashboardApi.ts` using `httpsCallable`):
 
 1. **Global Rank #1 Guarantee:** 
    The server-side engine queries all candidate profiles, runs `isStrictMatch` and score calculations across every profile, and sorts the complete array in descending order of score. This guarantees that Rank #1 is always the highest-matching candidate globally.
@@ -157,13 +157,13 @@ To eliminate mobile browser lag and protect proprietary matchmaking formulas, 10
 
 ## Developer Architecture Notes (Portal Pipelines)
 
-### Teacher Portal Pipeline (`getRankedStudents` / `/api/students/ranked`)
+### Teacher Portal Pipeline (`getRankedStudents` Callable)
 - The server engine fetches **Students** and their associated **Groups**.
 - **The Stitching Magic:** Because `teacherGenderPreference` lives in the `groups` collection, the backend engine stitches the parent group preferences into the student payload (`requestDoc`).
 - The backend evaluates `isStrictMatch(studentGroup, activeTeacher)` and scores candidates against the authenticated teacher's qualifications, boards, and budget.
 - Returns 20 students per page with `hasMore` indicator.
 
-### Student Portal Pipeline (`getRankedTutors` / `/api/tutors/ranked`)
+### Student Portal Pipeline (`getRankedTutors` Callable)
 - The server engine receives the student's active group context (`studentId`, `groupDocId`, `category`, `subjects`, `board`, `classLevel`, `budget`, `genderPreference`).
 - The engine fetches candidate **Tutors**, evaluates `isStrictMatch(context, tutor)`, and calculates suitability scores including verification bonuses (+20 KYC, +20 Pro).
 - Sorts globally and returns the top 20 tutors for the active page.

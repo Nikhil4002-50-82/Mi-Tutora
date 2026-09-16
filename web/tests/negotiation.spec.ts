@@ -92,4 +92,68 @@ test.describe('Negotiation Boundary Rules (negotiation_plan.md)', () => {
       expect(canModifyPrice('tuition_started')).toBe(false);
     });
   });
+
+  test.describe('Teacher View Modal: Dual-Card Tuition Fee Breakdown & Counter-Offer Reactivity (StudentViewModal.tsx)', () => {
+    function computeTuitionBreakdown(baseBudget: any, enteredOffer?: string) {
+      const parsedOffer = enteredOffer ? parseFloat(enteredOffer) : NaN;
+      const effectiveBudget = (!isNaN(parsedOffer) && parsedOffer > 0)
+        ? parsedOffer
+        : (typeof baseBudget === 'number' && !isNaN(baseBudget) && baseBudget > 0 ? baseBudget : 0);
+
+      const hasNumericBudget = effectiveBudget > 0;
+      const month1TutorShare = hasNumericBudget ? Math.round(effectiveBudget * 0.60) : 0;
+      const month1PlatformFee = hasNumericBudget ? Math.round(effectiveBudget * 0.40) : 0;
+      const month2PlusTutorShare = hasNumericBudget ? Math.round(effectiveBudget) : 0;
+
+      return {
+        effectiveBudget,
+        hasNumericBudget,
+        month1TutorShare,
+        month1PlatformFee,
+        month2PlusTutorShare,
+      };
+    }
+
+    test('Computes Month 1 (60% net share, 40% platform fee) and Month 2+ (100% direct retainer) for baseline budget', () => {
+      const breakdown = computeTuitionBreakdown(5000);
+      expect(breakdown.hasNumericBudget).toBe(true);
+      expect(breakdown.effectiveBudget).toBe(5000);
+      expect(breakdown.month1TutorShare).toBe(3000); // 60% of 5000
+      expect(breakdown.month1PlatformFee).toBe(2000); // 40% of 5000
+      expect(breakdown.month2PlusTutorShare).toBe(5000); // 100% of 5000
+    });
+
+    test('Reactively updates breakdown when teacher enters a custom counter-offer', () => {
+      // Student budget is 4000, but teacher inputs 6500 in the counter-offer box
+      const breakdown = computeTuitionBreakdown(4000, '6500');
+      expect(breakdown.effectiveBudget).toBe(6500);
+      expect(breakdown.month1TutorShare).toBe(3900); // 60% of 6500
+      expect(breakdown.month1PlatformFee).toBe(2600); // 40% of 6500
+      expect(breakdown.month2PlusTutorShare).toBe(6500); // 100% of 6500
+    });
+
+    test('Falls back safely to base budget when counter-offer is empty or non-numeric', () => {
+      const emptyBreakdown = computeTuitionBreakdown(6000, '');
+      expect(emptyBreakdown.effectiveBudget).toBe(6000);
+      expect(emptyBreakdown.month1TutorShare).toBe(3600);
+
+      const invalidBreakdown = computeTuitionBreakdown(6000, 'abc');
+      expect(invalidBreakdown.effectiveBudget).toBe(6000);
+      expect(invalidBreakdown.month1TutorShare).toBe(3600);
+    });
+
+    test('Handles zero or undefined budgets gracefully without NaN', () => {
+      const zeroBreakdown = computeTuitionBreakdown(0);
+      expect(zeroBreakdown.hasNumericBudget).toBe(false);
+      expect(zeroBreakdown.effectiveBudget).toBe(0);
+      expect(zeroBreakdown.month1TutorShare).toBe(0);
+      expect(zeroBreakdown.month1PlatformFee).toBe(0);
+      expect(zeroBreakdown.month2PlusTutorShare).toBe(0);
+
+      const undefinedBreakdown = computeTuitionBreakdown(undefined);
+      expect(undefinedBreakdown.hasNumericBudget).toBe(false);
+      expect(undefinedBreakdown.month1TutorShare).toBe(0);
+    });
+  });
 });
+

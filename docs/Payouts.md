@@ -11,11 +11,15 @@ This document outlines the operational steps, environment configuration, manual 
   * **Escrow Holding (Days 8–30):**
     * 60% of the tuition fee is locked in `tutor_payouts` with `status: 'escrow_held'`.
     * 25% of company margin (10% of total fee) is locked in `referrals` with `payoutStatus: 'escrow_held'`.
-  * **Day 30 Automated Disbursement:**
-    * The scheduled Cloud Function `dailyPayouts` runs nightly at **00:00 IST**.
-    * It checks for matured records where `releaseEligibleAt <= Date.now()`.
-    * It automatically transfers funds directly to the Tutor's UPI ID and the Referrer's UPI ID via the **RazorpayX Payouts API**.
+  * **Day 30 Automated Disbursement (Strict Fee Prerequisite):**
+    * The scheduled Cloud Function `dailyPayouts` runs nightly at **00:00 IST** (and `/api/payouts/process`).
+    * **Strict Prerequisite Check:** Transfers strictly execute **only if the student has paid their tuition fee**. The backend verifies `studentPaymentId` and `paidByStudentAt` for tutors, and `refData.status === 'qualified'` and `qualifiedAt` for referrals. If unpaid, payout execution is strictly skipped.
+    * Checks for matured records where `releaseEligibleAt <= Date.now()`.
+    * Automatically transfers funds directly to the Tutor's UPI ID and the Referrer's UPI ID via the **RazorpayX Payouts API**.
     * There is **zero minimum threshold** and no manual button clicking required from users.
+  * **Dashboard Transparency:**
+    * **Teacher Earnings (`Active Tuitions` in `teacher/page.tsx`):** Renders real-time stage states (Trial in progress due Day 7, Overdue 3-day grace period, Hard lock pause classes alert, Platform escrow held, and Disbursed to UPI).
+    * **Referrals Tracker (`ReferralsList.tsx`):** Stage 4 displays `"Awaiting Fee"` when pending, clarifying that reward locks into 30-day escrow only after friend settles fee.
 
 ---
 

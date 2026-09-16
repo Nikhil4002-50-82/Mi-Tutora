@@ -123,7 +123,7 @@ To allow instant physical feasibility assessment without opening cards:
 
 ### Server-Side Ranking Engine & 20-Card Lazy Loading
 To ensure instantaneous page loads and eliminate browser lag without exposing proprietary ranking algorithms:
-*   **Server-Side Execution (`getRankedTutors` & `getRankedStudents`):** 100% of scoring and filtering runs in Firebase Cloud Functions (2nd Gen) / Next.js Server API endpoints.
+*   **Server-Side Execution (`getRankedTutors` & `getRankedStudents`):** 100% of scoring and filtering runs in 2nd Gen Firebase Cloud Functions callable endpoints invoked via `dashboardApi.ts` using `httpsCallable`.
 *   **Global Rank #1 Guarantee:** All candidate profiles are evaluated and sorted in descending order of total score *before* pagination. Rank #1 is always the highest-scoring candidate globally, never missed due to shallow querying.
 *   **20-Card Paginated Chunks (`page`, `pageSize: 20`):** The client requests `page=1` initially (20 cards) and retrieves subsequent 20-card slices via the **"Load More"** trigger as the user scrolls, saving bandwidth and Firestore read quotas.
 
@@ -172,7 +172,7 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 1. **Commitment Demo Fee:** To eliminate frivolous applications, the teacher pays a nominal demo platform fee (₹99 to ₹299 based on category) to schedule the trial class.
 2. **Link Validation:** Video links (Google Meet, Zoom) are strictly sanitized and validated against official regex patterns before saving.
 3. **Explicit Completion:** After the trial class occurs, the teacher explicitly clicks "Mark Demo as Finished", setting `status: 'waiting_for_parent_decision'`.
-4. **Hourly Automated Expiry (`expireDemosAndDecisions`):** Running hourly (`0 * * * *`, IST), this Cloud Scheduler job automatically marks scheduled demos whose meeting window expired 24h ago as `completed`, and auto-declines applications where parents took no hiring decision within the 48-hour window.
+4. **Hourly Automated Expiry (`expireDemosAndDecisions`):** Running hourly (`0 * * * *`, IST), this Cloud Scheduler job automatically transitions scheduled demos whose scheduled meeting time passed 24h ago without manual teacher confirmation to `waiting_for_parent_decision` (stamping `demoCompletedAt: serverTimestamp()`), and auto-declines applications where parents took no hiring decision within the 48-hour window.
 
 ---
 
@@ -190,6 +190,11 @@ When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 
     *   If 3 grace days pass without payment (`daysElapsed >= 10`), the account enters hard lock.
     *   All sidebar navigation tabs and dashboard content are locked (`🔒` lock icons, dimmed styling, and disabled clicks).
     *   The student must click "Pay Monthly Fees Securely" to complete payment via Razorpay and restore full access.
+*   **Teacher Earnings Real-Time Visibility (`teacher/page.tsx`):**
+    *   While student is in trial (Days 1–7), the teacher sees Stage 1 *Due on Day 7* and Stage 2 *Expected on Day 30* with *Student Fee Required* status.
+    *   During Grace Period (Days 7–9), displays *Payment Overdue* and *Payout on Hold (Awaiting Student Fee)*.
+    *   In Hard Lock (Day 10+), displays *Account Locked* and *Payout Blocked*, advising tutor to pause classes until dues are cleared.
+    *   Once student pays, displays *₹X Received by Platform* and *₹Y Held in Platform Escrow* releasing on Day 30.
 *   **Strict Zero-Refund Policy:** Once the tuition fee is paid, **no refunds are permitted**. If the parent disconnects after paying, the full fee is retained to protect teacher earnings.
 
 ---
@@ -215,6 +220,7 @@ Day 7 (Payment)                Days 8–30 (Escrow)              Day 30 (Automat
 ```
 
 *   **Automated Day 30 Dual-Payout Scheduler (`dailyPayouts`):** Triggered every night at **00:00 IST**, this Cloud Scheduler job processes all matured Day 30 tuitions (`startDate + 30 days`), transferring tutor and referral earnings via the Razorpay Payouts API.
+*   **Strict Fee Prerequisite Verification Guard:** Payouts strictly require that student tuition payment is verified on the record (`studentPaymentId` and `paidByStudentAt` on `tutor_payouts`; `refData.status === 'qualified'` and `qualifiedAt` on `referrals`). The automated engine skips any record missing verified student payment, completely preventing unauthorized disbursements.
 *   **Batch & Concurrency Safety:** Uses a custom `BatchManager` strictly capping Firestore writes at 400 operations per batch, with deterministic document IDs (`payout_${applicationId}`) to prevent duplicate disbursements.
 *   **Missing UPI Safety Fallback:** If either party has not configured their UPI ID, the system flags `action_required_missing_upi` independently without blocking the other disbursement.
 *   **Admin Bulk CSV Fallback (`/api/admin/payouts/export-csv`):** Enables admins to download a banking-ready CSV listing all pending tutor and referrer payouts for manual corporate netbanking.
@@ -369,6 +375,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 | **Video Meeting Link Validation** | 👉 [`docs/Link_Validation_Demo_Architecture.md`](./Link_Validation_Demo_Architecture.md) |
 | **Authentication & RBAC Routing** | 👉 [`docs/Authentication.md`](./Authentication.md) |
 | **Custom ID Generation (`MTT`, `MTP`, `MTS`, `MTG`)** | 👉 [`docs/Document_ID.md`](./Document_ID.md) |
+| **RazorpayX Payouts Setup & Manual Testing Guide** | 👉 [`docs/Payouts.md`](./Payouts.md) |
 
 ---
 
@@ -377,7 +384,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](../web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 19 test suites (172 unit, integration & ranking pagination tests)
+# Run all 19 test suites (196+ unit, integration, escrow & ranking pagination tests)
 cd web
 npx playwright test
 
@@ -389,5 +396,5 @@ cd ../../functions
 npm run build
 ```
 
-*All 172 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+*All automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
 

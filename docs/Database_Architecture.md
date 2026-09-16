@@ -97,6 +97,7 @@ erDiagram
 | `latitude` | `number` | Float (e.g. `12.9716`) or `0.0` | GPS latitude. Used for Haversine proximity scoring (+10 to +30 pts). `0.0` for online-only. | `web/src/utils/matching.ts` |
 | `longitude` | `number` | Float (e.g. `77.5946`) or `0.0` | GPS longitude. Used for Haversine proximity scoring (+10 to +30 pts). `0.0` for online-only. | `web/src/utils/matching.ts` |
 | `weeklyQuota` | `map` | `{ weekStartDate: string, tokensUsed: number, lastUpdated: Timestamp }` | Quota engine: 5 tokens/week (Free) or 15 tokens/week (Pro). Resets on Monday. | `web/src/app/api/transactions/request/route.ts` |
+| `bankedTokens` | `number` | Non-negative integer (default: `0`) | Accumulated banked proposal tokens earned by referring other teachers. Redeemable via `functions/src/callable/redeemToken.ts`. | `web/src/app/api/verify-payment/route.ts` |
 | `isSubscribed` | `boolean` | `true` \| `false` | Legacy boolean for Pro membership. | `web/src/utils/matching.ts:L101` |
 | `subscriptionPlan` | `string` | `'free'` \| `'pro'` | Active subscription tier. Pro awards +20 ranking boost. | `web/src/utils/matching.ts:L101` |
 | `subscriptionExpiry` | `number` | Epoch timestamp in milliseconds | Timestamp when Pro plan expires. Verified before awarding Pro boosts. | `web/src/utils/matching.ts:L102` |

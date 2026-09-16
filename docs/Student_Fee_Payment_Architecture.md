@@ -67,6 +67,9 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 
 *   **Status:** The student receives classes but has not paid the monthly fee yet (`feePaid: false`).
 *   **The Admin Tracker:** The moment the student hires the teacher, a record is added to the `pending_tuition_fees` database collection to track unpaid dues.
+*   **Teacher View (Earnings Transparency):**
+    *   **Stage 1 (Student Fee):** Amber clock badge `Due on [Day 7 Date] (Trial Day 7)` with live countdown (*"Student 7-day trial in progress ({7 - daysElapsed} days remaining). Fee will be collected by platform."*).
+    *   **Stage 2 (Tutor Payout):** Slate calendar badge `Expected: ₹Y on [Day 30 Date]` with prominent `Student Fee Required` pill (*"Day 30 payout locks into escrow automatically once student pays on Day 7."*).
 *   **Cancellation Policy (Prorated):** 
     *   If the student decides they do not like the teacher and clicks "Remove Teacher" **before** 7 days have passed (`daysElapsed < 7`).
     *   They must pay a **prorated fee** calculated exactly for the number of days they attended: `(Monthly Fee ÷ Days in Month) × Days Elapsed`.
@@ -80,7 +83,9 @@ When Razorpay successfully charges the card, it pings this secure webhook.
     *   Every time the student opens or refreshes the portal, an amber **"Monthly Tuition Fee Due"** reminder pop-up appears displaying the tutor name, monthly fee, and active grace window.
     *   The student can click **"Remind Me Later"** or **`✕`** to dismiss the pop-up and freely browse and use all dashboard tabs without lockout.
     *   Clicking **"Pay Monthly Fees"** opens the Root-Level Payment Modal to settle fees via Razorpay.
-*   **Teacher View:** The teacher sees an amber status indicating the student's trial is completed and they are in their 3-day grace period awaiting fee collection.
+*   **Teacher View (Earnings Transparency):**
+    *   **Stage 1 (Student Fee):** Orange alert badge `Payment Overdue (3-Day Grace Period)` (*"Trial ended on [Day 7 Date]. Student in grace period awaiting payment."*).
+    *   **Stage 2 (Tutor Payout):** Amber lock badge `Payout on Hold (Awaiting Student Fee)` (*"Day 30 transfer will only lock into escrow once the student settles their dues."*).
 *   **Late Cancellation Penalty:** If the student attempts to click "Remove Teacher" at this stage without having paid, the platform backend denies the prorated discount. They are forced to pay the 100% full monthly fee as a penalty to clear their dues before the teacher is removed.
 
 ### Phase 3: The Hard Lock (Day 10+)
@@ -91,14 +96,20 @@ When Razorpay successfully charges the card, it pings this secure webhook.
     *   The entire main dashboard area is replaced with a dedicated red **"Account Locked"** screen.
     *   **Sidebar Navigation Locked:** All sidebar tabs (Dashboard, New Tuition, Requests & Offers, Notifications, My Teachers, Referrals) display a lock icon (`🔒`), are dimmed with `opacity-50 cursor-not-allowed`, and disabled. Clicking any tab shows a toast warning: *"Account locked. Please clear pending tuition fees to unlock your dashboard."*
     *   The student must click **"Pay Monthly Fees Securely"** on the lock card, which mounts the root-level payment modal and opens the Razorpay checkout overlay.
-*   **Teacher View:** The teacher sees a red alert on their dashboard instructing them to halt tuitions until the student pays the platform.
+*   **Teacher View (Earnings Transparency):**
+    *   **Stage 1 (Student Fee):** Red alert badge `Overdue - Student Account Locked` (*"Student has not paid dues. Portal is locked. Pause classes until fee is paid."*).
+    *   **Stage 2 (Tutor Payout):** Rose lock badge `Payout Blocked (Student Fee Unpaid)` (*"Day 30 Razorpay transfer will NOT execute unless the student clears their tuition fee."*).
+    *   **Action Mandate:** Tutors are instructed to pause classes immediately to protect against unpaid teaching time.
 
 ### Phase 4: Post-Payment (Escrow Holding & Strict Zero Refund)
 **Trigger:** The student has successfully paid the full monthly fee via Razorpay (`feePaid: true`).
 
 *   **Status:** The transaction for the month is finalized and secure. The `pending_tuition_fees` tracking document is resolved.
+*   **Teacher View (Earnings Transparency):**
+    *   **Stage 1 (Student Fee):** Green checkmark badge `₹X Received by Platform` (online checkout verified).
+    *   **Stage 2 (Tutor Payout):** Teal lock badge `₹Y Held in Platform Escrow (releasing on Day 30)`. Once Day 30 arrives and the transfer executes, transitions to Green checkmark badge `₹Y Disbursed to UPI` with bank UTR reference number.
 *   **Financial Split & Escrow Custody:** The platform retains its **40% commission**, and atomically logs an escrow record in `tutor_payouts` for the remaining **60% tutor share**. The funds are safely held until Day 30 (`startDate + 30 days`).
-*   **Automated Day 30 Payout:** Upon reaching Day 30, the platform triggers the Razorpay Payouts API to transfer the 60% balance directly to the teacher's UPI ID.
+*   **Automated Day 30 Payout:** Upon reaching Day 30, the platform triggers the Razorpay Payouts API to transfer the 60% balance directly to the teacher's UPI ID (strictly requiring student payment verification).
 *   **First-Month Only Intermediation:** The platform fee and escrow process occur strictly for Month 1. For Month 2 onwards, parent and teacher coordinate classes and tuition fees directly offline without platform cuts.
 *   **Cancellation Policy (Zero Refund):** 
     *   If the student clicks "Remove Teacher" at any point **after** paying the monthly fees, the teacher is immediately removed from the group, stopping future classes.

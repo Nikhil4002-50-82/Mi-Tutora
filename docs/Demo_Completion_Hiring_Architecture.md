@@ -37,15 +37,15 @@ To ensure that teachers are not left waiting indefinitely for a response, the sy
 - The 48-hour clock begins ticking from the `updatedAt` timestamp (the moment the teacher clicked "Mark Demo as Finished").
 - **Hourly Serverless Cron (`expireDemosAndDecisions`):** Running hourly (`0 * * * *`, IST), this 2nd Gen Cloud Function checks all documents in `waiting_for_parent_decision`.
 - If 48 hours have passed and the student still hasn't made a decision, the function automatically transitions the status to `declined`, freeing up the teacher's schedule and resetting active queue counts.
-- In addition, if a teacher neglects to mark a conducted demo as finished, the job automatically transitions sessions older than 24 hours past the scheduled time to `completed`.
+- In addition, if a teacher neglects to mark a conducted demo as finished, the job automatically transitions sessions older than 24 hours past the scheduled time to `waiting_for_parent_decision` (stamping `demoCompletedAt: serverTimestamp()`), unlocking the 48-hour parent hiring decision window.
 
 ---
 
 ## 3. Example Flow
 
 1.  **Scheduling Complete:** The student and teacher agree on a time, and the status becomes `demo_scheduled` for Tuesday at 5:00 PM.
-2.  **Demo Execution (Teacher):** The demo finishes on Tuesday at 6:00 PM. The teacher clicks "Mark Demo as Finished". The status immediately becomes `waiting_for_parent_decision`.
-3.  **Timeout Initiation:** The 48-hour timeout clock starts ticking on Tuesday at 6:00 PM.
+2.  **Demo Execution (Teacher):** The demo finishes on Tuesday at 6:00 PM. The teacher clicks "Mark Demo as Finished" (or if neglected, the system auto-transitions it 24h later). The status becomes `waiting_for_parent_decision`.
+3.  **Timeout Initiation:** The 48-hour timeout clock starts ticking on Tuesday at 6:00 PM (or upon auto-transition).
 4.  **Hourly Automated Auto-Decline (Cloud Scheduler):** The student takes no action for 2 days. On Thursday at 6:01 PM, the `expireDemosAndDecisions` cron detects that 48 hours have elapsed and automatically marks the status as `declined`.
 
 ---
@@ -61,6 +61,7 @@ stateDiagram-v2
     state "Decision Phase" as DecisionPhase {
         direction LR
         demo_scheduled --> waiting_for_parent_decision : demo_finished (Teacher Action)
+        demo_scheduled --> waiting_for_parent_decision : 24h Unconfirmed (System Cron)
     }
     
     waiting_for_parent_decision --> tuition_started : Hire (Student Action)

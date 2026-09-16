@@ -83,6 +83,12 @@ export async function POST(req: NextRequest) {
       const payout = docSnap.data();
       const releaseEligibleAt = payout.releaseEligibleAt || 0;
 
+      // STRICT SAFETY GUARD: Payout only processes if student has verified paid their tuition fee
+      if (!payout.studentPaymentId || !payout.paidByStudentAt) {
+        console.warn(`[/api/payouts/process] Skipping tutor payout ${docSnap.id}: student payment verification missing.`);
+        continue;
+      }
+
       // Only process if Day 30 has arrived
       if (now < releaseEligibleAt) {
         continue;
@@ -195,6 +201,12 @@ export async function POST(req: NextRequest) {
       const rewardAmount = refData.reward || 0;
 
       if (rewardAmount <= 0) continue;
+
+      // STRICT SAFETY GUARD: Referral reward only processes if qualified via verified payment
+      if (refData.status !== 'qualified' || !refData.qualifiedAt) {
+        console.warn(`[/api/payouts/process] Skipping referral payout ${refSnap.id}: student fee payment qualification missing.`);
+        continue;
+      }
 
       // Only process if Day 30 has arrived
       if (now < releaseEligibleAt) {
