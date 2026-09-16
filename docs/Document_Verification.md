@@ -83,9 +83,19 @@ service firebase.storage {
                    && request.resource.contentType == 'application/pdf'
                    && request.resource.size <= 5 * 1024 * 1024;
     }
-    match /{allPaths=**} {
+    // User avatars/profile images (Images only, max 5MB, owner-only write)
+    match /avatars/{userId}/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId 
+                   && request.resource.contentType.matches('image/.*')
+                   && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Disallow arbitrary writes and require auth to read undefined paths
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
   }
 }

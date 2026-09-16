@@ -581,11 +581,11 @@ The following active collections may not appear in a fresh database snapshot bec
 
 ## 5. Security Rules Summary (`firestore.rules`)
 
-1. **`users`**: Any authenticated user can read; creation enforces valid roles array (`hasOnly(['student', 'teacher', 'parent'])`); role escalation blocked on updates; deletion locked to owner only.
-2. **`parents`**: Requires authentication (`request.auth != null`) for read, create, and update. Update rule enforces `dailyUsage` counter can only increment by 1 per day (anti-spam, max 5/day) or reset to 1 on a new date.
-3. **`tutors`**: Public read and create for authenticated users; delete locked to owner (`request.auth.uid == tutorId`); update rule prevents client-side `bankedTokens` manipulation and enforces weekly token quota limits (5 for free, 15 for pro).
-4. **`students`**: Falls through to the wildcard catch-all rule — read, create, update allowed for any authenticated user; delete requires authentication.
-5. **`groups` & `tuition_requests`**: Falls through to the wildcard catch-all rule — read, create, update allowed for any authenticated user; delete requires authentication.
+1. **`users`**: Any authenticated user can read (required for teacher portal to view parent demo contacts and for referral uniqueness checks); creation strictly locked to the authenticated owner (`request.auth.uid == userId`) and enforces safe roles (`hasOnly(['student', 'teacher', 'parent'])`); update locked to owner only (`request.auth.uid == userId`), blocks client-side `walletBalance` manipulation, and prevents role escalation; deletion locked to owner only.
+2. **`parents`**: Requires authentication (`request.auth != null`) for read. Creation locked to owner (`request.auth.uid == parentId`); update locked to owner (`request.auth.uid == parentId`) and enforces `dailyUsage` counter can only increment by 1 per day (anti-spam, max 5/day) or reset to 1 on a new date; deletion locked to owner.
+3. **`tutors`**: Public read for authenticated users; creation locked to owner (`request.auth.uid == tutorId`); delete locked to owner (`request.auth.uid == tutorId`); update locked to owner (`request.auth.uid == tutorId`), prevents client-side `bankedTokens` manipulation, and enforces weekly token quota limits (5 for free, 15 for pro).
+4. **`students`**: Falls through to the wildcard catch-all rule — read, create, update, delete strictly require authentication (`request.auth != null`), preventing anonymous public access.
+5. **`groups` & `tuition_requests`**: Falls through to the wildcard catch-all rule — read, create, update, delete strictly require authentication (`request.auth != null`), preventing anonymous public access.
 6. **`applications`**: Any authenticated user can read (`request.auth != null`). Client updates are blocked from modifying `feePaid`, `demoPaymentPaid`, price fields after deal closure, or forcing a `tuition_started` / `demo_booking_phase` status directly. Deletions strictly restricted to server Admin SDK (`allow delete: if false`).
 7. **`payments`**: Any authenticated user can read; all writes (`create`, `update`, `delete`) are strictly blocked client-side — managed exclusively by backend Next.js API routes via Firebase Admin SDK.
 8. **`tutor_payouts`**: Any authenticated user can read; all writes blocked client-side — managed exclusively by Firebase Admin SDK.

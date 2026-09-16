@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink, RefreshCw, Sparkles, Info } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -696,6 +696,17 @@ export default function TeacherDashboard() {
   const hasValidExpiry = data?.profile?.subscriptionExpiry ? data?.profile?.subscriptionExpiry > trustedNow : false;
   const isProPlan = isSubscribedFlags && hasValidExpiry;
   const quotaLimit = isProPlan ? 15 : 5;
+  const subscriptionExpiry = data?.profile?.subscriptionExpiry;
+  const daysRemaining = subscriptionExpiry && isProPlan 
+    ? Math.max(0, Math.ceil((subscriptionExpiry - trustedNow) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const formattedExpiryDate = subscriptionExpiry 
+    ? new Date(subscriptionExpiry).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+    : null;
   const isCurrentWeek = data?.profile?.weeklyQuota?.weekStartDate === currentWeekStart;
   const tokensUsed = isCurrentWeek ? (data?.profile?.weeklyQuota?.tokensUsed || 0) : 0;
   const tokensRemaining = Math.max(0, quotaLimit - tokensUsed);
@@ -1047,7 +1058,7 @@ export default function TeacherDashboard() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'mock_key',
         amount: order.amount,
         currency: order.currency,
-        name: 'Mushi Education',
+        name: 'MiTutora',
         description: 'Pro Subscription Upgrade (1 Month)',
         order_id: order.id,
         handler: async function (response: any) {
@@ -2755,103 +2766,247 @@ export default function TeacherDashboard() {
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight">Subscriptions</h1>
-                    <p className="text-slate-500 font-medium mt-1">Upgrade your plan to send more requests and grow your business.</p>
+                    <p className="text-slate-500 font-medium mt-1">Manage your membership, weekly proposal quota, and plan validity.</p>
                   </div>
                 </div>
 
-                {/* Detailed Stats Dashboard */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Current Plan Card */}
-                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Current Plan</p>
-                    <h3 className="text-3xl font-black text-gray-900 flex items-center gap-2">
-                      {isProPlan ? 'Pro' : 'Basic'} 
-                      <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-md ml-2">Active</span>
-                    </h3>
+                {/* Active Pro Hero Banner (When Pro is Active) */}
+                {isProPlan && (
+                  <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                      <ShieldCheck className="w-56 h-56 text-emerald-400" />
+                    </div>
+                    <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                            Pro Educator Pass Active
+                          </span>
+                          {daysRemaining > 0 && (
+                            <span className="bg-white/10 text-emerald-200 border border-white/10 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                              <CalendarClock className="w-3.5 h-3.5 text-emerald-300" />
+                              {daysRemaining} {daysRemaining === 1 ? 'Day' : 'Days'} Remaining
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                            Your Pro Pass is Active
+                          </h2>
+                          <p className="text-emerald-100/70 text-sm font-medium mt-1">
+                            {formattedExpiryDate 
+                              ? `Full Pro benefits are unlocked until ${formattedExpiryDate}.`
+                              : 'You have unlimited access to 15 proposals per week and priority matching.'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-emerald-200/80 bg-black/20 rounded-xl px-3.5 py-2 w-fit border border-white/5">
+                          <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>One-time 30-day pass. Automatically reverts to Free Basic plan on expiry with zero recurring charges.</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row lg:flex-col shrink-0 gap-3">
+                        <button
+                          onClick={() => setUpgradeModalOpen(true)}
+                          className="bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/80 transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Extend Pro (+30 Days)
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  
-                  {/* Quota Progress */}
-                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm col-span-1 md:col-span-2 flex flex-col justify-center">
-                    <div className="flex justify-between items-end mb-2">
-                      <div>
-                        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Weekly Tokens</p>
-                        <p className="text-2xl font-black text-gray-900">{tokensUsed} / {quotaLimit} Used</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full inline-block">
-                          {tokensRemaining} Tokens Left
-                        </p>
+                )}
+
+                {/* 3-Card Metrics Dashboard */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Card 1: Current Plan & Expiry */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Membership</p>
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                        <CalendarDays className="w-4 h-4" />
                       </div>
                     </div>
-                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden mt-2">
-                      <div className="h-full bg-[#00a992] rounded-full transition-all duration-500" style={{ width: `${Math.min((tokensUsed / quotaLimit) * 100, 100)}%` }}></div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                        {isProPlan ? 'Pro Plan' : 'Basic Plan'}
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${isProPlan ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                          Active
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                        {isProPlan && formattedExpiryDate ? (
+                          <>
+                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Valid until {formattedExpiryDate}</span>
+                          </>
+                        ) : (
+                          <span>Free plan / Always available</span>
+                        )}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium mt-3 flex justify-between">
-                      <span>Resets on Monday</span>
-                      <span>{activePendingOffers} Total Pending Offers</span>
-                    </p>
+                  </div>
+
+                  {/* Card 2: Weekly Tokens */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Weekly Proposals</p>
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                        <Target className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-baseline mb-1">
+                        <h3 className="text-2xl font-black text-gray-900">{tokensUsed} / {quotaLimit}</h3>
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                          {tokensRemaining} Left
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden my-2">
+                        <div 
+                          className="h-full bg-[#00a992] rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min((tokensUsed / quotaLimit) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 font-medium flex justify-between">
+                        <span>Resets Monday 00:00 IST</span>
+                        <span>{activePendingOffers} Active Offers</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Banked Tokens Reserve */}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Banked Tokens</p>
+                      <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                        <Award className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900">
+                        {data?.profile?.bankedTokens || 0} <span className="text-sm font-semibold text-slate-400">Tokens</span>
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
+                        Earned through tutor referrals. Automatically used if your weekly quota is reached.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center max-w-4xl mx-auto mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch max-w-4xl mx-auto mt-4">
                   {/* Free Plan */}
-                  <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm hover:shadow-md transition-all flex flex-col h-full">
-                    <h3 className="text-2xl font-black text-gray-900 mb-2">Basic</h3>
-                    <p className="text-slate-500 font-medium mb-6">Perfect for getting started.</p>
-                    <div className="text-4xl font-black text-gray-900 mb-8">
-                      Free <span className="text-lg text-slate-400 font-medium tracking-normal">/forever</span>
+                  <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-2xl font-black text-gray-900">Basic</h3>
+                        {!isProPlan && (
+                          <span className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                            Current Plan
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-500 font-medium mb-6">Essential features for new and part-time tutors.</p>
+                      <div className="text-4xl font-black text-gray-900 mb-8">
+                        Free <span className="text-lg text-slate-400 font-medium tracking-normal">/forever</span>
+                      </div>
+                      
+                      <ul className="space-y-4 mb-8">
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                          <span className="text-gray-700 font-medium">Up to 5 proposals per week</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                          <span className="text-gray-700 font-medium">Standard search & profile visibility</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                          <span className="text-gray-700 font-medium">Parent contact info unlocked on demo hire</span>
+                        </li>
+                      </ul>
                     </div>
                     
-                    <ul className="space-y-4 mb-8 flex-1">
-                      <li className="flex items-center gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">Up to 5 requests per week</span>
-                      </li>
-                      <li className="flex items-center gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">Standard profile visibility</span>
-                      </li>
-                    </ul>
-                    
-                    <button className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50" disabled={!isProPlan}>
-                      {!isProPlan ? 'Current Plan' : 'Downgrade (Coming Soon)'}
-                    </button>
+                    <div>
+                      <button 
+                        disabled
+                        className="w-full bg-slate-100 text-slate-500 font-bold py-3.5 px-6 rounded-xl cursor-default text-sm border border-slate-200/60"
+                      >
+                        {!isProPlan ? 'Current Active Plan' : 'Default Fallback Plan'}
+                      </button>
+                      {isProPlan && (
+                        <p className="text-xs text-slate-400 text-center font-medium mt-2.5">
+                          Your account automatically reverts here when your Pro pass expires. No action needed.
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Pro Plan */}
-                  <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col h-full transform scale-105 border border-emerald-900/50">
-                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                  <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between h-full border border-emerald-900/50">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                       <Star className="w-32 h-32 text-emerald-300" />
                     </div>
                     <div className="relative z-10">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="text-2xl font-black text-white">Pro</h3>
-                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Recommended</span>
+                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Recommended
+                        </span>
                       </div>
-                      <p className="text-emerald-100/80 font-medium mb-6">For serious tutors looking to scale.</p>
+                      <p className="text-emerald-100/80 font-medium mb-6">For committed tutors looking to maximize student leads.</p>
                       <div className="text-4xl font-black text-white mb-8">
-                        ₹299 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/month</span>
+                        ₹299 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/30-day pass</span>
                       </div>
                       
-                      <ul className="space-y-4 mb-8 flex-1">
+                      <ul className="space-y-4 mb-8">
                         <li className="flex items-center gap-3">
                           <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                          <span className="text-white font-medium text-lg">Up to 15 requests per week</span>
+                          <span className="text-white font-medium">Up to 15 proposals per week (3x more leads)</span>
                         </li>
                         <li className="flex items-center gap-3">
                           <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                          <span className="text-white font-medium text-lg">Priority matching algorithm</span>
+                          <span className="text-white font-medium">Priority matchmaking algorithm ranking boost</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-white font-medium">Direct parent contact details on demo bookings</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-white font-medium">Verified Pro badge on discovery profile</span>
                         </li>
                       </ul>
-                      
+                    </div>
+                    
+                    <div className="relative z-10">
                       <button 
-                        onClick={isProPlan ? undefined : () => setUpgradeModalOpen(true)} 
-                        disabled={isProPlan}
-                        className={`w-full font-black py-4 px-6 rounded-xl transition-all active:scale-95 ${isProPlan ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] shadow-lg shadow-emerald-900/50 hover:shadow-emerald-900/80'}`}
+                        onClick={() => setUpgradeModalOpen(true)} 
+                        className="w-full font-black py-4 px-6 rounded-xl transition-all active:scale-95 bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/80 flex items-center justify-center gap-2 text-sm"
                       >
-                        {isProPlan ? 'Active Plan' : 'Upgrade to Pro'}
+                        {isProPlan ? (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Extend Pro Pass (+30 Days) — ₹299
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRight className="w-4 h-4" />
+                            Upgrade to Pro — ₹299
+                          </>
+                        )}
                       </button>
+                      {isProPlan && formattedExpiryDate && (
+                        <p className="text-xs text-emerald-300/70 text-center font-medium mt-2.5">
+                          Currently active until {formattedExpiryDate}. Extends by another 30 days from your expiry.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
