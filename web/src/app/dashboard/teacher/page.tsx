@@ -24,6 +24,7 @@ import MessageModal from '@/components/MessageModal';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { generateReferralCode } from '@/utils/referral';
 import { calculateSuitabilityScore, doesClassMatch, isStrictMatch } from '@/utils/matching';
+import { formatTimeTo12Hour } from '@/utils/timeFormat';
 import { toast } from 'sonner';
 
 
@@ -2038,7 +2039,7 @@ export default function TeacherDashboard() {
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Schedule</p>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Calendar className="w-4 h-4 text-emerald-600" />
-                                      <span className="text-sm font-bold text-slate-800">{new Date(neg.demoDate || neg.proposedDate).toLocaleDateString()} at {(neg.demoTime || neg.proposedTime)?.split('||')[0] || (neg.demoTime || neg.proposedTime)}</span>
+                                      <span className="text-sm font-bold text-slate-800">{new Date(neg.demoDate || neg.proposedDate).toLocaleDateString()} at {formatTimeTo12Hour(neg.demoTime || neg.proposedTime)}</span>
                                     </div>
                                     </div>
                                 ) : (
@@ -2393,7 +2394,7 @@ export default function TeacherDashboard() {
                                 </div>
                                 <div>
                                   <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Demo Schedule</p>
-                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {cls.app.demoTime}</p>
+                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {formatTimeTo12Hour(cls.app.demoTime)}</p>
                                 </div>
                               </div>
                             )}
@@ -3770,19 +3771,13 @@ export default function TeacherDashboard() {
               return;
             }
 
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/api/auth/delete-account', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ role: 'teacher' }),
-            });
-
-            const result = await res.json();
-            if (!res.ok || !result.success) {
-              throw new Error(result.error || 'Failed to delete account');
+            const { functions } = await import('@/utils/firebase/client');
+            const { httpsCallable } = await import('firebase/functions');
+            const deleteAccount = httpsCallable(functions, 'deleteUserAccount');
+            const res = await deleteAccount({ role: 'teacher' });
+            const result = res.data as { success: boolean; isFullyDeleted: boolean; remainingRoles?: string[] };
+            if (!result.success) {
+              throw new Error('Failed to delete account');
             }
 
             if (!result.isFullyDeleted) {

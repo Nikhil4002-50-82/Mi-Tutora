@@ -1,8 +1,8 @@
-# Firebase Cloud Functions (2nd Gen) Architecture & Production Implementation
+# Firebase Cloud Functions (2nd Gen) — Live Architecture Reference
 
-This document details the completed backend architecture of **Mi-Tutora** using **Firebase Cloud Functions (2nd Gen)** deployed to the **Mumbai region (`asia-south1`)**. 
+> **Status: Fully Implemented & Deployed** — All 11 functions are live in production (region: `asia-south1`).
 
-All heavy mathematical calculations, ranking algorithms, escrow disbursements, hourly time-sensitive state machines, and webhook listeners have been migrated out of client code and executed in secure, isolated serverless runtime containers.
+This document is the authoritative architecture reference for all **Firebase Cloud Functions (2nd Gen)** powering the Mi-Tutora backend. All heavy mathematical calculations, ranking algorithms, escrow disbursements, time-sensitive state machines, and webhook listeners run in secure, isolated serverless containers — fully decoupled from the browser client.
 
 ---
 

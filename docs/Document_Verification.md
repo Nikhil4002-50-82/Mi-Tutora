@@ -139,5 +139,94 @@ The feature is protected by 18 automated unit and integration tests in [`web/tes
 1. **Dynamic Mapping Suite:** Verifies that all qualification categories return `required: false` for certificate slots.
 2. **Strict PDF Validation Suite:** Tests rejection of non-PDFs, rejection of files > 5MB, and acceptance of valid PDFs.
 3. **Resume Validation Suite:** Tests acceptance of `.pdf`, `.doc`, `.docx` for resumes and validates `isResumeComplete()`.
-4. **Optional Completeness Suite:** Tests that `isVerificationComplete()` safely passes when certificates are omitted.
+4. **Completeness Suite:** Tests that `isVerificationComplete()` returns `true` only when all qualification-mapped document slots have uploaded files. This controls the **profile completeness badge** — not proposal gating (which only uses `isResumeComplete()`).
 5. **Proposal Gating Suite:** Tests proposal permission based on resume status.
+
+---
+
+## 8. Aadhar KYC via PowerAPI (Backend Ready, UI Pending)
+
+> [!IMPORTANT]
+> **Backend: Fully Implemented.** Both API routes are live and production-ready.
+> **Teacher Portal UI: Commented out** in [`teacher/page.tsx`](../web/src/app/dashboard/teacher/page.tsx) (lines 3513–3590) pending official company PowerAPI license acquisition. To re-enable, uncomment the `TRUST & SAFETY VERIFICATION` block in the Settings tab and set `POWERAPI_KEY` in environment variables.
+
+### 8.1 Overview
+
+Aadhar identity verification is a two-step OTP flow powered by the **PowerAPI** external service. The backend routes are complete and production-ready. The teacher-facing Settings UI block has been temporarily commented out until the company's PowerAPI license is formally activated.
+
+```mermaid
+sequenceDiagram
+    participant T as Teacher (Browser)
+    participant API as Next.js API
+    participant P as PowerAPI
+    participant DB as Firestore
+
+    T->>API: POST /api/kyc/generate-otp { aadharNumber }
+    API->>API: Validate 12-digit format
+    API->>API: Check POWERAPI_KEY env var
+    API->>P: POST /v1/aadhar/generate-otp { aadhar_number }
+    P-->>API: { reference_id }
+    API-->>T: { success, reference_id }
+
+    T->>API: POST /api/kyc/verify-otp { reference_id, otp }
+    API->>API: Verify Firebase ID token → extract tutorDocId
+    API->>P: POST /v1/aadhar/verify-otp { reference_id, otp }
+    P-->>API: { aadhaar_data.aadhaar_number }
+    API->>DB: tutors/{uid} set { aadharVerified: true, maskedAadhar, kycUpdatedAt }
+    API-->>T: { success, maskedAadhar }
+```
+
+### 8.2 Step 1 — Generate OTP (`POST /api/kyc/generate-otp`)
+
+| Property | Detail |
+| :--- | :--- |
+| **Auth** | Bearer token (Firebase ID token) — required |
+| **Request Body** | `{ aadharNumber: string }` — 12-digit, whitespace stripped, validated against `/^\d{12}$/` |
+| **Env Gate** | If `POWERAPI_KEY` is not set → returns `503` with message: *"Aadhaar KYC service is temporarily unavailable pending company license activation."* |
+| **External Call** | `POST https://api.powerapi.com/v1/aadhar/generate-otp` with `{ aadhar_number }` and `Authorization: Bearer POWERAPI_KEY` |
+| **Success Response** | `{ success: true, reference_id: string, message: 'OTP sent successfully.' }` |
+| **Error Response** | `{ error: string }` with appropriate HTTP status |
+
+### 8.3 Step 2 — Verify OTP (`POST /api/kyc/verify-otp`)
+
+| Property | Detail |
+| :--- | :--- |
+| **Auth** | Bearer token required. `tutorDocId` is extracted from the **verified server-side token** — never trusted from the client body (tamper-proof). |
+| **Request Body** | `{ reference_id: string, otp: string }` |
+| **Env Gate** | If `POWERAPI_KEY` not set → returns `503` |
+| **External Call** | `POST https://api.powerapi.com/v1/aadhar/verify-otp` with `{ reference_id, otp }` and `Authorization: Bearer POWERAPI_KEY` |
+| **Aadhar Masking** | `rawAadhar = data.aadhaar_data?.aadhaar_number` → masked as `XXXX-XXXX-<last4>` |
+| **Firestore Write** | `tutors/{uid}` — `set({ aadharVerified: true, maskedAadhar, kycUpdatedAt: new Date() }, { merge: true })` |
+| **Success Response** | `{ success: true, message: 'Aadhar Verified successfully', maskedAadhar }` |
+
+### 8.4 Client-Side State Machine (Live — UI Hidden)
+
+The teacher dashboard maintains a three-state KYC machine, wired up and functional — only the UI rendering block is commented out:
+
+| State | Trigger | UI Shown (when uncommented) |
+| :--- | :--- | :--- |
+| `'input'` | Default on load (if not yet verified) | Aadhar number input field + "Send OTP" button |
+| `'otp'` | After `generate-otp` succeeds | OTP input field + "Verify" button |
+| `'verified'` | After `verify-otp` succeeds OR `data.profile.aadharVerified === true` on load | Green "Identity Verified" banner + masked Aadhar + "+20 Match Points" badge |
+
+**Relevant code in [`teacher/page.tsx`](../web/src/app/dashboard/teacher/page.tsx):**
+- State declarations: lines 109–114
+- `handleGenerateOTP` handler: lines ~260–290
+- `handleVerifyOTP` handler: lines ~293–322
+- Commented UI block: lines 3513–3590 (`TRUST & SAFETY VERIFICATION` section)
+
+### 8.5 Environment Variable
+
+| Variable | Purpose |
+| :--- | :--- |
+| `POWERAPI_KEY` | PowerAPI authentication key. Set in `.env.local` for development and in production environment variables. Both routes return a graceful `503` (no crash, no data loss) when this variable is absent. |
+
+### 8.6 Effect on Platform When Verified
+
+| Effect | Detail |
+| :--- | :--- |
+| **Ranking Boost** | `aadharVerified: true` grants **+20 suitability score** in [`matchingEngine.ts`](../functions/src/utils/matchingEngine.ts) |
+| **Trust Badge** | `maskedAadhar` (`XXXX-XXXX-1234`) displayed on tutor profile and discovery cards |
+| **Dashboard Badge** | Already live independently in the teacher dashboard (line 1338) — shows verified shield regardless of the commented UI block |
+| **Firestore Fields Written** | `aadharVerified`, `maskedAadhar`, `kycUpdatedAt` on `tutors/{uid}` |
+

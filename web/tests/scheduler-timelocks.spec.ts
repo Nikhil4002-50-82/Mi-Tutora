@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { formatTimeTo12Hour, parse24To12Hour, to24HourTime } from '../src/utils/timeFormat';
 
 test.describe('Cloud Scheduler & Time-Lock Architecture', () => {
 
@@ -212,6 +213,112 @@ test.describe('Cloud Scheduler & Time-Lock Architecture', () => {
       // 2026-09-07 is the next Monday
       const nextMonday = new Date('2026-09-07T00:00:00Z');
       expect(getWeekStartDate(nextMonday)).toBe('2026-09-07');
+    });
+  });
+
+  test.describe('12-Hour AM/PM Time Format & Conversion Utilities', () => {
+    test('Formats 24-hour time to 12-hour AM/PM string', () => {
+      expect(formatTimeTo12Hour('20:34')).toBe('08:34 PM');
+      expect(formatTimeTo12Hour('09:05')).toBe('09:05 AM');
+      expect(formatTimeTo12Hour('17:00')).toBe('05:00 PM');
+      expect(formatTimeTo12Hour('12:00')).toBe('12:00 PM');
+      expect(formatTimeTo12Hour('00:00')).toBe('12:00 AM');
+      expect(formatTimeTo12Hour('00:30')).toBe('12:30 AM');
+      expect(formatTimeTo12Hour('11:59')).toBe('11:59 AM');
+      expect(formatTimeTo12Hour('23:59')).toBe('11:59 PM');
+    });
+
+    test('Gracefully handles metadata suffixes with ||', () => {
+      expect(formatTimeTo12Hour('20:34||extra_data')).toBe('08:34 PM');
+      expect(formatTimeTo12Hour('')).toBe('');
+      expect(formatTimeTo12Hour(null)).toBe('');
+    });
+
+    test('Parses 24-hour time into 12-hour UI components', () => {
+      expect(parse24To12Hour('20:34')).toEqual({ hour: '08', minute: '34', period: 'PM' });
+      expect(parse24To12Hour('09:15')).toEqual({ hour: '09', minute: '15', period: 'AM' });
+      expect(parse24To12Hour('00:00')).toEqual({ hour: '12', minute: '00', period: 'AM' });
+      expect(parse24To12Hour('12:00')).toEqual({ hour: '12', minute: '00', period: 'PM' });
+      expect(parse24To12Hour('')).toEqual({ hour: '05', minute: '00', period: 'PM' });
+    });
+
+    test('Converts 12-hour UI components back into 24-hour standard string', () => {
+      expect(to24HourTime('08', '34', 'PM')).toBe('20:34');
+      expect(to24HourTime('09', '15', 'AM')).toBe('09:15');
+      expect(to24HourTime('12', '00', 'AM')).toBe('00:00');
+      expect(to24HourTime('12', '00', 'PM')).toBe('12:00');
+      expect(to24HourTime('11', '59', 'PM')).toBe('23:59');
+    });
+
+    test('Guarantees 12h-to-24h-to-12h round-trip fidelity', () => {
+      const original24 = '20:34';
+      const parsed = parse24To12Hour(original24);
+      const converted24 = to24HourTime(parsed.hour, parsed.minute, parsed.period);
+      expect(converted24).toBe(original24);
+      expect(formatTimeTo12Hour(converted24)).toBe('08:34 PM');
+    });
+  });
+
+  test.describe('Offline Teacher Location & Travel Preferences Display', () => {
+    function evaluateOfflineTravelDisplay(tutor: {
+      mode?: string;
+      preferredLocations?: string;
+      locations?: string;
+      travelDistance?: string | number;
+      travelKm?: string | number;
+      area?: string;
+      city?: string;
+      pincode?: string;
+    }) {
+      const isOffline = (tutor.mode || '').toLowerCase().trim() !== 'online';
+      if (!isOffline) {
+        return { shouldShow: false, preferredLocations: '', travelDistance: '', baseLocality: '' };
+      }
+
+      const locations = tutor.preferredLocations || tutor.locations || [tutor.area, tutor.city].filter(Boolean).join(', ') || 'Open to all nearby areas';
+      const rawDistance = tutor.travelDistance || tutor.travelKm;
+      const cleanDistance = rawDistance ? String(rawDistance).replace(/[^0-9.]/g, '') : '';
+      const travel = cleanDistance ? `Within ${cleanDistance} km radius` : 'Within local vicinity';
+      const baseLocality = [tutor.area, tutor.city, tutor.pincode].filter(Boolean).join(', ');
+
+      return {
+        shouldShow: true,
+        preferredLocations: locations,
+        travelDistance: travel,
+        baseLocality,
+      };
+    }
+
+    test('Hides offline travel card for Online-only tutors', () => {
+      const res = evaluateOfflineTravelDisplay({ mode: 'Online', preferredLocations: 'Indiranagar', travelDistance: '5' });
+      expect(res.shouldShow).toBe(false);
+    });
+
+    test('Renders preferred locations and willingness to travel for Offline tutors', () => {
+      const res = evaluateOfflineTravelDisplay({
+        mode: 'Offline',
+        preferredLocations: 'Koramangala, HSR Layout',
+        travelDistance: '10',
+        area: 'Indiranagar',
+        city: 'Bengaluru',
+        pincode: '560038',
+      });
+      expect(res.shouldShow).toBe(true);
+      expect(res.preferredLocations).toBe('Koramangala, HSR Layout');
+      expect(res.travelDistance).toBe('Within 10 km radius');
+      expect(res.baseLocality).toBe('Indiranagar, Bengaluru, 560038');
+    });
+
+    test('Falls back gracefully when travel distance is not specified', () => {
+      const res = evaluateOfflineTravelDisplay({
+        mode: 'Offline',
+        area: 'Jayanagar',
+        city: 'Bengaluru',
+      });
+      expect(res.shouldShow).toBe(true);
+      expect(res.preferredLocations).toBe('Jayanagar, Bengaluru');
+      expect(res.travelDistance).toBe('Within local vicinity');
+      expect(res.baseLocality).toBe('Jayanagar, Bengaluru');
     });
   });
 });

@@ -47,6 +47,12 @@ Once the price is locked in, the system moves to scheduling the actual demo clas
 3.  **Accepting:** Once a party sees a proposed time that works for them, they fire `accept_demo_date`. The system takes the `proposedDate`/`proposedTime` and permanently locks them into `demoDate` and `demoTime`.
 4.  **Finalizing:** The status advances to `demo_scheduled`.
 
+> [!NOTE]
+> **Time Format Architecture (12-Hour UI vs. 24-Hour Database Storage):**
+> - **Firestore Persistence:** To ensure uniform alphanumeric sorting and precise time-lock comparisons across Cloud Schedulers (`dailyPayouts`, `expireDemos`), `proposedTime` and `demoTime` are strictly stored in Firestore as standard 24-hour `"HH:mm"` strings (e.g. `"20:34"`).
+> - **User Interface (ActionModal & Dashboard Cards):** Users interact with a segmented 12-hour picker in [`ActionModal.tsx`](file:///c:/Users/Dell/Desktop/mushi/web/src/components/ActionModal.tsx) (1–12 hour selector, minute options, and `AM` / `PM` segmented pills with a live confirmation badge, e.g. `Selected Demo Time: 08:34 PM`). Dashboard cards render formatted 12-hour strings via [`formatTimeTo12Hour()`](file:///c:/Users/Dell/Desktop/mushi/web/src/utils/timeFormat.ts) (e.g. `16 Sep 2026 at 08:34 PM`).
+
+
 ---
 
 ## 4. Example Flows

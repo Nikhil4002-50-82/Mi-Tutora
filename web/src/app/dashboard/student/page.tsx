@@ -17,7 +17,7 @@ import { ReviewModal } from '@/components/dashboard/ReviewModal';
 import { TuitionGroupCard } from '@/components/dashboard/TuitionGroupCard';
 
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp, Bookmark, Lightbulb, ExternalLink } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Navigation, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp, Bookmark, Lightbulb, ExternalLink } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -27,6 +27,7 @@ import MessageModal from '@/components/MessageModal';
 import GroupSettingsModal from '@/components/GroupSettingsModal';
 import { generateReferralCode } from '@/utils/referral';
 import { calculateSuitabilityScore, doesClassMatch, isStrictMatch } from '@/utils/matching';
+import { formatTimeTo12Hour } from '@/utils/timeFormat';
 import { toast } from 'sonner';
 const logo = '/imports/logo.png';
 
@@ -1513,7 +1514,10 @@ export default function StudentDashboard() {
                                       <p className="text-sm text-slate-500">{cls.subject}</p>
                                     </div>
                                   </div>
-                                  <button onClick={() => { if(cls.tutorDetails) { setSelectedViewUser(cls.tutorDetails); setSelectedViewApp(cls.app); } else setActiveTab('my_teachers'); }} className="text-emerald-700 font-bold text-sm bg-emerald-50/50 border border-emerald-100 px-6 py-2 rounded-full hover:bg-emerald-100 transition-colors">
+                                  <button onClick={() => { 
+                                    const fullTutor = cls.tutorDetails || data?.allTutors?.find((t: any) => t.id === cls.app?.tutorDocId);
+                                    if(fullTutor) { setSelectedViewUser(fullTutor); setSelectedViewApp(cls.app); } else setActiveTab('my_teachers'); 
+                                  }} className="text-emerald-700 font-bold text-sm bg-emerald-50/50 border border-emerald-100 px-6 py-2 rounded-full hover:bg-emerald-100 transition-colors">
                                     View
                                   </button>
                                 </div>
@@ -1845,6 +1849,24 @@ export default function StudentDashboard() {
                                 <span className="text-slate-600 font-bold">Fee:</span>
                                 <span className="text-[#00a992] font-bold">{teacher.feeRange || 'Negotiable'}</span>
                               </div>
+                              {(teacher.mode || '').toLowerCase().trim() !== 'online' && (
+                                <>
+                                  {(teacher.preferredLocations || teacher.locations) && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <MapPin className="w-4 h-4 text-[#00a992] flex-shrink-0" />
+                                      <span className="text-slate-600 font-bold">Locations:</span>
+                                      <span className="text-slate-500 truncate" title={teacher.preferredLocations || teacher.locations}>{teacher.preferredLocations || teacher.locations}</span>
+                                    </div>
+                                  )}
+                                  {(teacher.travelDistance || teacher.travelKm) && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Navigation className="w-4 h-4 text-[#00a992] flex-shrink-0" />
+                                      <span className="text-slate-600 font-bold">Travel:</span>
+                                      <span className="text-slate-500">Within {String(teacher.travelDistance || teacher.travelKm).replace(/[^0-9.]/g, '')} km</span>
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           
                             {/* Actions Area */}
@@ -2168,7 +2190,7 @@ export default function StudentDashboard() {
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Proposed Schedule</p>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Calendar className="w-4 h-4 text-emerald-600" />
-                                      <span className="text-sm font-bold text-slate-800">{new Date(neg.proposedDate).toLocaleDateString()} at {neg.proposedTime?.split('||')[0] || neg.proposedTime}</span>
+                                      <span className="text-sm font-bold text-slate-800">{new Date(neg.proposedDate).toLocaleDateString()} at {formatTimeTo12Hour(neg.proposedTime)}</span>
                                     </div>
                                     </div>
                                 ) : (
@@ -2183,11 +2205,14 @@ export default function StudentDashboard() {
                               <div className="mt-auto space-y-2">
                                 <button
                                   onClick={() => {
-                                    const teacherUser = data?.allTutors?.find((t:any) => t.id === neg.tutorDocId) || {
-                                      id: neg.tutorDocId,
-                                      name: neg.tutorName || 'Teacher',
-                                      category: neg.category,
-                                    };
+                                    const teacherUser = data?.allTutors?.find((t:any) => t.id === neg.tutorDocId) 
+                                      || neg.tutorDetails
+                                      || {
+                                        id: neg.tutorDocId,
+                                        name: neg.tutorName || 'Teacher',
+                                        category: neg.category,
+                                        mode: neg.mode,
+                                      };
                                     setSelectedViewUser(teacherUser);
                                     setSelectedViewApp(neg);
                                   }}
@@ -2503,7 +2528,7 @@ export default function StudentDashboard() {
                                 </div>
                                 <div>
                                   <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Demo Schedule</p>
-                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {cls.app.demoTime}</p>
+                                  <p className="font-bold text-slate-800">{new Date(cls.app.demoDate).toLocaleDateString()} at {formatTimeTo12Hour(cls.app.demoTime)}</p>
                                 </div>
                               </div>
                             )}
@@ -2576,11 +2601,14 @@ export default function StudentDashboard() {
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const viewUser = cls.tutorDetails || {
-                                    id: cls.app?.tutorDocId,
-                                    name: cls.teacher || 'Tutor',
-                                    feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
-                                  };
+                                  const viewUser = cls.tutorDetails 
+                                    || data?.allTutors?.find((t: any) => t.id === cls.app?.tutorDocId)
+                                    || {
+                                      id: cls.app?.tutorDocId,
+                                      name: cls.teacher || 'Tutor',
+                                      feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                      mode: cls.app?.mode,
+                                    };
                                   setSelectedViewUser(viewUser);
                                   setSelectedViewApp(cls.app);
                                 }}
@@ -2702,11 +2730,14 @@ export default function StudentDashboard() {
                             <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const viewUser = cls.tutorDetails || {
-                                    id: cls.app?.tutorDocId,
-                                    name: cls.teacher || 'Tutor',
-                                    feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
-                                  };
+                                  const viewUser = cls.tutorDetails 
+                                    || data?.allTutors?.find((t: any) => t.id === cls.app?.tutorDocId)
+                                    || {
+                                      id: cls.app?.tutorDocId,
+                                      name: cls.teacher || 'Tutor',
+                                      feeRange: cls.app?.finalPrice || cls.app?.currentOffer || 0,
+                                      mode: cls.app?.mode,
+                                    };
                                   setSelectedViewUser(viewUser);
                                   setSelectedViewApp(cls.app);
                                 }}
@@ -3343,19 +3374,13 @@ export default function StudentDashboard() {
               return;
             }
 
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/api/auth/delete-account', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ role: 'student' }),
-            });
-
-            const result = await res.json();
-            if (!res.ok || !result.success) {
-              throw new Error(result.error || 'Failed to delete account');
+            const { functions } = await import('@/utils/firebase/client');
+            const { httpsCallable } = await import('firebase/functions');
+            const deleteAccount = httpsCallable(functions, 'deleteUserAccount');
+            const res = await deleteAccount({ role: 'student' });
+            const result = res.data as { success: boolean; isFullyDeleted: boolean; remainingRoles?: string[] };
+            if (!result.success) {
+              throw new Error('Failed to delete account');
             }
 
             if (!result.isFullyDeleted) {

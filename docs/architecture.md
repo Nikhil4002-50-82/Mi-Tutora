@@ -292,11 +292,12 @@ erDiagram
 | :-: | :--- | :--- | :--- | :--- |
 | 1 | `users` | Auth accounts, RBAC roles, `upiId`, and referral codes. | Auth UID | [`docs/Database_Architecture.md#21-collection-users`](./Database_Architecture.md) |
 | 2 | `parents` | Parent profiles, phone/WhatsApp contacts. | Auth UID | [`docs/Database_Architecture.md#22-collection-parents`](./Database_Architecture.md) |
-| 3 | `tutors` | Teacher profiles, categories, fees, `upiId`, tokens, KYC, `verificationDocs`, `verificationStatus`. | Auth UID | [`docs/Database_Architecture.md#23-collection-tutors`](./Database_Architecture.md) |
+| 3 | `tutors` | Teacher profiles, categories, fees, `preferredLocations`, `travelDistance`, `upiId`, tokens, KYC, `verificationDocs`, `verificationStatus`. | Auth UID | [`docs/Database_Architecture.md#23-collection-tutors`](./Database_Architecture.md) |
 | 4 | `students` | Individual learners, grade levels, boards, subjects. | Auto ID | [`docs/Database_Architecture.md#24-collection-students`](./Database_Architecture.md) |
 | 5 | `groups` | Multi-student learning clusters and joint budgets. | Auto ID | [`docs/Database_Architecture.md#25-collection-groups`](./Database_Architecture.md) |
 | 6 | `tuition_requests` | Real-time marketplace listings created from groups. | Auto ID | [`docs/Database_Architecture.md#26-collection-tuition_requests`](./Database_Architecture.md) |
-| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states. | Auto ID | [`docs/Database_Architecture.md#27-collection-applications`](./Database_Architecture.md) |
+| 7 | `applications` | 2-way negotiations, demo scheduling, tuition states; includes `privateData/meeting` video link vault. | Auto ID | [`docs/Database_Architecture.md#27-collection-applications`](./Database_Architecture.md) |
+
 | 8 | `payments` | Incoming payment records (demo fees, tuition, pro plans). | Auto ID | [`docs/Database_Architecture.md#28-collection-payments`](./Database_Architecture.md) |
 | 9 | `pending_tuition_fees` | Fallback ledger for pending Day 7 trial completions. | Auto ID | [`docs/Database_Architecture.md#29-collection-pending_tuition_fees`](./Database_Architecture.md) |
 | 10 | `referrals` | Referral tracking, Day 30 cash escrow, banked tokens. | Auto ID | [`docs/Database_Architecture.md#210-collection-referrals`](./Database_Architecture.md) |
@@ -384,7 +385,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](../web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 19 test suites (196+ unit, integration, escrow & ranking pagination tests)
+# Run all 19 test suites (210 passed unit, integration, escrow, time format & ranking tests)
 cd web
 npx playwright test
 
@@ -396,5 +397,6 @@ cd ../../functions
 npm run build
 ```
 
-*All automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+*All automated tests pass with 0 errors across 19 test suites (210 passed tests), validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, 12-hour AM/PM time conversions, and offline travel preferences.*
+
 

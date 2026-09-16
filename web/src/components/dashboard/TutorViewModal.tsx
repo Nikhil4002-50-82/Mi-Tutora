@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star, ShieldCheck } from 'lucide-react';
+import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star, ShieldCheck, MapPin, Navigation, Globe } from 'lucide-react';
 
 interface TutorViewModalProps {
   selectedViewUser: any;
@@ -170,6 +170,65 @@ export function TutorViewModal({
               </div>
             </div>
 
+            {/* Offline Tuition & Travel Preferences (Shown when teacher conducts offline/in-person classes) */}
+            {selectedViewUser.mode?.toLowerCase() !== 'online' && (
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/80 shadow-sm">
+                <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-gray-900 leading-tight">Offline Tuition & Travel</h4>
+                      <p className="text-xs text-gray-500 font-medium">In-person & home tuition preferences</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200 capitalize">
+                    {selectedViewUser.mode || 'Offline'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Preferred Locations */}
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Preferred Locations</p>
+                    </div>
+                    <p className="font-bold text-gray-800 text-sm">
+                      {selectedViewUser.preferredLocations || selectedViewUser.locations || [selectedViewUser.area, selectedViewUser.city].filter(Boolean).join(', ') || 'Open to all nearby areas'}
+                    </p>
+                  </div>
+
+                  {/* Willingness to Travel */}
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Navigation className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Willingness to Travel</p>
+                    </div>
+                    <p className="font-bold text-gray-800 text-sm">
+                      {selectedViewUser.travelDistance || selectedViewUser.travelKm
+                        ? `Within ${String(selectedViewUser.travelDistance || selectedViewUser.travelKm).replace(/[^0-9.]/g, '')} km radius`
+                        : 'Within local vicinity'}
+                    </p>
+                  </div>
+
+                  {/* Tutor Base Locality */}
+                  {(selectedViewUser.area || selectedViewUser.city || selectedViewUser.pincode) && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm sm:col-span-2">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Globe className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tutor Base Locality</p>
+                      </div>
+                      <p className="font-bold text-gray-800 text-sm">
+                        {[selectedViewUser.area, selectedViewUser.city, selectedViewUser.pincode].filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">
@@ -178,12 +237,12 @@ export function TutorViewModal({
                 <p className="text-3xl font-black text-emerald-700">₹{selectedViewApp?.finalPrice || selectedViewApp?.currentOffer || selectedViewUser.feeRange || 'Negotiable'}<span className="text-base font-bold text-emerald-600/70">/mo</span></p>
               </div>
               <div className="text-right">
-                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Mode & Location</p>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Teaching Mode</p>
                 <p className="font-bold text-emerald-800 capitalize">{selectedViewUser.mode || 'Online'}</p>
-                {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.locations && (
-                  <p className="text-sm font-medium text-emerald-700 mt-1 max-w-[200px] truncate" title={selectedViewUser.locations}>
-                    {selectedViewUser.locations || 'Location hidden'}
-                  </p>
+                {selectedViewUser.mode?.toLowerCase() === 'online' ? (
+                  <p className="text-xs font-semibold text-emerald-600 mt-0.5">Online (Google Meet / Zoom)</p>
+                ) : (
+                  <p className="text-xs font-semibold text-emerald-600 mt-0.5">Offline / In-Person</p>
                 )}
               </div>
             </div>
