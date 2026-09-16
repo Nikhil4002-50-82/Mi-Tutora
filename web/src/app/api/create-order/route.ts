@@ -124,7 +124,10 @@ export async function POST(req: NextRequest) {
 
     if (totalToPay <= 0) {
       const crypto = await import('crypto');
-      const secret = process.env.RAZORPAY_KEY_SECRET || 'wallet_secret';
+      const secret = process.env.RAZORPAY_KEY_SECRET;
+      if (!secret) {
+        return NextResponse.json({ error: 'Razorpay secret is not configured.' }, { status: 500 });
+      }
       const walletOrderId = `order_wallet_${applicationId}_${Date.now()}`;
       const walletPaymentId = `pay_wallet_${Date.now()}`;
       const walletSignature = crypto

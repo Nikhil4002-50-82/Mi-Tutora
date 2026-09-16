@@ -116,9 +116,11 @@ export async function POST(req: NextRequest) {
 
       if (hasRazorpayX) {
         try {
+          const maxAllowedTutorShare = payout.grossAmount ? Math.round(payout.grossAmount * 0.60) : payout.tutorShareAmount;
+          const safeTutorAmount = Math.min(payout.tutorShareAmount || 0, maxAllowedTutorShare);
           const payoutPayload = {
             account_number: razorpayAccount,
-            amount: Math.round(payout.tutorShareAmount * 100), // paise
+            amount: Math.round(safeTutorAmount * 100), // paise
             currency: 'INR',
             mode: 'UPI',
             purpose: 'payout',
@@ -240,9 +242,11 @@ export async function POST(req: NextRequest) {
 
       if (hasRazorpayX) {
         try {
+          const maxAllowedReward = refData.grossAmount ? Math.round(refData.grossAmount * 0.40 * 0.25) : rewardAmount;
+          const safeRewardAmount = Math.min(rewardAmount, maxAllowedReward);
           const payoutPayload = {
             account_number: razorpayAccount,
-            amount: Math.round(rewardAmount * 100), // paise
+            amount: Math.round(safeRewardAmount * 100), // paise
             currency: 'INR',
             mode: 'UPI',
             purpose: 'payout',

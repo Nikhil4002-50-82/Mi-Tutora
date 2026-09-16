@@ -43,9 +43,31 @@ export async function POST(req: NextRequest) {
     let tutorId = '';
 
     if (role === 'student') {
+        if (!tutor?.id || !groupToUse?.id) {
+            return NextResponse.json({ success: false, error: 'Missing tutor or group details' }, { status: 400 });
+        }
+        const tutorDoc = await adminDb.collection('tutors').doc(tutor.id).get();
+        if (!tutorDoc.exists) {
+            return NextResponse.json({ success: false, error: 'Tutor not found' }, { status: 404 });
+        }
+        const groupDoc = await adminDb.collection('groups').doc(groupToUse.id).get();
+        if (groupDoc.exists) {
+            if (groupDoc.data()?.parentDocId !== userId) {
+                return NextResponse.json({ success: false, error: 'Unauthorized: Group does not belong to you' }, { status: 403 });
+            }
+        } else {
+            const studentDoc = await adminDb.collection('students').doc(groupToUse.id).get();
+            if (studentDoc.exists && studentDoc.data()?.parentDocId !== userId) {
+                return NextResponse.json({ success: false, error: 'Unauthorized: Student does not belong to you' }, { status: 403 });
+            }
+        }
+
         qGroupId = groupToUse.id;
         tutorId = tutor.id;
     } else {
+        if (!studentData?.id) {
+            return NextResponse.json({ success: false, error: 'Missing student or group details' }, { status: 400 });
+        }
         qGroupId = studentData.id;
         tutorId = userId;
     }

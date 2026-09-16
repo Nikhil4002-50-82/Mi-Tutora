@@ -131,18 +131,12 @@ export async function POST(req: NextRequest) {
 async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: string, role: string, isRemoval: boolean, orderId: string, paymentId: string, useWallet: boolean) {
     const batch = adminDb.batch();
     
-    // 1. Update the ledger
+    // 1. Verify ledger record exists
     const paymentsRef = adminDb.collection('payments');
     const q = paymentsRef.where('razorpayOrderId', '==', orderId).limit(1);
     const snap = await q.get();
     
-    if (!snap.empty) {
-        batch.update(snap.docs[0].ref, {
-            status: 'paid',
-            razorpayPaymentId: paymentId,
-            updatedAt: new Date()
-        });
-    } else {
+    if (snap.empty) {
         // SECURITY PATCH: Do not blindly accept unknown order IDs
         throw new Error("Order ID not found in secure ledger. Payment rejected.");
     }
