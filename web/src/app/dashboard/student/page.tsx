@@ -3222,6 +3222,19 @@ export default function StudentDashboard() {
         handleDirectRequestDemo={handleDirectRequestDemo}
         dailyRequestsCount={dailyRequestsCount}
         setActionConfirmModal={setActionConfirmModal}
+        onPayFee={(app) => {
+          setSelectedViewUser(null);
+          setSelectedViewApp(null);
+          setPayingClass({
+            id: app.id,
+            studentName: app.studentName || 'Student',
+            finalPrice: app.finalPrice || 0,
+            isProrated: false,
+            isRemoval: false,
+            studentsList: app.studentsList || (app.studentDetails ? [app.studentDetails] : []),
+            tutorName: app.tutorName || selectedViewUser?.name || 'Tutor'
+          });
+        }}
       />
 
       {/* Remove Student Confirmation Modal */}

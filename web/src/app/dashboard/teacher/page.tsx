@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, CalendarClock, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink, RefreshCw, Sparkles, Info } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink, RefreshCw, Sparkles, Info, Coins } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -3217,10 +3217,81 @@ export default function TeacherDashboard() {
             {/* TAB: EARNINGS */}
             {activeTab === 'earnings' && (
               <div className="space-y-8 pb-10">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-2">
                   <div>
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight">Earnings & Ledger</h1>
-                    <p className="text-slate-500 font-medium mt-1">Track your income, demo fees, and payment history.</p>
+                    <p className="text-slate-500 font-medium mt-1">Track your income, escrow maturity, and scheduled UPI payouts.</p>
+                  </div>
+                </div>
+
+                {/* Day 30 Automated Escrow & Payout Policy Banner */}
+                <div className="bg-gradient-to-br from-[#063831] via-[#08423a] to-[#04241f] text-white rounded-3xl p-6 shadow-xl border border-emerald-800/40 relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-emerald-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30 shrink-0">
+                        <ShieldCheck className="w-5 h-5 text-emerald-300" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-white text-base tracking-tight">
+                          Automated Day 30 Escrow & Payout Policy
+                        </h3>
+                        <p className="text-xs text-emerald-100/80 font-medium mt-0.5">
+                          Direct platform-to-bank UPI transfers via Razorpay
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Registered UPI Status */}
+                    <div className="flex items-center gap-2">
+                      {Boolean(data?.profile?.upiId || data?.userData?.upiId) ? (
+                        <div className="flex items-center gap-2 bg-emerald-500/15 border border-emerald-400/30 px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-300">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>Payout UPI: {data?.profile?.upiId || data?.userData?.upiId}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-400/40 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-300">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>UPI ID Missing</span>
+                          <button
+                            onClick={() => setActiveTab('profile')}
+                            className="ml-1 underline text-white hover:text-amber-200 font-bold"
+                          >
+                            Add in Profile
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2 Core Payout Rules */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                    <div className="flex items-start gap-3 bg-black/25 border border-emerald-500/20 rounded-2xl p-4">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertCircle className="w-4 h-4 text-amber-300" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wider">
+                          Strict Prerequisite: Student Fee Required
+                        </h4>
+                        <p className="text-xs text-emerald-50/90 font-medium mt-1 leading-relaxed">
+                          Day 30 automated payouts for both your 60% tuition share and referral rewards will execute <strong>only after the student pays their fee</strong>. If the fee remains unpaid or overdue, payouts remain blocked and will not disburse.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 bg-black/25 border border-emerald-500/20 rounded-2xl p-4">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-400/20 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
+                        <CalendarClock className="w-4 h-4 text-emerald-300" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                          Automated UPI Disbursement on Day 30
+                        </h4>
+                        <p className="text-xs text-emerald-50/90 font-medium mt-1 leading-relaxed">
+                          Once student payment is verified, funds lock into platform escrow for 30 days. On the 30th day, funds are deposited directly to your UPI ID without requiring manual withdrawal.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -3234,75 +3305,194 @@ export default function TeacherDashboard() {
                       </div>
                       <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Net Revenue</p>
                       <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.netRevenue?.toLocaleString() || '0'}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">60% Tuition + Referrals - Demo Fees</p>
                     </div>
                     {Boolean(data?.earningsData?.heldInEscrow && data.earningsData.heldInEscrow > 0) && (
-                      <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200/60 px-2.5 py-1 rounded-lg">
-                        <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                        <span>₹{data.earningsData.heldInEscrow.toLocaleString()} in Day 30 Escrow</span>
+                      <div className="mt-4 flex flex-col gap-1 text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200/70 p-2.5 rounded-xl">
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <span>₹{data.earningsData.heldInEscrow.toLocaleString()} in Day 30 Escrow</span>
+                        </div>
+                        <div className="text-[11px] font-medium text-teal-700/90 pl-5">
+                          Tuition: ₹{(data.earningsData.tuitionEscrow || 0).toLocaleString()} • Referrals: ₹{(data.earningsData.referralEscrow || 0).toLocaleString()}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* First Month Gross */}
+                  {/* Gross Student Inflow */}
                   <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
                     <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
                       <TrendingUp className="w-6 h-6 text-emerald-500" />
                     </div>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gross Inflow</p>
-                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.totalRevenue?.toLocaleString() || '0'}</h3>
+                    <div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Gross Student Inflow</p>
+                      <h3 className="text-3xl font-black text-gray-900">₹{(data?.earningsData?.grossStudentVolume ?? data?.earningsData?.totalRevenue ?? 0).toLocaleString()}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">Total tuition fees paid by students</p>
+                    </div>
                   </div>
 
-                  {/* Demo Fees Paid */}
+                  {/* Referral Rewards */}
                   <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-gray-100 mb-4">
-                      <TrendingDown className="w-6 h-6 text-orange-500" />
+                    <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 mb-4">
+                      <Coins className="w-6 h-6 text-teal-600" />
                     </div>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Demo Fees Paid</p>
-                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.demoFeesPaid?.toLocaleString() || '0'}</h3>
+                    <div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Referral Rewards</p>
+                      <h3 className="text-3xl font-black text-gray-900">₹{(data?.earningsData?.referralCashEarned || 0).toLocaleString()}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">{(data?.earningsData?.bankedTokensEarned || 0)} Proposal Tokens Earned</p>
+                    </div>
                   </div>
 
                   {/* Active MRR */}
                   <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50/50 text-blue-600 flex items-center justify-center border border-blue-100 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50/50 text-emerald-600 flex items-center justify-center border border-emerald-100 mb-4">
                       <CalendarDays className="w-6 h-6" />
                     </div>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Active Monthly (MRR)</p>
-                    <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'}</h3>
+                    <div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Active Monthly (MRR)</p>
+                      <h3 className="text-3xl font-black text-gray-900">₹{data?.earningsData?.activeMRR?.toLocaleString() || '0'}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">Active ongoing monthly tuitions</p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Ledger & Active Tuitions */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                  {/* Ledger */}
-                  <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                      <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-                        Transaction Ledger
-                      </h3>
+                  {/* Left Column: Transaction Ledger & Referral Rewards Ledger */}
+                  <div className="space-y-8">
+                    {/* Transaction Ledger */}
+                    <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                      <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                            Transaction Ledger
+                          </h3>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5">Audited history of earnings, escrow locks, and demo fees.</p>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-100 max-h-[420px] overflow-y-auto custom-scrollbar">
+                        {data?.earningsData?.ledgerEntries?.length > 0 ? (
+                          data.earningsData.ledgerEntries.map((entry: any) => {
+                            const isOutflow = entry.isOutflow;
+                            const isEscrow = entry.status === 'escrow_held';
+
+                            let typeLabel = entry.type?.replace(/_/g, ' ') || 'Transaction';
+                            if (entry.type === 'first_month_tutor_share') typeLabel = 'Month 1 (60% Tutor Share)';
+                            else if (entry.type === 'manual_payment') typeLabel = 'Direct Tuition Payment';
+                            else if (entry.type === 'referral_paid_upi') typeLabel = 'Referral Reward (UPI)';
+                            else if (entry.type === 'referral_escrow_held') typeLabel = 'Referral Reward (Day 30 Escrow)';
+                            else if (entry.type === 'demo_fee_paid') typeLabel = 'Demo Booking Fee';
+
+                            return (
+                              <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isOutflow ? 'bg-orange-50 text-orange-600' : isEscrow ? 'bg-teal-50 text-teal-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                    {isOutflow ? <TrendingDown className="w-5 h-5" /> : isEscrow ? <Lock className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-gray-900 text-sm">{entry.studentName}</p>
+                                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                      <p className="text-xs text-slate-500 font-medium capitalize">{typeLabel} • {new Date(entry.date).toLocaleDateString()}</p>
+                                      {isEscrow && (
+                                        <span className="text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.2 rounded">
+                                          In Escrow
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`font-bold ${isOutflow ? 'text-orange-600' : isEscrow ? 'text-teal-700' : 'text-emerald-600'}`}>
+                                    {isOutflow ? '-' : '+'}₹{entry.amount?.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="p-8 text-center text-gray-500 font-medium text-sm">No transactions found.</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto custom-scrollbar">
-                      {data?.earningsData?.ledgerEntries?.length > 0 ? (
-                        data.earningsData.ledgerEntries.map((entry: any) => (
-                          <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${entry.isOutflow ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                {entry.isOutflow ? <TrendingDown className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
+
+                    {/* Referral Rewards & Escrow Tracker */}
+                    <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                      <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                            <Coins className="w-5 h-5 text-teal-600" />
+                            <span>Referral Rewards & Escrow</span>
+                          </h3>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            Day 30 referral cash rewards and proposal tokens.
+                          </p>
+                        </div>
+                        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                          {data?.earningsData?.referralLedger?.length || 0} Friends
+                        </span>
+                      </div>
+                      <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto custom-scrollbar">
+                        {data?.earningsData?.referralLedger?.length > 0 ? (
+                          data.earningsData.referralLedger.map((refItem: any) => {
+                            const isPaid = refItem.payoutStatus === 'paid';
+                            const isQualified = refItem.status === 'qualified';
+                            const isToken = refItem.rewardType === 'banked_token';
+                            const releaseDateStr = refItem.releaseEligibleAt 
+                              ? new Date(refItem.releaseEligibleAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                              : 'Pending Day 7 Fee';
+
+                            return (
+                              <div key={refItem.id} className="p-5 flex flex-col gap-2.5 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                      isPaid ? 'bg-emerald-50 text-emerald-600' : isQualified ? 'bg-teal-50 text-teal-600' : 'bg-amber-50 text-amber-600'
+                                    }`}>
+                                      {isPaid ? <CheckCircle2 className="w-4 h-4" /> : isQualified ? <Lock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-gray-900 text-sm">{refItem.name}</p>
+                                      <p className="text-[11px] text-slate-500 font-medium">
+                                        {isToken ? 'Teacher Referral' : 'Student Referral'} • Joined {new Date(refItem.createdAt || Date.now()).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-bold text-sm text-gray-900">
+                                      {isToken ? '1 Proposal Token' : `₹${(refItem.reward || 0).toLocaleString()}`}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Status notice */}
+                                <div className="pt-1">
+                                  {isPaid ? (
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-3 py-1.5 rounded-xl">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>Deposited to UPI {refItem.payoutVpa ? `(${refItem.payoutVpa})` : ''} {refItem.utrNumber ? `• Bank UTR: ${refItem.utrNumber}` : ''}</span>
+                                    </div>
+                                  ) : isQualified ? (
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200/60 px-3 py-1.5 rounded-xl">
+                                      <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                                      <span>Locked in Escrow until {releaseDateStr} (Day 30 automated UPI payout)</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200/60 px-3 py-1.5 rounded-xl">
+                                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>Awaiting Student Fee — Payout will not release if fee is unpaid.</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-bold text-gray-900 text-sm">{entry.studentName}</p>
-                                <p className="text-xs text-slate-500 font-medium capitalize mt-0.5">{entry.type.replace(/_/g, ' ')} • {new Date(entry.date).toLocaleDateString()}</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className={`font-bold ${entry.isOutflow ? 'text-orange-600' : 'text-emerald-600'}`}>
-                                {entry.isOutflow ? '-' : '+'}₹{entry.amount?.toLocaleString()}
-                              </p>
-                            </div>
+                            );
+                          })
+                        ) : (
+                          <div className="p-8 text-center text-gray-500 font-medium text-sm">
+                            No referrals logged yet. Share your referral link to earn rewards.
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-8 text-center text-gray-500 font-medium text-sm">No transactions found.</div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -3341,7 +3531,7 @@ export default function TeacherDashboard() {
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <p className="font-bold text-gray-900 text-base">{cls.student}</p>
                                     {isMonth1 ? (
-                                      <span className="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-md">
+                                      <span className="text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200/60 px-2 py-0.5 rounded-md">
                                         Month 1 Escrow (60% Payout)
                                       </span>
                                     ) : (

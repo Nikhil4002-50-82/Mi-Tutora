@@ -317,6 +317,9 @@ export const fetchTeacherDashboardData = async () => {
     return {
       id: d.id,
       ...data,
+      applicationDocId: data.applicationDocId || data.applicationId || '',
+      tutorShareAmount: typeof data.tutorShareAmount === 'number' ? data.tutorShareAmount : (typeof data.tutorShare === 'number' ? data.tutorShare : Math.round((data.grossAmount || 0) * 0.60)),
+      platformFeeAmount: typeof data.platformFeeAmount === 'number' ? data.platformFeeAmount : (typeof data.platformShare === 'number' ? data.platformShare : Math.round((data.grossAmount || 0) * 0.40)),
       startDate: parseTimestamp(data.startDate),
       paidByStudentAt: parseTimestamp(data.paidByStudentAt),
       releaseEligibleAt: parseTimestamp(data.releaseEligibleAt),
@@ -330,8 +333,11 @@ export const fetchTeacherDashboardData = async () => {
     return {
       id: d.id,
       ...data,
+      reward: typeof data.reward === 'number' ? data.reward : (typeof data.estimatedReward === 'number' ? data.estimatedReward : 0),
       createdAt: parseTimestamp(data.createdAt),
-      qualifiedAt: parseTimestamp(data.qualifiedAt)
+      qualifiedAt: parseTimestamp(data.qualifiedAt),
+      releaseEligibleAt: parseTimestamp(data.releaseEligibleAt),
+      paidAt: parseTimestamp(data.paidAt)
     };
   });
   const marketplacePricing = pricingSnap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
@@ -613,51 +619,70 @@ export const deriveTeacherDashboardState = (baseData: any) => {
     .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   const recommendedNegotiations = allNegotiations.filter((app: any) => matchedGroups.some((g:any) => g.id === (app.groupDocId || app.studentDocId)));
 
-  let totalRevenue = 0;
+  const findPayoutForApp = (appId: string) => (tutorPayouts || []).find((p: any) => p.applicationDocId === appId || p.applicationId === appId || p.id === `payout_${appId}`);
+
+  let grossStudentVolume = 0;
+  let tuitionRevenue = 0;
   let demoFeesPaid = 0;
   let activeMRR = 0;
+  let tuitionEscrow = 0;
+  let referralEscrow = 0;
+  let referralCashEarned = 0;
+  let bankedTokensEarned = 0;
   const ledgerEntries: any[] = [];
 
   applicationsWithSubjects.forEach((app: any) => {
     // Track Demo Fee (Teacher Outflow)
     const hasPassedDemoPhase = ['demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status);
     if (hasPassedDemoPhase) {
-      const dFee = 100; // Estimated fallback demo fee
+      const dFee = 100; // Standard demo fee
       demoFeesPaid += dFee;
       ledgerEntries.push({
         id: `${app.id}_demo`,
-        date: app.createdAt || Date.now(), // Approximate date
+        date: app.createdAt || Date.now(),
         studentName: app.studentName || 'Student',
         subject: app.category || 'General',
         amount: dFee,
         type: 'demo_fee_paid',
-        isOutflow: true
+        isOutflow: true,
+        status: 'paid'
       });
     }
 
-    // Track First Month Fee (Teacher Inflow)
+    // Track First Month Fee & Escrow
     if (app.status === 'tuition_started') {
       const fFee = app.finalPrice || 0;
       activeMRR += fFee;
       
       if (app.feePaid === true) {
-        totalRevenue += fFee;
+        grossStudentVolume += fFee;
+        const payout = findPayoutForApp(app.id);
+        const tShare = payout?.tutorShareAmount ?? Math.round(fFee * 0.60);
+        tuitionRevenue += tShare;
+
+        const isDisbursed = payout?.status === 'paid';
+        if (!payout || ['escrow_held', 'ready_for_payout', 'action_required_missing_upi'].includes(payout.status)) {
+          tuitionEscrow += tShare;
+        }
+
         ledgerEntries.push({
           id: `${app.id}_first_month`,
-          date: app.updatedAt || Date.now(), // Approximate start date
+          date: app.updatedAt || Date.now(),
           studentName: app.studentName || 'Student',
           subject: app.category || 'General',
-          amount: fFee,
-          type: 'first_month_received',
-          isOutflow: false
+          amount: tShare,
+          type: 'first_month_tutor_share',
+          isOutflow: false,
+          status: isDisbursed ? 'paid' : 'escrow_held'
         });
       }
     }
 
-    // Track Subsequent Manual Payments
+    // Track Subsequent Direct Payments (Month 2+)
     if (app.subsequentPayments && Array.isArray(app.subsequentPayments)) {
       app.subsequentPayments.forEach((pmt: any, index: number) => {
-        totalRevenue += pmt.amount;
+        grossStudentVolume += pmt.amount;
+        tuitionRevenue += pmt.amount;
         ledgerEntries.push({
           id: `${app.id}_manual_${index}`,
           date: pmt.date || Date.now(),
@@ -665,32 +690,85 @@ export const deriveTeacherDashboardState = (baseData: any) => {
           subject: app.category || 'General',
           amount: pmt.amount,
           type: 'manual_payment',
-          isOutflow: false
+          isOutflow: false,
+          status: 'paid'
         });
       });
     }
   });
 
-  let heldInEscrow = 0;
-  applicationsWithSubjects.forEach((app: any) => {
-    if (app.status === 'tuition_started' && app.feePaid) {
-      const payout = (tutorPayouts || []).find((p: any) => p.applicationId === app.id || p.id === `payout_${app.id}`);
-      if (!payout || payout.status !== 'paid') {
-        const tShare = payout?.tutorShare || Math.round((app.finalPrice || 0) * 0.60);
-        heldInEscrow += tShare;
+  // Track Referral Rewards (Cash to UPI or Banked Proposal Tokens)
+  (referrals || []).forEach((ref: any) => {
+    if (ref.rewardType === 'banked_token') {
+      if (ref.status === 'qualified') {
+        bankedTokensEarned += 1;
+      }
+    } else {
+      const reward = ref.reward || 0;
+      if (reward > 0) {
+        if (ref.payoutStatus === 'paid') {
+          referralCashEarned += reward;
+          ledgerEntries.push({
+            id: `${ref.id}_ref_paid`,
+            date: ref.paidAt || Date.now(),
+            studentName: ref.referredUserName || 'Referred Friend',
+            subject: 'Referral Cash Payout',
+            amount: reward,
+            type: 'referral_paid_upi',
+            isOutflow: false,
+            status: 'paid'
+          });
+        } else if (ref.status === 'qualified' && ['escrow_held', 'ready_for_payout', 'action_required_missing_upi'].includes(ref.payoutStatus || 'escrow_held')) {
+          referralEscrow += reward;
+          referralCashEarned += reward;
+          ledgerEntries.push({
+            id: `${ref.id}_ref_escrow`,
+            date: ref.qualifiedAt || Date.now(),
+            studentName: ref.referredUserName || 'Referred Friend',
+            subject: 'Referral Reward in Day 30 Escrow',
+            amount: reward,
+            type: 'referral_escrow_held',
+            isOutflow: false,
+            status: 'escrow_held'
+          });
+        }
       }
     }
   });
 
+  const referralLedger = (referrals || []).map((r: any) => ({
+    id: r.id,
+    name: r.referredUserName || 'Referred Friend',
+    status: r.status || 'pending',
+    reward: r.reward || r.estimatedReward || 0,
+    rewardType: r.rewardType || 'wallet_cash',
+    payoutStatus: r.payoutStatus || (r.status === 'qualified' ? 'escrow_held' : 'pending'),
+    releaseEligibleAt: r.releaseEligibleAt || 0,
+    qualifiedAt: r.qualifiedAt || 0,
+    createdAt: r.createdAt || 0,
+    payoutVpa: r.payoutVpa || '',
+    utrNumber: r.utrNumber || ''
+  }));
+
+  const heldInEscrow = tuitionEscrow + referralEscrow;
+  const netRevenue = (tuitionRevenue + referralCashEarned) - demoFeesPaid;
+
   ledgerEntries.sort((a, b) => b.date - a.date);
 
   const earningsData = {
-    totalRevenue,
+    totalRevenue: grossStudentVolume,
+    grossStudentVolume,
+    tuitionRevenue,
+    referralCashEarned,
+    bankedTokensEarned,
     demoFeesPaid,
-    netRevenue: totalRevenue - demoFeesPaid,
+    netRevenue,
     activeMRR,
     heldInEscrow,
-    ledgerEntries
+    tuitionEscrow,
+    referralEscrow,
+    ledgerEntries,
+    referralLedger
   };
 
   return {
@@ -724,12 +802,12 @@ export const deriveTeacherDashboardState = (baseData: any) => {
       groupDetails: app.groupDetails
     })),
     upcomingClasses: applicationsWithSubjects.filter((app: any) => ['tuition_started'].includes(app.status)).map((app: any) => {
-      const payout = (tutorPayouts || []).find((p: any) => p.applicationId === app.id || p.id === `payout_${app.id}`);
+      const payout = findPayoutForApp(app.id);
       const baseStart = app.startDate || app.updatedAt || app.createdAt || Date.now();
       const day7DueDate = baseStart + (7 * 24 * 60 * 60 * 1000);
       const day30PayoutDate = payout?.releaseEligibleAt || (baseStart + (30 * 24 * 60 * 60 * 1000));
-      const tutorShare = payout?.tutorShare || Math.round((app.finalPrice || 0) * 0.60);
-      const platformShare = payout?.platformShare || Math.round((app.finalPrice || 0) * 0.40);
+      const tutorShare = payout?.tutorShareAmount ?? Math.round((app.finalPrice || 0) * 0.60);
+      const platformShare = payout?.platformFeeAmount ?? Math.round((app.finalPrice || 0) * 0.40);
       const isMonth1 = !app.subsequentPayments || app.subsequentPayments.length === 0;
 
       return {

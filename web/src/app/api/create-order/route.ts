@@ -93,6 +93,16 @@ export async function POST(req: NextRequest) {
                     coursePrice = monthlyFee; // 7 days passed: NO REFUND
                 }
             } else {
+                if (appData.startDate) {
+                    const serverCurrentTime = Date.now();
+                    const startMillis = appData.startDate.toMillis ? appData.startDate.toMillis() : appData.startDate;
+                    const daysElapsed = Math.floor((serverCurrentTime - startMillis) / (1000 * 60 * 60 * 24));
+                    if (daysElapsed < 7) {
+                        return NextResponse.json({ 
+                            error: 'Tuition fee payment unlocks on Day 7 of your trial period.' 
+                        }, { status: 400 });
+                    }
+                }
                 coursePrice = monthlyFee;
             }
         }

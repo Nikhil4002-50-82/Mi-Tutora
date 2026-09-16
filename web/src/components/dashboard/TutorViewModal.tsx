@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star, ShieldCheck, MapPin, Navigation, Globe } from 'lucide-react';
+import { User, X, CheckCircle2, TrendingUp, CalendarDays, Star, ShieldCheck, MapPin, Navigation, Globe, Clock, AlertTriangle, AlertCircle, ArrowRight, Lock } from 'lucide-react';
 
 interface TutorViewModalProps {
   selectedViewUser: any;
@@ -15,6 +15,7 @@ interface TutorViewModalProps {
   dailyRequestsCount: number;
   setActionConfirmModal: (modal: any) => void;
   offerLoading?: boolean;
+  onPayFee?: (app: any) => void;
 }
 
 export function TutorViewModal({
@@ -30,7 +31,8 @@ export function TutorViewModal({
   handleDirectRequestDemo,
   dailyRequestsCount,
   setActionConfirmModal,
-  offerLoading
+  offerLoading,
+  onPayFee
 }: TutorViewModalProps) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -247,56 +249,220 @@ export function TutorViewModal({
               </div>
             </div>
 
-            {selectedViewApp && selectedViewApp.status === 'tuition_started' && (
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h4 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex justify-between items-center">
-                  Payment Details
-                  <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
-                    {selectedViewApp.paymentHistory?.length || 0} Payments Made
-                  </span>
-                </h4>
-                
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Next Payment Due</p>
-                    <p className="font-black text-gray-900 text-lg">
-                      {selectedViewApp.nextPaymentDate 
-                        ? new Date(selectedViewApp.nextPaymentDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
-                        : new Date(selectedViewApp.updatedAt + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
-                    <CalendarDays className="w-6 h-6" />
-                  </div>
-                </div>
+            {selectedViewApp && selectedViewApp.status === 'tuition_started' && (() => {
+              const parseTimestamp = (val: any) => {
+                if (!val) return 0;
+                if (typeof val === 'number') return val;
+                if (typeof val.toMillis === 'function') return val.toMillis();
+                if (val.seconds) return val.seconds * 1000;
+                if (val._seconds) return val._seconds * 1000;
+                const parsed = new Date(val).getTime();
+                return isNaN(parsed) ? 0 : parsed;
+              };
 
-                <div>
-                  <p className="text-sm font-bold text-gray-800 mb-3">Payment History</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                    {selectedViewApp.paymentHistory && selectedViewApp.paymentHistory.length > 0 ? (
-                      selectedViewApp.paymentHistory.map((payment: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg hover:border-emerald-200 transition-colors shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                              <TrendingUp className="w-4 h-4" />
+              const startMs = parseTimestamp(selectedViewApp.startDate) || parseTimestamp(selectedViewApp.createdAt) || Date.now();
+              const nowTime = Date.now();
+              const daysElapsed = Math.max(0, Math.floor((nowTime - startMs) / (24 * 60 * 60 * 1000)));
+
+              const isFeePaid = Boolean(selectedViewApp.feePaid);
+              const day7DueDate = startMs + (7 * 24 * 60 * 60 * 1000);
+              const day30Date = startMs + (30 * 24 * 60 * 60 * 1000);
+
+              const day7DateStr = new Date(day7DueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+              const day30DateStr = new Date(day30Date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+              const isInTrial = !isFeePaid && daysElapsed < 7;
+              const isGracePeriod = !isFeePaid && daysElapsed >= 7 && daysElapsed < 10;
+              const isLockedOverdue = !isFeePaid && daysElapsed >= 10;
+
+              const subsequentPayments: any[] = Array.isArray(selectedViewApp.subsequentPayments) ? selectedViewApp.subsequentPayments : [];
+              const totalPaymentsMade = (isFeePaid ? 1 : 0) + subsequentPayments.length;
+
+              const nextMonthNumber = 1 + subsequentPayments.length;
+              const nextPaymentDueDate = selectedViewApp.nextPaymentDate 
+                ? new Date(selectedViewApp.nextPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                : new Date(startMs + (nextMonthNumber * 30 * 24 * 60 * 60 * 1000)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+              const paymentsList: Array<{
+                id: string;
+                title: string;
+                amount: number;
+                date: number;
+                method: string;
+                isEscrow: boolean;
+                status: string;
+                paymentId?: string;
+              }> = [];
+
+              if (isFeePaid) {
+                const paidDate = parseTimestamp(selectedViewApp.feePaidAt) || parseTimestamp(selectedViewApp.updatedAt) || startMs;
+                paymentsList.push({
+                  id: 'month_1_payment',
+                  title: 'Month 1 Tuition (Platform Escrow)',
+                  amount: selectedViewApp.finalPrice || 0,
+                  date: paidDate,
+                  method: 'MiTutora Online Checkout',
+                  isEscrow: true,
+                  status: 'Paid & Escrow Protected',
+                  paymentId: selectedViewApp.paymentId || selectedViewApp.orderId || ''
+                });
+              }
+
+              subsequentPayments.forEach((pmt: any, idx: number) => {
+                paymentsList.push({
+                  id: `month_${idx + 2}_payment`,
+                  title: `Month ${idx + 2} Direct Tuition`,
+                  amount: pmt.amount || selectedViewApp.finalPrice || 0,
+                  date: parseTimestamp(pmt.date) || Date.now(),
+                  method: 'Direct Payment to Tutor',
+                  isEscrow: false,
+                  status: 'Paid Direct'
+                });
+              });
+
+              return (
+                <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-5">
+                  <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                    <div>
+                      <h4 className="text-xl font-bold text-gray-900">Payment Details</h4>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">Track your tuition fee schedule and escrow status.</p>
+                    </div>
+                    <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
+                      {totalPaymentsMade} {totalPaymentsMade === 1 ? 'Payment' : 'Payments'} Made
+                    </span>
+                  </div>
+
+                  {/* Payment Milestone Status Card */}
+                  {!isFeePaid ? (
+                    <div className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                      isLockedOverdue 
+                        ? 'bg-rose-50 border-rose-200 text-rose-950' 
+                        : isGracePeriod 
+                          ? 'bg-orange-50 border-orange-200 text-orange-950' 
+                          : 'bg-amber-50 border-amber-200 text-amber-950'
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 shrink-0">
+                          {isLockedOverdue ? (
+                            <AlertCircle className="w-5 h-5 text-rose-600" />
+                          ) : isGracePeriod ? (
+                            <AlertTriangle className="w-5 h-5 text-orange-600" />
+                          ) : (
+                            <Clock className="w-5 h-5 text-amber-600" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                            Month 1 Tuition Fee Due
+                          </p>
+                          <p className="text-sm font-bold mt-0.5">
+                            {isLockedOverdue ? (
+                              'Payment Overdue — Account Locked'
+                            ) : isGracePeriod ? (
+                              `Payment Overdue (3-Day Grace Period ends ${new Date(startMs + 10 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`
+                            ) : (
+                              `Due on ${day7DateStr} (Trial Day 7)`
+                            )}
+                          </p>
+                          <p className="text-xs opacity-90 mt-1">
+                            {isLockedOverdue 
+                              ? 'Your 7-day trial has ended. Classes are paused until tuition dues are cleared.' 
+                              : isGracePeriod 
+                                ? `Trial ended on ${day7DateStr}. Please clear dues to prevent class suspension.` 
+                                : `7-day trial in progress (${Math.max(0, 7 - daysElapsed)} days remaining). Your fee is held in platform escrow until Day 30.`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {onPayFee && (
+                        isInTrial ? (
+                          <button
+                            type="button"
+                            disabled
+                            title={`7-day trial in progress. Payment unlocks on Day 7 (${day7DateStr}).`}
+                            className="bg-slate-100/90 text-slate-400 border border-slate-200/90 font-bold text-xs px-4 py-2.5 rounded-xl shadow-none cursor-not-allowed select-none opacity-75 backdrop-blur-[2px] flex items-center gap-1.5 shrink-0 transition-all"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Unlocks Day 7 ({Math.max(1, 7 - daysElapsed)}d left)</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onPayFee(selectedViewApp)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 shrink-0 active:scale-95"
+                          >
+                            <span>Pay Fee (₹{(selectedViewApp.finalPrice || 0).toLocaleString()})</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200/80 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Month 1 Settled</p>
+                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Platform Escrow Protected</span>
+                          </div>
+                          <p className="text-sm font-bold text-gray-900 mt-0.5">
+                            Next Payment Due: {nextPaymentDueDate} (Month {nextMonthNumber} Direct)
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">
+                            Month 1 fee is held in platform escrow for 30 days. Month 2+ direct tuition is paid directly to your tutor with 0% platform fee.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 shrink-0">
+                        <CalendarDays className="w-5 h-5" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment History */}
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 mb-3">Payment History</p>
+                    <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                      {paymentsList.length > 0 ? (
+                        paymentsList.map((payment) => (
+                          <div key={payment.id} className="flex justify-between items-center p-3.5 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 transition-colors shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                                payment.isEscrow ? 'bg-teal-50 text-teal-600' : 'bg-emerald-50 text-emerald-600'
+                              }`}>
+                                {payment.isEscrow ? <ShieldCheck className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">{payment.title}</p>
+                                <p className="text-xs font-medium text-slate-500 mt-0.5">
+                                  {payment.method} • {new Date(payment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                  {payment.paymentId ? ` • ID: ${payment.paymentId}` : ''}
+                                </p>
+                              </div>
                             </div>
-                            <div>
+                            <div className="text-right">
                               <p className="text-sm font-bold text-gray-900">₹{payment.amount?.toLocaleString()}</p>
-                              <p className="text-xs font-medium text-slate-500">{new Date(payment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-block mt-0.5 ${
+                                payment.isEscrow ? 'text-teal-700 bg-teal-50 border border-teal-200/60' : 'text-emerald-700 bg-emerald-50 border border-emerald-200/60'
+                              }`}>
+                                {payment.status}
+                              </span>
                             </div>
                           </div>
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Paid</span>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center text-xs font-medium text-gray-500">
+                          No payments recorded yet. Month 1 tuition fee will appear here once cleared.
                         </div>
-                      ))
-                    ) : (
-                      <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-center text-sm font-medium text-gray-500">
-                        No past payments found.
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             
             {selectedViewUser.mode?.toLowerCase() !== 'online' && selectedViewUser.address && (
               <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mt-8">

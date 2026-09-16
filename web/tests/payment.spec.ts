@@ -184,4 +184,68 @@ test.describe('Payment Architecture & Financial Integrity (Payment_Architecture.
       expect(getStudentDemoFee(puc2, mockPucPricing).price).toBe(220);
     });
   });
+
+  test.describe('Student 7-Day Trial Tuition Fee Payment Gating', () => {
+    function evaluateTuitionPaymentEligibility(appData: { startDate: number; feePaid?: boolean }, isRemoval: boolean, serverTime: number) {
+      const daysElapsed = Math.floor((serverTime - appData.startDate) / (1000 * 60 * 60 * 24));
+      
+      if (isRemoval) {
+        if (daysElapsed < 7) {
+          return { allowed: true, type: 'prorated_cancellation', daysElapsed };
+        } else {
+          return { allowed: true, type: 'full_fee_cancellation', daysElapsed };
+        }
+      }
+
+      if (daysElapsed < 7) {
+        return { 
+          allowed: false, 
+          error: 'Tuition fee payment unlocks on Day 7 of your trial period.',
+          daysRemaining: 7 - daysElapsed 
+        };
+      }
+
+      return { allowed: true, type: 'full_tuition_payment', daysElapsed };
+    }
+
+    test('Blocks full tuition payment on Day 0 through Day 6 with countdown', () => {
+      const start = Date.now();
+      
+      // Day 0
+      const day0 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start);
+      expect(day0.allowed).toBe(false);
+      expect(day0.daysRemaining).toBe(7);
+
+      // Day 3
+      const day3 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (3 * 24 * 60 * 60 * 1000));
+      expect(day3.allowed).toBe(false);
+      expect(day3.daysRemaining).toBe(4);
+
+      // Day 6
+      const day6 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (6 * 24 * 60 * 60 * 1000));
+      expect(day6.allowed).toBe(false);
+      expect(day6.daysRemaining).toBe(1);
+    });
+
+    test('Unlocks full tuition payment exactly on Day 7 and onwards', () => {
+      const start = Date.now();
+
+      // Day 7
+      const day7 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (7 * 24 * 60 * 60 * 1000));
+      expect(day7.allowed).toBe(true);
+      expect(day7.type).toBe('full_tuition_payment');
+
+      // Day 10 (Overdue)
+      const day10 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (10 * 24 * 60 * 60 * 1000));
+      expect(day10.allowed).toBe(true);
+      expect(day10.type).toBe('full_tuition_payment');
+    });
+
+    test('Allows prorated cancellation payment before Day 7 during trial', () => {
+      const start = Date.now();
+      const day4Removal = evaluateTuitionPaymentEligibility({ startDate: start }, true, start + (4 * 24 * 60 * 60 * 1000));
+      expect(day4Removal.allowed).toBe(true);
+      expect(day4Removal.type).toBe('prorated_cancellation');
+    });
+  });
 });
