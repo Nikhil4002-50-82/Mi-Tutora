@@ -73,11 +73,11 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    const razorpayKey = process.env.RAZORPAY_KEY_ID;
-    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-    const razorpayAccount = process.env.RAZORPAYX_ACCOUNT_NUMBER;
-    const hasRazorpayX = !!(razorpayKey && razorpaySecret && razorpayAccount);
-    const authString = hasRazorpayX ? Buffer.from(`${razorpayKey}:${razorpaySecret}`).toString('base64') : '';
+    // MANUAL PAYOUT MODE: Automated RazorpayX disbursements are explicitly disabled.
+    // Day 30 escrows and referral bonuses will transition to 'ready_for_payout'
+    // for manual fulfillment in the Admin Dashboard.
+    const hasRazorpayX = false;
+    const authString = '';
 
     for (const docSnap of tutorSnapshot.docs) {
       const payout = docSnap.data();
@@ -114,78 +114,15 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      if (hasRazorpayX) {
-        try {
-          const maxAllowedTutorShare = payout.grossAmount ? Math.round(payout.grossAmount * 0.60) : payout.tutorShareAmount;
-          const safeTutorAmount = Math.min(payout.tutorShareAmount || 0, maxAllowedTutorShare);
-          const payoutPayload = {
-            account_number: razorpayAccount,
-            amount: Math.round(safeTutorAmount * 100), // paise
-            currency: 'INR',
-            mode: 'UPI',
-            purpose: 'payout',
-            fund_account: {
-              account_type: 'vpa',
-              vpa: { address: targetVpa },
-              contact: {
-                name: payout.tutorName || 'Tutor',
-                type: 'vendor'
-              }
-            },
-            queue_if_low_balance: true,
-            reference_id: `PAYOUT_TUTOR_${docSnap.id}`
-          };
-
-          const rpRes = await fetch('https://api.razorpay.com/v1/payouts', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${authString}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payoutPayload)
-          });
-
-          const rpData = await rpRes.json();
-          if (rpRes.ok) {
-            batch.update(docSnap.ref, {
-              status: rpData.status === 'processed' ? 'paid' : 'processing',
-              payoutVpa: targetVpa,
-              razorpayPayoutId: rpData.id || '',
-              utrNumber: rpData.utr || '',
-              paidAt: rpData.status === 'processed' ? FieldValue.serverTimestamp() : null,
-              updatedAt: FieldValue.serverTimestamp()
-            });
-            await commitBatchIfNeeded();
-            results.push({ id: docSnap.id, type: 'tutor', status: 'disbursed_via_api', payoutId: rpData.id });
-          } else {
-            console.error('RazorpayX Tutor Payout Error:', rpData);
-            batch.update(docSnap.ref, {
-              status: 'ready_for_payout',
-              payoutVpa: targetVpa,
-              updatedAt: FieldValue.serverTimestamp()
-            });
-            await commitBatchIfNeeded();
-            results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout_queued' });
-          }
-        } catch (apiErr) {
-          console.error('Failed to call RazorpayX API for tutor:', apiErr);
-          batch.update(docSnap.ref, {
-            status: 'ready_for_payout',
-            payoutVpa: targetVpa,
-            updatedAt: FieldValue.serverTimestamp()
-          });
-          await commitBatchIfNeeded();
-          results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout_api_fallback' });
-        }
-      } else {
-        batch.update(docSnap.ref, {
-          status: 'ready_for_payout',
-          payoutVpa: targetVpa,
-          updatedAt: FieldValue.serverTimestamp()
-        });
-        await commitBatchIfNeeded();
-        results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout' });
-      }
+      // In Manual Payout Mode: Escrows that reach Day 30 transition to ready_for_payout
+      // to be manually reviewed and paid by admin via the Admin Dashboard.
+      batch.update(docSnap.ref, {
+        status: 'ready_for_payout',
+        payoutVpa: targetVpa,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      await commitBatchIfNeeded();
+      results.push({ id: docSnap.id, type: 'tutor', status: 'ready_for_payout' });
     }
 
     // -------------------------------------------------------------------------
@@ -240,74 +177,14 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      if (hasRazorpayX) {
-        try {
-          const maxAllowedReward = refData.grossAmount ? Math.round(refData.grossAmount * 0.40 * 0.25) : rewardAmount;
-          const safeRewardAmount = Math.min(rewardAmount, maxAllowedReward);
-          const payoutPayload = {
-            account_number: razorpayAccount,
-            amount: Math.round(safeRewardAmount * 100), // paise
-            currency: 'INR',
-            mode: 'UPI',
-            purpose: 'payout',
-            fund_account: {
-              account_type: 'vpa',
-              vpa: { address: targetVpa },
-              contact: {
-                name: refData.referrerName || 'Student Referrer',
-                type: 'customer'
-              }
-            },
-            queue_if_low_balance: true,
-            reference_id: `PAYOUT_REF_${refSnap.id}`
-          };
-
-          const rpRes = await fetch('https://api.razorpay.com/v1/payouts', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${authString}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payoutPayload)
-          });
-
-          const rpData = await rpRes.json();
-          if (rpRes.ok) {
-            batch.update(refSnap.ref, {
-              payoutStatus: rpData.status === 'processed' ? 'paid' : 'processing',
-              payoutVpa: targetVpa,
-              razorpayPayoutId: rpData.id || '',
-              utrNumber: rpData.utr || '',
-              paidAt: rpData.status === 'processed' ? FieldValue.serverTimestamp() : null
-            });
-            await commitBatchIfNeeded();
-            results.push({ id: refSnap.id, type: 'referrer', status: 'disbursed_via_api', payoutId: rpData.id });
-          } else {
-            console.error('RazorpayX Referrer Payout Error:', rpData);
-            batch.update(refSnap.ref, {
-              payoutStatus: 'ready_for_payout',
-              payoutVpa: targetVpa
-            });
-            await commitBatchIfNeeded();
-            results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout_queued' });
-          }
-        } catch (apiErr) {
-          console.error('Failed to call RazorpayX API for referrer:', apiErr);
-          batch.update(refSnap.ref, {
-            payoutStatus: 'ready_for_payout',
-            payoutVpa: targetVpa
-          });
-          await commitBatchIfNeeded();
-          results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout_api_fallback' });
-        }
-      } else {
-        batch.update(refSnap.ref, {
-          payoutStatus: 'ready_for_payout',
-          payoutVpa: targetVpa
-        });
-        await commitBatchIfNeeded();
-        results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout' });
-      }
+      // In Manual Payout Mode: Referrals that reach Day 30 transition to ready_for_payout
+      // to be manually reviewed and paid by admin via the Admin Dashboard.
+      batch.update(refSnap.ref, {
+        payoutStatus: 'ready_for_payout',
+        payoutVpa: targetVpa
+      });
+      await commitBatchIfNeeded();
+      results.push({ id: refSnap.id, type: 'referrer', status: 'ready_for_payout' });
     }
 
     if (batchCount > 0) {

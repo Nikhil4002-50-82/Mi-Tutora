@@ -366,7 +366,7 @@ function SignupContent() {
       </div>
 
       {/* RIGHT COLUMN - SIGNUP FORM */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden bg-white min-h-screen lg:min-h-0 -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-none">
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-start lg:justify-center pt-3 pb-6 px-5 sm:p-8 lg:p-12 relative overflow-hidden bg-white min-h-0 lg:min-h-screen -mt-8 lg:mt-0 rounded-t-2xl sm:rounded-t-[2.5rem] lg:rounded-none z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-none">
         
         {/* Subtle mobile background glow */}
         <div className={`lg:hidden absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none -translate-y-1/2 transition-colors duration-200
@@ -374,12 +374,12 @@ function SignupContent() {
         `} />
 
         {/* Back to Home Button (Mobile & Desktop) */}
-        <div className="w-full max-w-md flex justify-start mb-6 lg:mb-10 z-20 relative">
+        <div className="w-full max-w-md flex justify-start mt-4 sm:mt-0 mb-5 sm:mb-6 lg:mb-10 z-20 relative">
           <button 
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-sm font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-sm hover:shadow-md px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-white bg-[#063831] hover:bg-[#04241f] shadow-sm hover:shadow-md px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-200 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Back to Home
           </button>
         </div>
@@ -393,18 +393,18 @@ function SignupContent() {
         >
           {/* Mobile Logo & Role Selector Removed (now in banner) */}
 
-          <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mb-2">
+          <div className="mb-3 sm:mb-6 lg:mb-10 text-center lg:text-left">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 tracking-tight mb-1 sm:mb-2">
               Create an Account
             </h2>
-            <p className="text-gray-500 font-medium">Already have an account? <a href={`/login${searchParams.toString() ? '?' + searchParams.toString() : ''}`} className="text-[#00a992] hover:underline font-bold">Log in</a></p>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium">Already have an account? <a href={`/login${searchParams.toString() ? '?' + searchParams.toString() : ''}`} className="text-[#00a992] hover:underline font-bold">Log in</a></p>
           </div>
           
           {error && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-red-50 text-red-600 p-4 rounded-2xl mb-8 text-sm font-medium border border-red-100 flex items-center justify-center lg:justify-start"
+              className="bg-red-50 text-red-600 p-3 sm:p-4 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 text-xs sm:text-sm font-medium border border-red-100 flex items-center justify-center lg:justify-start"
             >
               {error}
             </motion.div>
@@ -414,23 +414,23 @@ function SignupContent() {
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-emerald-50 text-emerald-700 p-4 rounded-2xl mb-8 text-sm font-medium border border-emerald-100 flex items-center justify-center lg:justify-start"
+              className="bg-emerald-50 text-emerald-700 p-3 sm:p-4 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 text-xs sm:text-sm font-medium border border-emerald-100 flex items-center justify-center lg:justify-start"
             >
               {successMsg}
             </motion.div>
           )}
 
-          <div className="space-y-4 mb-6">
+          <div className="mb-3 sm:mb-5 lg:mb-6">
             <button
               type="button"
               disabled={isAnyLoading}
               onClick={handleGoogleSignup}
-              className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm hover:shadow transition-all text-sm font-bold text-gray-700 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2.5 sm:gap-3 py-2.5 sm:py-3.5 bg-white border border-gray-200 hover:border-gray-300 rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition-all text-xs sm:text-sm font-bold text-gray-700 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isGoogleLoading ? (
-                <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+                <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
               ) : (
-                <svg viewBox="0 0 24 24" className="w-5 h-5">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -442,21 +442,21 @@ function SignupContent() {
             </button>
           </div>
 
-          <div className="relative mb-6 flex items-center justify-center">
+          <div className="relative mb-3 sm:mb-5 lg:mb-6 flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-200"></div>
             </div>
-            <span className="relative bg-white px-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Or sign up with email</span>
+            <span className="relative bg-white px-3 sm:px-4 text-[11px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">Or sign up with email</span>
           </div>
 
-          <form onSubmit={handleSignup} className="space-y-4">
+          <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
             <div>
-              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1.5">
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1 sm:mb-1.5">
                 Full Name<span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <UserPlus className="h-5 w-5 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
+                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
@@ -465,7 +465,7 @@ function SignupContent() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
-                  className={`w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
+                  className={`w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
@@ -473,12 +473,12 @@ function SignupContent() {
             </div>
 
             <div>
-              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1.5">
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1 sm:mb-1.5">
                 Email<span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 </div>
                 <input
                   type="email"
@@ -487,7 +487,7 @@ function SignupContent() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className={`w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
+                  className={`w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
@@ -495,12 +495,12 @@ function SignupContent() {
             </div>
 
             <div>
-              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1.5">
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1 sm:mb-1.5">
                 Password<span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
@@ -509,34 +509,34 @@ function SignupContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
+                  className={`w-full pl-10 sm:pl-11 pr-11 sm:pr-12 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300 disabled:opacity-70 disabled:cursor-not-allowed
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-3.5 sm:pr-4 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-2">
+              <label className="text-xs sm:text-sm font-bold text-gray-700 block mb-1 sm:mb-1.5">
                 Referral Code <span className="text-gray-400 font-normal">(Optional)</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Award className="h-5 w-5 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none">
+                  <Award className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
                   placeholder="e.g. JOHN-X8B2"
-                  className={`w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
+                  className={`w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-4 transition duration-300 placeholder:text-gray-400 font-medium hover:border-gray-300
                     ${isTeacher ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-[#00a992] focus:ring-[#00a992]/10'}
                   `}
                 />
@@ -546,7 +546,7 @@ function SignupContent() {
             <button
               type="submit"
               disabled={isAnyLoading}
-              className={`group w-full disabled:opacity-70 disabled:cursor-not-allowed text-white py-4 rounded-2xl text-base font-bold transition duration-300 shadow-xl flex items-center justify-center gap-2 cursor-pointer mt-6
+              className={`group w-full disabled:opacity-70 disabled:cursor-not-allowed text-white py-3 sm:py-4 rounded-xl sm:rounded-2xl text-sm sm:text-base font-bold transition duration-300 shadow-xl flex items-center justify-center gap-2 cursor-pointer mt-3 sm:mt-6
                 ${isTeacher 
                   ? 'bg-gradient-to-r from-[#04241f] to-emerald-800 hover:from-emerald-900 hover:to-emerald-700 shadow-emerald-900/20 hover:shadow-emerald-900/40' 
                   : 'bg-[#063831] hover:bg-[#04241f] shadow-[#063831]/20 hover:shadow-[#063831]/40'
@@ -557,7 +557,7 @@ function SignupContent() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <UserPlus className="w-5 h-5" />
+                  <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
                   Create {isTeacher ? 'Educator' : 'Student'} Account
                 </>
               )}

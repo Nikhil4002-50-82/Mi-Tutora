@@ -2,6 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper function to check if the authenticated caller has admin privileges
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('role', '') == 'admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin' ||
+          ('roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']))))
+      );
+    }
+
+    // Unrestricted read and write access across all collections for platform administrators
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
     // Secure the "users" collection against privilege escalation and mass deletion
     match /users/{userId} {
       allow read: if request.auth != null; 
