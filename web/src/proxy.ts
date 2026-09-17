@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Next.js Edge Middleware - V14 Security Fix
+ * Next.js 16 Edge Proxy - V14 Security Fix
  * Adds explicit CORS headers to all /api/* routes.
  * Handles OPTIONS preflight requests so browser-based cross-origin calls work correctly.
  */
@@ -15,7 +15,7 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Max-Age': '86400',
 };
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   if (req.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
   }

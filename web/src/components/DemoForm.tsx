@@ -1267,7 +1267,7 @@ export default function DemoForm({
 
                   {(pref.mode === 'Offline' && !isProgramming) && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <label className="text-sm font-semibold flex items-center gap-1.5">
                           <MapPin className="w-4 h-4 text-[#00a992]" />
                           <span>Group Address</span>
@@ -1578,7 +1578,7 @@ export default function DemoForm({
                 <span>Board</span>
                 <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {['CBSE', 'ICSE', 'State Board', 'IB / IGCSE'].map((item) => (
                   <label key={item} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-4 cursor-pointer hover:border-purple-500">
                     <input
@@ -1597,7 +1597,7 @@ export default function DemoForm({
             </div>
 
             <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div className="flex flex-col gap-2 mb-3">
                 <label className="text-sm font-semibold flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-[#00a992]" />
                   <span>Subjects</span>
@@ -1605,7 +1605,7 @@ export default function DemoForm({
                 </label>
 
                 {isSeniorSecondary(student.classGrade) && (
-                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg text-xs font-medium">
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg text-xs font-medium w-full sm:w-fit">
                     <span className="text-slate-500 px-1.5">Stream:</span>
                     {(['All', 'Science', 'Commerce', 'Arts / Humanities'] as const).map((st) => {
                       const active = (student.stream || 'All') === st;
@@ -1635,7 +1635,7 @@ export default function DemoForm({
               {!student.board ? (
                 <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">Please select a board to see subjects.</p>
               ) : (
-                <div className="grid md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {getAvailableSubjects(student.board, student.classGrade, student.stream).map(sub => (
                     <label key={sub} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500 transition-all">
                       <input
@@ -1660,7 +1660,7 @@ export default function DemoForm({
               <span>Technologies</span>
               <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {['Python', 'Java', 'AI & ML', 'HTML & CSS', 'Data Analytics', 'Gen AI', 'Agentic AI'].map((item) => (
                 <label key={item} className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all cursor-pointer">
                   <input
@@ -1683,7 +1683,7 @@ export default function DemoForm({
               <span>Languages</span>
               <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {['English', 'Arabic', 'German', 'Japanese', 'French', 'Spanish'].map((item) => (
                 <label key={item} className="border border-slate-300 rounded-xl px-4 py-4 flex items-center gap-3 hover:border-purple-500 transition-all cursor-pointer">
                   <input
@@ -1945,12 +1945,12 @@ export default function DemoForm({
               </div>
             )}
             
-            <div className="flex gap-4 pt-6 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-6 border-t border-slate-100">
               {formData.step > (hasProfile ? 2 : 1) && (
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, step: prev.step - 1 }))}
-                  className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95 flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition-all active:scale-95 flex items-center justify-center gap-1.5"
                 >
                   <span>← Back</span>
                 </button>

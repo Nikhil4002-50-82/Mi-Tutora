@@ -955,7 +955,7 @@ export default function TeacherForm({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
               <label className="text-sm font-semibold flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-[#00a992]" />
                 <span>WhatsApp No.</span>
@@ -1033,7 +1033,7 @@ export default function TeacherForm({
 
           ) : (
 
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
 
               {[
                 'Online',
@@ -1407,7 +1407,7 @@ export default function TeacherForm({
                 <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
 
                 {[
                   'LKG',
@@ -1447,7 +1447,7 @@ export default function TeacherForm({
                 <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
                 {[
                   'CBSE',
@@ -1487,7 +1487,7 @@ export default function TeacherForm({
               {formData.boards.length === 0 || formData.classes.length === 0 ? (
                 <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">Please select at least one class and one board below to see the subjects.</p>
               ) : (
-                <div className="grid md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {(() => {
                     const { allSubjects } = getSubjectsForTeacher(formData.boards, formData.classes);
 
@@ -1522,7 +1522,7 @@ export default function TeacherForm({
               <span>Technologies you Teach</span>
             </label>
 
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
 
               {[
                 'Python',
@@ -1564,7 +1564,7 @@ export default function TeacherForm({
               <span>Languages you Teach</span>
             </label>
 
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
               {[
                 'English',

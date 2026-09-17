@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/utils/firebase/admin';
 
-// Cache this route's responses for 60 seconds to reduce repeated N+1 Firestore reads (V9 security fix)
-export const revalidate = 60;
+// Force dynamic rendering — this route reads nextUrl.searchParams at request time
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
