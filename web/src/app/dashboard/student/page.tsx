@@ -17,7 +17,7 @@ import { ReviewModal } from '@/components/dashboard/ReviewModal';
 import { TuitionGroupCard } from '@/components/dashboard/TuitionGroupCard';
 
 import { motion } from 'motion/react';
-import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Navigation, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp, Bookmark, Lightbulb, ExternalLink } from 'lucide-react';
+import { Home, Search, BookOpen, Clock, Settings, LogOut, ChevronRight, Star, Calendar, MapPin, Navigation, Users, Video, CreditCard, ChevronDown, CheckCircle2, XCircle, FileText, ArrowRight, Activity, Bell, Filter, Edit2, PlayCircle, Plus, Info, Zap, Shield, Lock, Trash2, X, CalendarDays, LayoutDashboard, ShieldCheck, User, Gift, MessageCircle, Menu, Globe, Banknote, Handshake, AlertCircle, AlertTriangle, FileImage, Phone, Mail, GraduationCap, ArrowLeft, Loader2, Copy, Wallet, TrendingUp, Lightbulb, ExternalLink } from 'lucide-react';
 
 import GroupManager from '@/components/GroupManager';
 import DemoForm from '@/components/DemoForm';
@@ -228,14 +228,13 @@ export default function StudentDashboard() {
     });
   }, [data?.students, data?.myStudent]);
   
-  const initialTuitionTabSet = useRef(false);
+  const hasProfile = allStudents.length > 0;
+
   useEffect(() => {
-    if (data && !loading && !initialTuitionTabSet.current) {
-      const hasStudents = data.students && data.students.length > 0;
-      setTuitionSubTab(hasStudents ? 'recommendation' : 'all');
-      initialTuitionTabSet.current = true;
+    if (data && !loading) {
+      setTuitionSubTab(hasProfile ? 'recommendation' : 'all');
     }
-  }, [data, loading]);
+  }, [data, loading, hasProfile]);
 
   const hasPendingDues = useMemo(() => {
     if (!data?.upcomingClasses) return false;
@@ -440,8 +439,6 @@ export default function StudentDashboard() {
   });
 
   const computedRecommendedNegotiations = data?.allNegotiations?.filter((app:any) => computedRecommendedTutors.some((t:any) => t.id === app.tutorDocId)) || [];
-
-  const hasProfile = allStudents.length > 0;
 
   const initialRedirectDone = useRef(false);
 
@@ -1541,7 +1538,7 @@ export default function StudentDashboard() {
                     <div className="lg:col-span-5 xl:col-span-4 space-y-4">
                       <div className="flex justify-between items-end px-2">
                         <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Teachers</h2>
-                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
+                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab(hasProfile ? 'recommendation' : 'all'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
                       </div>
                       
                       {studentGroups.length > 0 && (
@@ -1574,8 +1571,8 @@ export default function StudentDashboard() {
                                return !isLocked;
                             }).slice(0, 4).map((tutor: any, index: number) => {
                               const matchGroup = (app: any) => {
-                                return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
-                              };
+                                 return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
+                               };
                               const activeAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && ['negotiating', 'pending', 'reviewing', 'offer_sent', 'demo_requested_by_student', 'demo_requested_by_teacher', 'demo_pending_payment', 'demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'accepted', 'tuition_started'].includes(app.status));
                               const hiredAppForGroup = data?.applications?.find((app: any) => matchGroup(app) && app.status === 'tuition_started');
                               const offerApp = activeAppForGroup?.tutorDocId === tutor.id ? activeAppForGroup : undefined;
@@ -1616,7 +1613,7 @@ export default function StudentDashboard() {
                             })}
                             <div className="pt-4 mt-2 border-t border-gray-50 flex justify-between items-center">
                               <span className="text-xs text-slate-500 font-medium">Find more great tutors</span>
-                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
+                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab(hasProfile ? 'recommendation' : 'all'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
                                 <ArrowRight className="w-4 h-4" />
                               </button>
                             </div>
@@ -1635,7 +1632,7 @@ export default function StudentDashboard() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
                   <div>
                     <h2 className="text-3xl sm:text-4xl font-black text-[#111827] tracking-tight">
-                      {tuitionSubTab === 'all' ? 'All Tutors' : 'Recommended Tutors'}
+                      {hasProfile ? 'Recommended Tutors' : 'All Tutors'}
                     </h2>
                     <p className="text-slate-500 mt-1 mb-4">Find great tutors who are ready to teach you.</p>
                     {studentGroups.length > 0 && (
@@ -1652,30 +1649,6 @@ export default function StudentDashboard() {
                         </select>
                       </div>
                     )}
-                  </div>
-                  <div className="flex bg-gray-100 p-1 rounded-full shadow-inner w-full sm:w-auto overflow-x-auto border border-gray-200">
-                    <button 
-                      onClick={() => {
-                        if (tuitionSubTab === 'all') return;
-                        setIsSwitchingTab(true);
-                        setTuitionSubTab('all');
-                        setTimeout(() => setIsSwitchingTab(false), 1200);
-                      }} 
-                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                      All
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (tuitionSubTab === 'recommendation') return;
-                        setIsSwitchingTab(true);
-                        setTuitionSubTab('recommendation');
-                        setTimeout(() => setIsSwitchingTab(false), 1200);
-                      }} 
-                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                      Recommendation
-                    </button>
                   </div>
                 </div>
 
@@ -1898,7 +1871,7 @@ export default function StudentDashboard() {
                                   </div>
                                   
                                   {isHired ? (
-                                    <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-full shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200 mb-4">
+                                    <button disabled className="w-full bg-emerald-50 text-emerald-700 font-bold py-3.5 rounded-full shadow-none text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-emerald-200">
                                       <CheckCircle2 className="w-4 h-4" /> Already Hired
                                     </button>
                                   ) : (
@@ -1917,7 +1890,7 @@ export default function StudentDashboard() {
                                           <ExternalLink className="w-3 h-3 text-emerald-600 opacity-80" />
                                         </button>
                                       )}
-                                      <div className="flex gap-2 mb-4">
+                                      <div className="flex gap-2">
                                         <button 
                                           onClick={() => setSelectedViewUser(teacher)}
                                           className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
@@ -1958,10 +1931,6 @@ export default function StudentDashboard() {
                                       </div>
                                     </>
                                   )}
-                                  
-                                  <button className="w-full text-center text-sm font-bold text-emerald-700 flex items-center justify-center gap-2 hover:text-emerald-800 transition-colors">
-                                    <Bookmark className="w-4 h-4" /> Save for later
-                                  </button>
                                 </>
                               )}
                             </div>
@@ -2883,28 +2852,28 @@ export default function StudentDashboard() {
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
                   {/* Glassmorphic Hero Card */}
-                  <div className="lg:col-span-2 bg-gradient-to-br from-[#063831] via-[#0a4d44] to-[#04241f] rounded-3xl p-8 sm:p-10 text-white shadow-2xl shadow-teal-900/20 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-700">
-                      <Gift className="w-64 h-64 -rotate-12 translate-x-12 -translate-y-12" />
+                  <div className="lg:col-span-2 bg-gradient-to-br from-[#00a992] via-[#009682] to-[#008270] rounded-3xl p-8 sm:p-10 text-white shadow-2xl shadow-teal-950/20 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 group-hover:opacity-15 transition-all duration-700">
+                      <Gift className="w-64 h-64 -rotate-12 translate-x-12 -translate-y-12 text-white" />
                     </div>
                     {/* Glowing Orbs */}
-                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-emerald-500/30 rounded-full blur-[80px]" />
-                    <div className="absolute bottom-0 right-10 w-48 h-48 bg-teal-400/20 rounded-full blur-[60px]" />
+                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-teal-300/20 rounded-full blur-[80px]" />
+                    <div className="absolute bottom-0 right-10 w-48 h-48 bg-emerald-400/20 rounded-full blur-[60px]" />
                     
                     <div className="relative z-10 flex flex-col h-full justify-between">
                       <div className="max-w-md mb-8">
-                        <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-100 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-emerald-400/20 backdrop-blur-md">
+                        <div className="inline-flex items-center gap-2 bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-white/30 backdrop-blur-md">
                           <Gift className="w-3.5 h-3.5" /> REWARD PROGRAM
                         </div>
-                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-emerald-300">Earn together.</span></h3>
-                        <p className="text-emerald-50/80 text-base sm:text-lg font-medium leading-relaxed">
+                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-white drop-shadow-sm">Earn together.</span></h3>
+                        <p className="text-teal-50/90 text-base sm:text-lg font-medium leading-relaxed">
                           Share your unique referral code. Earn 25% of the initial company margin (approx. 10% of total course value) when your friend books their first class!
                         </p>
                       </div>
                       
-                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-white/15">
+                      <div className="bg-black/20 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-black/25">
                         <div>
-                          <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Unique Code</p>
+                          <p className="text-xs font-bold text-teal-100 uppercase tracking-widest mb-2">Your Unique Code</p>
                           <span className="text-3xl sm:text-4xl font-black tracking-widest text-white drop-shadow-md">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3">
@@ -2919,7 +2888,7 @@ export default function StudentDashboard() {
                             const link = `${window.location.origin}/signup?ref=${code}`;
                             navigator.clipboard.writeText(link);
                             toast.success("Invite Link copied to clipboard!");
-                          }} className="flex-1 bg-white text-[#063831] px-4 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                          }} className="flex-1 bg-white hover:bg-teal-50 text-[#00a992] px-4 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                             <Copy className="w-4 h-4" /> Copy Invite Link
                           </button>
                         </div>

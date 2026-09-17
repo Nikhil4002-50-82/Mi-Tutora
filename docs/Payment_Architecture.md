@@ -23,6 +23,7 @@ All payment calculations and verifications happen securely on the backend.
 *   **Purpose:** Securely calculates the true price for tuitions/demos and generates a Razorpay Order ID.
 *   **Input:** `applicationDocId`, `userId`, `role` ('student' or 'teacher'), `useWallet`.
 *   **Security Check:** The backend ignores any price sent by the frontend. If `role` is 'student', it queries the application's `finalPrice`. If `role` is 'teacher', it fetches the `marketplace_pricing` matrix and recalculates the specific platform demo fee natively on the server.
+*   **Day 7 Trial Gate:** When `role === 'student'` and `isRemoval === false`, the backend verifies `daysElapsed >= 7`. If `daysElapsed < 7`, the server rejects the order with `400 Bad Request` (*"Tuition fee payment unlocks on Day 7 of your trial period."*), preventing premature full tuition payments during the 7-day trial.
 
 ### B. Payment Verification (`/api/verify-payment`)
 *   **Purpose:** Verifies the cryptographic signature from Razorpay for tuitions/demos.
@@ -69,6 +70,7 @@ All payment calculations and verifications happen securely on the backend.
     1.  **Grace Period Reminder Pop-Up (Days 7–9):** Dismissible modal prompting payment on load with "Pay Monthly Fees" button.
     2.  **My Teachers Tab:** Direct "Pay Monthly Fees" button on the active teacher card.
     3.  **Account Locked Screen (Day 10+):** Fullscreen lock card with "Pay Monthly Fees Securely" button.
+    4.  **Tutor View Modal (`TutorViewModal.tsx`):** Unlocks on Day 7 (Days 0–6 rendered blurred and disabled with lock icon and live trial countdown).
 *   **Flow:** Call `/api/create-order` -> Open Root-Level Razorpay Widget (`payingClass`) -> Send signature to `/api/verify-payment` -> UI refreshes to show `feePaid: true`.
 *   **Instant Remove Teacher Flow:** If a student has already paid (`isPaid === true`), clicking "Remove Teacher" instantly terminates the tuition by calling the `executeDeclineOffer` utility. This completely bypasses the Razorpay checkout modal to mathematically prevent double-charging.
 

@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 
 import { motion } from 'motion/react';
-import { Calendar, CalendarDays, CalendarClock, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Bookmark, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink, RefreshCw, Sparkles, Info, Coins } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, LayoutDashboard, LogOut, User, Users, Gift, Lock, CheckCircle2, AlertTriangle, AlertCircle, MessageCircle, BookOpen, Menu, X, Globe, Star, Bell, Phone, Mail, MapPin, Target, Handshake, ChevronRight, ChevronDown, ArrowRight, CreditCard, IndianRupee, TrendingUp, TrendingDown, Copy, Wallet, GraduationCap, Lightbulb, Loader2, FileText, ShieldCheck, Trash2, Clock, Award, UserCheck, ExternalLink, RefreshCw, Sparkles, Info, Coins } from 'lucide-react';
 import TeacherForm from '@/components/TeacherForm';
 import ActionModal from '@/components/ActionModal';
 import MessageModal from '@/components/MessageModal';
@@ -203,14 +203,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  const initialTuitionTabSet = useRef(false);
   useEffect(() => {
-    if (data && !loading && !initialTuitionTabSet.current) {
-      const profileCompleted = !!data?.profile?.phone || !!data?.profile?.category || !!data?.profile?.subjects;
-      setTuitionSubTab(profileCompleted ? 'recommendation' : 'all');
-      initialTuitionTabSet.current = true;
+    if (data && !loading) {
+      setTuitionSubTab(hasProfile ? 'recommendation' : 'all');
     }
-  }, [data, loading]);
+  }, [data, loading, hasProfile]);
 
   useEffect(() => {
     if (data?.applications && data?.profile && !hasFetchedLinks) {
@@ -1496,7 +1493,7 @@ export default function TeacherDashboard() {
                     <div className="lg:col-span-5 xl:col-span-4 space-y-4">
                       <div className="flex justify-between items-end px-2">
                         <h2 className="text-xl font-bold text-gray-900 tracking-tight">Recommended Students</h2>
-                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
+                        <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab(hasProfile ? 'recommendation' : 'all'); }} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View All</button>
                       </div>
                       <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
                         {computedRecommendedStudents.length === 0 ? (
@@ -1543,7 +1540,7 @@ export default function TeacherDashboard() {
                             })}
                             <div className="pt-4 mt-2 border-t border-gray-50 flex justify-between items-center">
                               <span className="text-xs text-slate-500 font-medium">Find more great students</span>
-                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab('recommendation'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
+                              <button onClick={() => { setActiveTab('new_tuition'); setTuitionSubTab(hasProfile ? 'recommendation' : 'all'); }} className="text-slate-400 hover:text-emerald-600 transition-colors">
                                 <ArrowRight className="w-4 h-4" />
                               </button>
                             </div>
@@ -1561,33 +1558,9 @@ export default function TeacherDashboard() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
                   <div>
                     <h2 className="text-3xl sm:text-4xl font-black text-[#111827] tracking-tight">
-                      {tuitionSubTab === 'all' ? 'All Students' : 'Recommended Students'}
+                      {hasProfile ? 'Recommended Students' : 'All Students'}
                     </h2>
                     <p className="text-slate-500 mt-1">Find great students who are ready to learn with you.</p>
-                  </div>
-                  <div className="flex bg-gray-100 p-1 rounded-full shadow-inner w-full sm:w-auto overflow-x-auto border border-gray-200">
-                    <button 
-                      onClick={() => {
-                        if (tuitionSubTab === 'all') return;
-                        setIsSwitchingTab(true);
-                        setTuitionSubTab('all');
-                        setTimeout(() => setIsSwitchingTab(false), 1200);
-                      }} 
-                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                      All
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (tuitionSubTab === 'recommendation') return;
-                        setIsSwitchingTab(true);
-                        setTuitionSubTab('recommendation');
-                        setTimeout(() => setIsSwitchingTab(false), 1200);
-                      }} 
-                      className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-full transition-all whitespace-nowrap ${tuitionSubTab === 'recommendation' ? 'bg-white text-[#00a992] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                      Recommendation
-                    </button>
                   </div>
                 </div>
 
@@ -1825,7 +1798,7 @@ export default function TeacherDashboard() {
                                               <ExternalLink className="w-3 h-3 text-emerald-600 opacity-80" />
                                             </button>
                                           )}
-                                          <div className="flex gap-2 mb-4">
+                                          <div className="flex gap-2">
                                             <button 
                                               onClick={() => setSelectedViewUser(buildStudentViewUser(group, group))}
                                               className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
@@ -1874,9 +1847,6 @@ export default function TeacherDashboard() {
                                           </div>
                                         </>
                                       )}
-                                      <button className="w-full text-center text-sm font-bold text-emerald-700 flex items-center justify-center gap-2 hover:text-emerald-800 transition-colors">
-                                        <Bookmark className="w-4 h-4" /> Save for later
-                                      </button>
                                     </>
                                   )}
                                 </div>
@@ -2772,20 +2742,20 @@ export default function TeacherDashboard() {
 
                 {/* Active Pro Hero Banner (When Pro is Active) */}
                 {isProPlan && (
-                  <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
-                      <ShieldCheck className="w-56 h-56 text-emerald-400" />
+                  <div className="bg-gradient-to-r from-[#00a992] via-[#009682] to-[#008270] border border-teal-400/40 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                      <ShieldCheck className="w-56 h-56 text-white" />
                     </div>
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                          <span className="bg-white/20 text-white border border-white/30 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-white" />
                             Pro Educator Pass Active
                           </span>
                           {daysRemaining > 0 && (
-                            <span className="bg-white/10 text-emerald-200 border border-white/10 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                              <CalendarClock className="w-3.5 h-3.5 text-emerald-300" />
+                            <span className="bg-white/15 text-white border border-white/20 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                              <CalendarClock className="w-3.5 h-3.5 text-white" />
                               {daysRemaining} {daysRemaining === 1 ? 'Day' : 'Days'} Remaining
                             </span>
                           )}
@@ -2795,15 +2765,15 @@ export default function TeacherDashboard() {
                           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                             Your Pro Pass is Active
                           </h2>
-                          <p className="text-emerald-100/70 text-sm font-medium mt-1">
+                          <p className="text-teal-50/90 text-sm font-medium mt-1">
                             {formattedExpiryDate 
                               ? `Full Pro benefits are unlocked until ${formattedExpiryDate}.`
                               : 'You have unlimited access to 15 proposals per week and priority matching.'}
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-emerald-200/80 bg-black/20 rounded-xl px-3.5 py-2 w-fit border border-white/5">
-                          <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="flex items-center gap-2 text-xs text-white/90 bg-black/20 rounded-xl px-3.5 py-2 w-fit border border-white/10">
+                          <Info className="w-4 h-4 text-teal-200 shrink-0" />
                           <span>One-time 30-day pass. Automatically reverts to Free Basic plan on expiry with zero recurring charges.</span>
                         </div>
                       </div>
@@ -2811,7 +2781,7 @@ export default function TeacherDashboard() {
                       <div className="flex flex-col sm:flex-row lg:flex-col shrink-0 gap-3">
                         <button
                           onClick={() => setUpgradeModalOpen(true)}
-                          className="bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/80 transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                          className="bg-white hover:bg-teal-50 text-[#00a992] font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-teal-950/20 transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
                         >
                           <RefreshCw className="w-4 h-4" />
                           Extend Pro (+30 Days)
@@ -2948,38 +2918,38 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Pro Plan */}
-                  <div className="bg-gradient-to-br from-[#063831] to-[#04241f] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between h-full border border-emerald-900/50">
+                  <div className="bg-gradient-to-br from-[#00a992] to-[#008270] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between h-full border border-teal-400/30 text-white">
                     <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                      <Star className="w-32 h-32 text-emerald-300" />
+                      <Star className="w-32 h-32 text-white" />
                     </div>
                     <div className="relative z-10">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="text-2xl font-black text-white">Pro</h3>
-                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
+                        <span className="bg-white/20 text-white border border-white/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-white" />
                           Recommended
                         </span>
                       </div>
-                      <p className="text-emerald-100/80 font-medium mb-6">For committed tutors looking to maximize student leads.</p>
+                      <p className="text-teal-50/90 font-medium mb-6">For committed tutors looking to maximize student leads.</p>
                       <div className="text-4xl font-black text-white mb-8">
-                        ₹299 <span className="text-lg text-emerald-200/50 font-medium tracking-normal">/30-day pass</span>
+                        ₹299 <span className="text-lg text-teal-100/70 font-medium tracking-normal">/30-day pass</span>
                       </div>
                       
                       <ul className="space-y-4 mb-8">
                         <li className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
                           <span className="text-white font-medium">Up to 15 proposals per week (3x more leads)</span>
                         </li>
                         <li className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
                           <span className="text-white font-medium">Priority matchmaking algorithm ranking boost</span>
                         </li>
                         <li className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
                           <span className="text-white font-medium">Direct parent contact details on demo bookings</span>
                         </li>
                         <li className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
                           <span className="text-white font-medium">Verified Pro badge on discovery profile</span>
                         </li>
                       </ul>
@@ -2988,7 +2958,7 @@ export default function TeacherDashboard() {
                     <div className="relative z-10">
                       <button 
                         onClick={() => setUpgradeModalOpen(true)} 
-                        className="w-full font-black py-4 px-6 rounded-xl transition-all active:scale-95 bg-gradient-to-r from-emerald-400 to-[#00a992] hover:from-emerald-300 hover:to-emerald-400 text-[#04241f] shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/80 flex items-center justify-center gap-2 text-sm"
+                        className="w-full font-black py-4 px-6 rounded-xl transition-all active:scale-95 bg-white hover:bg-teal-50 text-[#00a992] shadow-lg shadow-teal-950/20 flex items-center justify-center gap-2 text-sm"
                       >
                         {isProPlan ? (
                           <>
@@ -3003,7 +2973,7 @@ export default function TeacherDashboard() {
                         )}
                       </button>
                       {isProPlan && formattedExpiryDate && (
-                        <p className="text-xs text-emerald-300/70 text-center font-medium mt-2.5">
+                        <p className="text-xs text-teal-100/80 text-center font-medium mt-2.5">
                           Currently active until {formattedExpiryDate}. Extends by another 30 days from your expiry.
                         </p>
                       )}
@@ -3065,32 +3035,32 @@ export default function TeacherDashboard() {
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
                   {/* Glassmorphic Hero Card */}
-                  <div className="lg:col-span-2 bg-gradient-to-br from-[#063831] via-[#0a4d44] to-[#04241f] rounded-3xl p-8 sm:p-10 text-white shadow-2xl shadow-teal-900/20 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-700">
-                      <Gift className="w-64 h-64 -rotate-12 translate-x-12 -translate-y-12" />
+                  <div className="lg:col-span-2 bg-gradient-to-br from-[#00a992] via-[#009682] to-[#008270] rounded-3xl p-8 sm:p-10 text-white shadow-2xl shadow-teal-950/20 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 group-hover:opacity-15 transition-all duration-700">
+                      <Gift className="w-64 h-64 -rotate-12 translate-x-12 -translate-y-12 text-white" />
                     </div>
                     {/* Glowing Orbs */}
-                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-emerald-500/30 rounded-full blur-[80px]" />
-                    <div className="absolute bottom-0 right-10 w-48 h-48 bg-teal-400/20 rounded-full blur-[60px]" />
+                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-teal-300/20 rounded-full blur-[80px]" />
+                    <div className="absolute bottom-0 right-10 w-48 h-48 bg-emerald-400/20 rounded-full blur-[60px]" />
                     
                     <div className="relative z-10 flex flex-col h-full justify-between">
                       <div className="max-w-md mb-8">
-                        <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-100 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-emerald-400/20 backdrop-blur-md">
+                        <div className="inline-flex items-center gap-2 bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-white/30 backdrop-blur-md">
                           <Gift className="w-3.5 h-3.5" /> REWARD PROGRAM
                         </div>
-                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-emerald-300">Earn rewards.</span></h3>
-                        <div className="text-emerald-50/90 text-base sm:text-lg font-medium leading-relaxed space-y-3">
+                        <h3 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight leading-tight">Invite friends.<br/><span className="text-white drop-shadow-sm">Earn rewards.</span></h3>
+                        <div className="text-teal-50/90 text-base sm:text-lg font-medium leading-relaxed space-y-3">
                           <p>Share your unique referral code and unlock exclusive rewards based on who joins!</p>
-                          <ul className="text-sm sm:text-base space-y-2 mt-2 bg-black/20 p-4 rounded-xl border border-white/10">
-                            <li className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-emerald-300 shrink-0" /> <strong>Refer Students:</strong> Earn 25% of margin as Wallet Cash.</li>
-                            <li className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-emerald-300 shrink-0" /> <strong>Refer Teachers:</strong> Earn 1 Banked Token (Free Request).</li>
+                          <ul className="text-sm sm:text-base space-y-2 mt-2 bg-black/20 p-4 rounded-xl border border-white/15">
+                            <li className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-teal-200 shrink-0" /> <strong>Refer Students:</strong> Earn 25% of margin as Wallet Cash.</li>
+                            <li className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-teal-200 shrink-0" /> <strong>Refer Teachers:</strong> Earn 1 Banked Token (Free Request).</li>
                           </ul>
                         </div>
                       </div>
                       
-                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-white/15">
+                      <div className="bg-black/20 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 transform transition-all hover:bg-black/25">
                         <div>
-                          <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-2">Your Unique Code</p>
+                          <p className="text-xs font-bold text-teal-100 uppercase tracking-widest mb-2">Your Unique Code</p>
                           <span className="text-3xl sm:text-4xl font-black tracking-widest text-white drop-shadow-md">{data?.userData?.referralCode || data?.userData?.referralcode || 'GENERATING...'}</span>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3">
@@ -3105,7 +3075,7 @@ export default function TeacherDashboard() {
                             const link = `${window.location.origin}/signup?ref=${code}`;
                             navigator.clipboard.writeText(link);
                             toast.success("Invite Link copied to clipboard!");
-                          }} className="flex-1 bg-white text-[#063831] px-4 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                          }} className="flex-1 bg-white hover:bg-teal-50 text-[#00a992] px-4 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                             <Copy className="w-4 h-4" /> Copy Invite Link
                           </button>
                         </div>
@@ -3225,17 +3195,17 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Day 30 Automated Escrow & Payout Policy Banner */}
-                <div className="bg-gradient-to-br from-[#063831] via-[#08423a] to-[#04241f] text-white rounded-3xl p-6 shadow-xl border border-emerald-800/40 relative overflow-hidden">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-emerald-800/50">
+                <div className="bg-gradient-to-br from-[#00a992] via-[#009682] to-[#008270] text-white rounded-3xl p-6 shadow-xl border border-teal-500/30 relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/20">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30 shrink-0">
-                        <ShieldCheck className="w-5 h-5 text-emerald-300" />
+                      <div className="w-10 h-10 rounded-2xl bg-white/20 text-white flex items-center justify-center border border-white/30 shrink-0">
+                        <ShieldCheck className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <h3 className="font-black text-white text-base tracking-tight">
                           Automated Day 30 Escrow & Payout Policy
                         </h3>
-                        <p className="text-xs text-emerald-100/80 font-medium mt-0.5">
+                        <p className="text-xs text-teal-50/90 font-medium mt-0.5">
                           Direct platform-to-bank UPI transfers via Razorpay
                         </p>
                       </div>
@@ -3244,17 +3214,17 @@ export default function TeacherDashboard() {
                     {/* Registered UPI Status */}
                     <div className="flex items-center gap-2">
                       {Boolean(data?.profile?.upiId || data?.userData?.upiId) ? (
-                        <div className="flex items-center gap-2 bg-emerald-500/15 border border-emerald-400/30 px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-300">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="flex items-center gap-2 bg-white/20 border border-white/30 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white">
+                          <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
                           <span>Payout UPI: {data?.profile?.upiId || data?.userData?.upiId}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-400/40 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-300">
-                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <div className="flex items-center gap-2 bg-black/25 border border-amber-300/40 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-200">
+                          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
                           <span>UPI ID Missing</span>
                           <button
                             onClick={() => setActiveTab('profile')}
-                            className="ml-1 underline text-white hover:text-amber-200 font-bold"
+                            className="ml-1 underline text-white hover:text-amber-100 font-bold"
                           >
                             Add in Profile
                           </button>
@@ -3265,29 +3235,29 @@ export default function TeacherDashboard() {
 
                   {/* 2 Core Payout Rules */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                    <div className="flex items-start gap-3 bg-black/25 border border-emerald-500/20 rounded-2xl p-4">
-                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                        <AlertCircle className="w-4 h-4 text-amber-300" />
+                    <div className="flex items-start gap-3 bg-black/20 border border-white/15 backdrop-blur-sm rounded-2xl p-4">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400/25 text-amber-200 border border-amber-300/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertCircle className="w-4 h-4 text-amber-200" />
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wider">
                           Strict Prerequisite: Student Fee Required
                         </h4>
-                        <p className="text-xs text-emerald-50/90 font-medium mt-1 leading-relaxed">
+                        <p className="text-xs text-white/90 font-medium mt-1 leading-relaxed">
                           Day 30 automated payouts for both your 60% tuition share and referral rewards will execute <strong>only after the student pays their fee</strong>. If the fee remains unpaid or overdue, payouts remain blocked and will not disburse.
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-3 bg-black/25 border border-emerald-500/20 rounded-2xl p-4">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-400/20 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
-                        <CalendarClock className="w-4 h-4 text-emerald-300" />
+                    <div className="flex items-start gap-3 bg-black/20 border border-white/15 backdrop-blur-sm rounded-2xl p-4">
+                      <div className="w-8 h-8 rounded-xl bg-white/20 text-white border border-white/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <CalendarClock className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">
                           Automated UPI Disbursement on Day 30
                         </h4>
-                        <p className="text-xs text-emerald-50/90 font-medium mt-1 leading-relaxed">
+                        <p className="text-xs text-white/90 font-medium mt-1 leading-relaxed">
                           Once student payment is verified, funds lock into platform escrow for 30 days. On the 30th day, funds are deposited directly to your UPI ID without requiring manual withdrawal.
                         </p>
                       </div>

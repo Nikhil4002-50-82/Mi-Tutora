@@ -6,10 +6,10 @@ Welcome! This document explains exactly how the platform matches Students with T
 
 ## The Big Picture: How It Works
 
-Imagine a giant funnel. When a user opens their dashboard, the platform pours all available profiles into this funnel. The funnel has two layers:
+The platform uses a **Profile-Gated Discovery Engine** to show the most relevant profiles to students and teachers based on their onboarding state:
 
-1. **The "All" Tab (The Open Market):** This shows everyone. It gives every profile a "Suitability Score" (like grading a test) and sorts them so the best matches float to the top.
-2. **The "Recommended" Tab (The VIP Lounge):** This is highly exclusive. Before a profile can enter this tab, it must pass a strict security check (the `isStrictMatch` filter). If they fail even one critical requirement (like teaching the wrong grade), they are blocked from this tab entirely.
+1. **Before Initial Profile Setup (The Open Market — "All"):** When a user has not yet configured their subjects, category, or student profile (`!hasProfile`), they explore the full market in the "All" section. Profiles are scored based on base suitability, and users are presented with an informational reminder prompt to complete their profile to unlock tailored recommendations. The manual toggle pill is hidden.
+2. **After Initial Profile Setup (The VIP Lounge — "Recommended"):** Once a profile is established (`hasProfile`), the "New Tuition" discovery feed transitions exclusively to the "Recommended" section. Before a candidate profile can enter this section, it must pass a strict security check (the `isStrictMatch` filter). If they fail even one critical requirement (like teaching the wrong grade or board), they are filtered out entirely. The "All" section and toggle pill are removed from this view.
 
 ---
 
@@ -104,10 +104,11 @@ graph TD
     
     %% Frontend Client
     subgraph Frontend [Client Browser / React UI]
-        STATE[Append 20 Cards to Infinite Feed]
-        LOAD_MORE[User Clicks 'Load More' or Infinite Scroll]
-        TAB_ALL((ALL TAB))
-        TAB_REC((RECOMMENDED TAB))
+        GATE{Profile Setup Complete?}
+        VIEW_ALL[All View: Open Market Feed]
+        VIEW_REC[Recommended View: Curated Matches]
+        STATE[Append 20 Cards to Feed]
+        LOAD_MORE[User Clicks 'Load More' Button]
     end
     
     %% Flow
@@ -125,19 +126,20 @@ graph TD
     GLOBAL_SORT --> PAGINATE
     
     PAGINATE -->|20 Cards per Page| STATE
-    STATE --> TAB_ALL
-    STATE --> TAB_REC
+    STATE --> GATE
+    GATE -- No (!hasProfile) --> VIEW_ALL
+    GATE -- Yes (hasProfile) --> VIEW_REC
     LOAD_MORE -->|Fetch page + 1| PAGINATE
 
     classDef database fill:#f9dbbd,stroke:#d98324,stroke-width:2px,color:#000;
     classDef server fill:#b5eaea,stroke:#2b9eb3,stroke-width:2px,color:#000;
     classDef react fill:#cceabb,stroke:#3f8832,stroke-width:2px,color:#000;
-    classDef tab fill:#fcdab7,stroke:#c45b14,stroke-width:4px,color:#000;
+    classDef gate fill:#fcdab7,stroke:#c45b14,stroke-width:2px,color:#000;
     
     class DB_T,DB_S,DB_G database;
     class FETCH,STITCH,FILTER,SCORE,SCORE_ZERO,GLOBAL_SORT,PAGINATE server;
-    class STATE,LOAD_MORE react;
-    class TAB_ALL,TAB_REC tab;
+    class STATE,LOAD_MORE,VIEW_ALL,VIEW_REC react;
+    class GATE gate;
 ```
 
 ---

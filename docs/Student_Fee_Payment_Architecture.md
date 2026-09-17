@@ -17,16 +17,19 @@ graph TD
     
     D --> E{Timeline & Action}
     
+    E -->|Days 0 to 6: Trial in Progress| E1[Student View Modal: Pay Fee Blurred & Disabled with Countdown]
     E -->|Clicks 'Remove' < Day 7| F[UI requests Prorated Checkout]
     E -->|Days 7 to 9: Grace Period| G[Dismissible Pop-Up: 'Pay Monthly Fees']
+    E -->|Day 7+: TutorViewModal Unlocks| G1[Active 'Pay Fee' Button]
     E -->|Day 10+: Post-Grace Period| G2[Hard Lock Screen: 'Pay Monthly Fees Securely']
     
     F --> H[API: /create-order]
     G -->|Clicks Pay Monthly Fees| I[API: /create-order]
+    G1 -->|Clicks Pay Fee| I
     G2 -->|Clicks Pay Monthly Fees Securely| I
     
     H -->|isRemoval: true| J[Backend strictly calculates daysElapsed via server clock. Computes prorated fee.]
-    I -->|isRemoval: false| K[Backend fetches 100% full monthly fee from Database.]
+    I -->|isRemoval: false| K[Backend verifies daysElapsed >= 7. Fetches 100% full monthly fee from Database.]
     
     J --> L[Razorpay Checkout Popup]
     K --> L
@@ -45,8 +48,9 @@ The payment system is deeply integrated to protect against client-side tampering
 ### A. Order Generation (`/api/create-order`)
 When a student initiates a payment, the frontend passes `role: 'student'` and an `isRemoval` flag. 
 *   **Security Lock:** The backend completely ignores the price sent by the frontend. It fetches the application data directly from Firestore.
+*   **Day 7 Trial Gate (Anti-Tamper Lock):** If `isRemoval` is false (regular monthly fee payment) and `startDate` is present, the backend verifies that `daysElapsed >= 7`. If `daysElapsed < 7`, the server strictly rejects order creation with `400 Bad Request` (*"Tuition fee payment unlocks on Day 7 of your trial period."*). This prevents premature charges and guarantees trial protection.
 *   **The Prorated Math Engine:** If `isRemoval` is true, the backend calculates the difference between Google's atomic server time (`admin.firestore.Timestamp.now().toMillis()`) and the exact `startDate`. 
-    *   If it is under 7 days, it mathematically prorates the monthly fee exactly.
+    *   If it is under 7 days, it mathematically prorates the monthly fee exactly: `(Monthly Fee ÷ Days in Month) × Days Elapsed`.
     *   If it is 7 days or more, it rejects the discount and charges the 100% full fee.
 *   **Ledger Tagging:** Before sending the order to Razorpay, the system creates a pending entry in the `payments` collection tagged securely as `type: 'tuition'`.
 
@@ -67,6 +71,10 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 
 *   **Status:** The student receives classes but has not paid the monthly fee yet (`feePaid: false`).
 *   **The Admin Tracker:** The moment the student hires the teacher, a record is added to the `pending_tuition_fees` database collection to track unpaid dues.
+*   **Student View (Fee Button Gating in TutorViewModal):**
+    *   In the student portal `TutorViewModal` (under Payment Details), the "Pay Fee" button is rendered in a blurred, disabled state (`backdrop-blur-[2px] opacity-75 cursor-not-allowed`) displaying a lock icon and live countdown: `Unlocks Day 7 ({7 - daysElapsed}d left)`.
+    *   Hovering provides a tooltip: *"7-day trial in progress. Payment unlocks on Day 7 ([Day 7 Date])."*
+    *   Full monthly payment is prohibited during Days 0–6 to preserve trial protections and prevent proration conflicts upon early cancellation.
 *   **Teacher View (Earnings Transparency):**
     *   **Stage 1 (Student Fee):** Amber clock badge `Due on [Day 7 Date] (Trial Day 7)` with live countdown (*"Student 7-day trial in progress ({7 - daysElapsed} days remaining). Fee will be collected by platform."*).
     *   **Stage 2 (Tutor Payout):** Slate calendar badge `Expected: ₹Y on [Day 30 Date]` with prominent `Student Fee Required` pill (*"Day 30 payout locks into escrow automatically once student pays on Day 7."*).

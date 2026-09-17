@@ -17,7 +17,7 @@ To maximize paid upgrades, the platform uses an industry-standard "Strict Quota"
 - **Target Audience:** New teachers testing the platform.
 - **Quota:** 5 Tokens (Requests) per week.
 - **Limits:** Once 5 requests are sent, all "Send Offer" buttons are locked until the following Monday (or a rolling 7-day window).
-- **Matchmaking:** Standard visibility in the Student's "All" tab.
+- **Matchmaking:** Standard visibility in recommendations (organic placement without the +20 Pro boost).
 
 ### Pro Plan (Paid Tier - ₹299/month)
 - **Target Audience:** Serious teachers scaling their tuition business.
@@ -68,3 +68,4 @@ The `tutors` collection maintains the following quota and subscription fields:
 - **The Progress Bar:** The Subscription tab will feature a clean progress bar showing `X / 5 Requests Used This Week`.
 - **The Lockout:** If a Basic teacher hits 5 requests, the "Send Offer" button in the Student modal will turn gray. Clicking it will open a "Quota Exceeded" modal with a direct link to pay for the Pro plan. 
 - **The Upsell:** The Pro tier card will clearly highlight the ROI: *"Upgrade for ₹299 to unlock 10 more students this week!"*
+- **Brand Palette Integration:** The Pro pricing card and Active Pro hero banner feature the `#00a992` brand gradient (`from-[#00a992] to-[#008270]`) with high-contrast white CTAs, establishing a consistent brand identity across both dashboards.

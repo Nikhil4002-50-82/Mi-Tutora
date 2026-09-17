@@ -127,6 +127,11 @@ To ensure instantaneous page loads and eliminate browser lag without exposing pr
 *   **Global Rank #1 Guarantee:** All candidate profiles are evaluated and sorted in descending order of total score *before* pagination. Rank #1 is always the highest-scoring candidate globally, never missed due to shallow querying.
 *   **20-Card Paginated Chunks (`page`, `pageSize: 20`):** The client requests `page=1` initially (20 cards) and retrieves subsequent 20-card slices via the **"Load More"** trigger as the user scrolls, saving bandwidth and Firestore read quotas.
 
+### Discovery Feed: Profile-Gated Views
+To ensure maximum lead relevance while maintaining a seamless onboarding flow:
+*   **Before Profile Setup (`!hasProfile`):** Users explore the entire catalog ("All Students" / "All Tutors") with a banner prompt encouraging them to configure their subjects and category. The manual subtab toggle pill is hidden.
+*   **After Profile Setup (`hasProfile`):** The New Tuition discovery feed transitions exclusively to algorithmic recommendations ("Recommended Students" / "Recommended Tutors"), removing the "All" section and toggle pill so users only interact with qualified matches.
+
 ---
 
 ## 4. Discovery, Token Quotas & Pro Subscriptions
