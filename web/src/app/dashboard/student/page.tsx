@@ -3750,7 +3750,7 @@ export default function StudentDashboard() {
       {/* PAYMENT MODAL (Root Level for instant accessibility from any state including hard lock) */}
       {payingClass && (() => {
         const coursePrice = payingClass.finalPrice || payingClass.currentOffer || payingClass.budget || 4000;
-        const totalToPay = coursePrice + Math.round(coursePrice * 0.18);
+        const totalToPay = coursePrice;
         
         return (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -3769,12 +3769,6 @@ export default function StudentDashboard() {
                       <span className="text-xs font-medium">Agreed monthly fee</span>
                     </div>
                     <span className="text-gray-900">₹{coursePrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
-                    <div className="flex flex-col">
-                      <span className="text-gray-900">GST (18%)</span>
-                    </div>
-                    <span className="text-gray-900">₹{Math.round(coursePrice * 0.18).toLocaleString()}</span>
                   </div>
                 </div>
                 

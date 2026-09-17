@@ -4151,19 +4151,12 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-gray-900">₹{coursePrice}</span>
                   </div>
-                  
-                  <div className="flex justify-between items-center text-sm font-bold text-gray-500">
-                    <div className="flex flex-col">
-                      <span className="text-gray-900">GST (18%)</span>
-                    </div>
-                    <span className="text-gray-900">₹{Math.round(coursePrice * 0.18)}</span>
-                  </div>
               </div>
               
               <div className="flex justify-between items-center pt-4 border-t border-gray-200 text-lg font-black text-gray-900">
                 <span>Total to Pay</span>
                 <span className="text-[#00a992]">
-                  ₹{coursePrice + Math.round(coursePrice * 0.18)}
+                  ₹{coursePrice}
                 </span>
               </div>
             </div>

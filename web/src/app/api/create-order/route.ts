@@ -108,8 +108,8 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // Calculate total including 18% GST
-    let totalToPay = coursePrice + Math.round(coursePrice * 0.18);
+    // Total to pay
+    let totalToPay = coursePrice;
     let walletDiscountApplied = 0;
     
     // If the user requested to use their wallet balance, deduct it securely

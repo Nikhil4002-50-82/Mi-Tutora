@@ -22,15 +22,11 @@ $$\text{Platform Net Margin } = P - R = G \times 0.30 \quad (30\% \text{ net ret
 
 | Financial Component | Formula / Share | Example (₹6,000) | Destination & Custody |
 | :--- | :--- | :--- | :--- |
-| **Base Tuition Fee** | Agreed Monthly Tuition Rate | **₹6,000** | Basis for 60/40 Escrow & Referral Reward |
-| **Gross Inflow (Checkout)**| Base Tuition + 18% GST | **₹7,080** | Paid by Parent on Day 7 via Razorpay |
+| **Gross Inflow (Checkout)**| Agreed Monthly Tuition Rate | **₹6,000** | Paid by Parent on Day 7 via Razorpay |
 | **Platform Commission** | 40% of Base Fee | **₹2,400** | Platform Gross Margin |
 | **Tutor Share (Escrow)** | 60% of Base Fee | **₹3,600** | **Held in platform escrow until Day 30** |
 | **Referral Reward (Escrow)** | 25% of Platform Cut | **₹600** | **Held in platform escrow until Day 30; then deposited automatically via UPI** |
 | **Platform Net Margin** | Platform Cut minus Referral | **₹1,800** | Net platform retained earnings |
-
-> [!NOTE]
-> **GST Billing Alignment:** In accordance with Indian taxation rules, 18% GST is collected on checkout from the parent (`coursePrice + 18% GST` via `/api/create-order`). The platform 40/60 escrow split and referral reward are computed strictly on the net base tuition fee (`rewardBase`), preserving educator and affiliate earnings.
 
 ### 1.3 Teacher Proposal Breakdown (`StudentViewModal.tsx`)
 
