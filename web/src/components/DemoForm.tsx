@@ -54,9 +54,9 @@ interface Props {
   hasProfile?: boolean;
 }
 
-export const ICSE_SUBJECTS = ["English","English Language","English Literature","Second Language","Mathematics","Environmental Studies (EVS)","General Knowledge (GK)","Computer","Computer Applications","Science","Integrated Science","Physics","Chemistry","Biology","History","Civics","Geography","Art","Music","Physical Education","Moral Science","Economics","Commercial Studies","Yoga","Home Science"];
-const CBSE_SUBJECTS = ["English","Mathematics","EVS","Hindi/Regional Language","Hindi","Sanskrit/Third Language","Science","Social Science","Computer","Artificial Intelligence/Information Technology","Health & Physical Education","Skill Subjects","Art","Physical Education"];
-const STATE_BOARD_SUBJECTS = ["Kannada","English","Hindi/Third Language","Mathematics","EVS","Science","Social Science","Computer","Art","Physical Education"];
+import { getSubjectsForStudent, isSeniorSecondary, ICSE_7_TO_10 } from '@/utils/subjects';
+
+export const ICSE_SUBJECTS = Array.from(ICSE_7_TO_10);
 
 export default function DemoForm({
   category,
@@ -118,6 +118,7 @@ export default function DemoForm({
             studentType: initialData.studentType || '',
             classGrade: initialData.classLevel || '',
             board: initialData.board || '',
+            stream: initialData.stream || '',
             subjects: initialData.subjects || [],
             technologies: initialData.technologies || [],
             languages: initialData.languages || [],
@@ -149,6 +150,7 @@ export default function DemoForm({
           studentType: '',
           classGrade: '',
           board: '',
+          stream: '',
           subjects: [] as string[],
           technologies: [] as string[],
           languages: [] as string[],
@@ -248,6 +250,7 @@ export default function DemoForm({
                       studentType: studentData.studentType || '',
                       classGrade: studentData.classLevel || '',
                       board: studentData.board || '',
+                      stream: studentData.stream || '',
                       subjects: studentData.subjects || [],
                       technologies: studentData.technologies || [],
                       languages: studentData.languages || [],
@@ -436,6 +439,7 @@ export default function DemoForm({
             studentType: '',
             classGrade: '',
             board: '',
+            stream: '',
             subjects: [],
             technologies: [],
             languages: [],
@@ -850,24 +854,8 @@ export default function DemoForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldSubmitGroup]);
 
-  const getAvailableSubjects = (board: string, classGrade: string) => {
-    let availableSubjects = new Set<string>();
-    if (board === 'ICSE') {
-      ICSE_SUBJECTS.forEach(s => availableSubjects.add(s));
-    } else if (board === 'CBSE') {
-      CBSE_SUBJECTS.forEach(s => availableSubjects.add(s));
-    } else if (board === 'State Board' || board === 'IB / IGCSE') {
-      STATE_BOARD_SUBJECTS.forEach(s => availableSubjects.add(s));
-    } else {
-      ICSE_SUBJECTS.forEach(s => availableSubjects.add(s));
-      CBSE_SUBJECTS.forEach(s => availableSubjects.add(s));
-      STATE_BOARD_SUBJECTS.forEach(s => availableSubjects.add(s));
-    }
-    const puGrades = ['1st PU', '2nd PU', '11th Standard', '12th Standard'];
-    if (puGrades.includes(classGrade)) {
-      ['KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
-    }
-    return Array.from(availableSubjects).sort();
+  const getAvailableSubjects = (board: string, classGrade: string, stream?: string) => {
+    return getSubjectsForStudent(board, classGrade, stream);
   };
 
   const renderProfileView = () => {
@@ -1609,17 +1597,47 @@ export default function DemoForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-[#00a992]" />
-                <span>Subjects</span>
-                <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <label className="text-sm font-semibold flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-[#00a992]" />
+                  <span>Subjects</span>
+                  <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+
+                {isSeniorSecondary(student.classGrade) && (
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg text-xs font-medium">
+                    <span className="text-slate-500 px-1.5">Stream:</span>
+                    {(['All', 'Science', 'Commerce', 'Arts / Humanities'] as const).map((st) => {
+                      const active = (student.stream || 'All') === st;
+                      return (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => {
+                            const newStudents = [...formData.students];
+                            newStudents[sIndex] = { ...newStudents[sIndex], stream: st === 'All' ? '' : st };
+                            setFormData({ ...formData, students: newStudents });
+                          }}
+                          className={`px-2.5 py-1 rounded-md transition-all ${
+                            active
+                              ? 'bg-purple-600 text-white shadow-sm font-semibold'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {!student.board ? (
                 <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">Please select a board to see subjects.</p>
               ) : (
                 <div className="grid md:grid-cols-3 gap-3">
-                  {getAvailableSubjects(student.board, student.classGrade).map(sub => (
-                    <label key={sub} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500">
+                  {getAvailableSubjects(student.board, student.classGrade, student.stream).map(sub => (
+                    <label key={sub} className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500 transition-all">
                       <input
                         type="checkbox"
                         checked={student.subjects?.includes(sub)}

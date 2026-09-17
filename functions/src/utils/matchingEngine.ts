@@ -39,7 +39,7 @@ export function doesClassMatch(studentClass: string, teacherClasses: string[]): 
   return false;
 }
 
-export function matchesSubjectToken(need: string, offer: string): boolean {
+function matchesSingleSubjectToken(need: string, offer: string): boolean {
   if (!need || !offer) return false;
   const n = need.toLowerCase().trim();
   const o = offer.toLowerCase().trim();
@@ -50,12 +50,70 @@ export function matchesSubjectToken(need: string, offer: string): boolean {
   const cleanO = o.replace(/[^a-z0-9]/g, "");
   if (cleanN === cleanO) return true;
 
+  // "All Subject" / "All Subjects" wildcard: If tutor offers All Subject(s), they cover any subject
+  if (cleanO === "allsubject" || cleanO === "allsubjects") return true;
+
   // Math aliases
-  if (
-    (cleanN === "math" || cleanN === "maths" || cleanN === "mathematics") &&
-    (cleanO === "math" || cleanO === "maths" || cleanO === "mathematics")
-  ) {
+  const mathTokens = ["math", "maths", "mathematics"];
+  if (mathTokens.includes(cleanN) && mathTokens.includes(cleanO)) {
     return true;
+  }
+
+  // SST / Social Studies / Social Science aliases (distinct from pure "Science")
+  const sstTokens = ["sst", "socialscience", "socialstudies", "socialstudiessocialscience"];
+  if (sstTokens.includes(cleanN) && sstTokens.includes(cleanO)) {
+    return true;
+  }
+
+  // EVS / Environmental Studies / Environmental Science
+  const evsTokens = ["evs", "environmentalstudies", "environmentalscience", "evsenvironmentalstudies"];
+  if (evsTokens.includes(cleanN) && evsTokens.includes(cleanO)) {
+    return true;
+  }
+
+  // GK / General Knowledge
+  const gkTokens = ["gk", "generalknowledge", "generalknowledgegk"];
+  if (gkTokens.includes(cleanN) && gkTokens.includes(cleanO)) {
+    return true;
+  }
+
+  // Arts / Fine Arts / Art & Craft / Painting
+  const artTokens = ["art", "arts", "artcraft", "artandcraft", "finearts", "fineartspainting", "painting"];
+  if (artTokens.includes(cleanN) && artTokens.includes(cleanO)) {
+    return true;
+  }
+
+  // Moral Science / Value Education
+  const moralTokens = ["moralscience", "moralsciencevalueeducation", "valueeducation"];
+  if (moralTokens.includes(cleanN) && moralTokens.includes(cleanO)) {
+    return true;
+  }
+
+  // English / English Core, Hindi / Hindi Core
+  if ((cleanN === "english" && cleanO === "englishcore") || (cleanN === "englishcore" && cleanO === "english")) {
+    return true;
+  }
+  if ((cleanN === "hindi" && cleanO === "hindicore") || (cleanN === "hindicore" && cleanO === "hindi")) {
+    return true;
+  }
+
+  return false;
+}
+
+export function matchesSubjectToken(need: string, offer: string): boolean {
+  if (!need || !offer) return false;
+  if (matchesSingleSubjectToken(need, offer)) return true;
+
+  // Slash splitting (e.g., "Computer Science / Informatics Practices" matching "Computer Science")
+  if (need.includes("/") || offer.includes("/")) {
+    const needParts = need.includes("/") ? need.split("/").map((p) => p.trim()).filter(Boolean) : [need];
+    const offerParts = offer.includes("/") ? offer.split("/").map((p) => p.trim()).filter(Boolean) : [offer];
+
+    for (const np of needParts) {
+      for (const op of offerParts) {
+        if (matchesSingleSubjectToken(np, op)) return true;
+      }
+    }
   }
 
   return false;

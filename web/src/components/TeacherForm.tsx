@@ -51,6 +51,7 @@ import {
   isVerificationComplete,
   DocumentRequirement,
 } from '@/utils/documentVerification';
+import { getSubjectsForTeacher } from '@/utils/subjects';
 
 
 interface Props {
@@ -1488,44 +1489,20 @@ export default function TeacherForm({
               ) : (
                 <div className="grid md:grid-cols-3 gap-3">
                   {(() => {
-                    let availableSubjects = new Set();
-                    
-                    const hasEarly = formData.classes.some((c: string) => ['LKG', 'UKG', '1st - 5th'].includes(c));
-                    const hasMiddle = formData.classes.some((c: string) => ['6th - 8th'].includes(c));
-                    const hasHigh = formData.classes.some((c: string) => ['9th - 10th'].includes(c));
-                    const hasPU = formData.classes.some((c: string) => ['1st PU', '2nd PU'].includes(c));
+                    const { allSubjects } = getSubjectsForTeacher(formData.boards, formData.classes);
 
-                    if (formData.boards.includes('ICSE')) {
-                      if (hasEarly) ['English', 'Second Language', 'Mathematics', 'Environmental Studies (EVS)', 'General Knowledge (GK)', 'Computer', 'Art', 'Music', 'Physical Education', 'Moral Science', 'Science', 'Social Studies'].forEach(s => availableSubjects.add(s));
-                      if (hasMiddle) ['English Language', 'English Literature', 'Second Language', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Integrated Science', 'History', 'Civics', 'Geography', 'Computer Applications', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasHigh) ['English Language', 'English Literature', 'Second Language', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Civics', 'Geography', 'Computer Applications', 'Physical Education', 'Economics', 'Commercial Studies', 'Yoga', 'Home Science'].forEach(s => availableSubjects.add(s));
-                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
-                    }
-                    if (formData.boards.includes('CBSE')) {
-                      if (hasEarly) ['English', 'Mathematics', 'EVS', 'Hindi/Regional Language', 'Hindi', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasMiddle) ['English', 'Mathematics', 'Science', 'Social Science', 'Hindi', 'Sanskrit/Third Language', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasHigh) ['English', 'Mathematics', 'Science', 'Social Science', 'Hindi', 'Artificial Intelligence/Information Technology', 'Health & Physical Education', 'Skill Subjects', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
-                    }
-                    if (formData.boards.includes('State Board') || formData.boards.includes('IB / IGCSE')) {
-                      if (hasEarly) ['Kannada', 'English', 'Mathematics', 'EVS', 'Science', 'Social Science', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasMiddle) ['Kannada', 'English', 'Hindi/Third Language', 'Mathematics', 'Science', 'Social Science', 'Computer', 'Art', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasHigh) ['Kannada', 'English', 'Hindi/Third Language', 'Mathematics', 'Science', 'Social Science', 'Computer', 'Physical Education'].forEach(s => availableSubjects.add(s));
-                      if (hasPU) ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English', 'Accountancy', 'Business Studies', 'Economics', 'KCET', 'NEET', 'JEE'].forEach(s => availableSubjects.add(s));
-                    }
-
-                    return Array.from(availableSubjects).sort().map((sub: any) => (
+                    return allSubjects.sort().map((sub: string) => (
                       <label
-                        key={sub as string}
+                        key={sub}
                         className="flex items-center gap-3 border border-slate-300 rounded-xl px-4 py-3 hover:border-emerald-500 transition-all cursor-pointer"
                       >
                         <input 
                           type="checkbox" 
-                          checked={formData.subjects?.includes(sub as string)}
-                          onChange={() => handleCheckboxChange('subjects', sub as string)}
+                          checked={formData.subjects?.includes(sub)}
+                          onChange={() => handleCheckboxChange('subjects', sub)}
                           className="accent-emerald-500"
                         />
-                        <span className="text-sm font-medium">{sub as string}</span>
+                        <span className="text-sm font-medium">{sub}</span>
                       </label>
                     ));
                   })()}

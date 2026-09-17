@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { calculateSuitabilityScore, isStrictMatch, calculateDistanceKm } from '../src/utils/matching';
+import { calculateSuitabilityScore, isStrictMatch, calculateDistanceKm, matchesSubjectToken } from '../src/utils/matching';
+import { getSubjectsForStudent, getSubjectsForTeacher } from '../src/utils/subjects';
 
 test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)', () => {
 
@@ -279,6 +280,89 @@ test.describe('Matchmaking & Ranking Algorithm (Ranking_System_Architecture.md)'
       const teacher = { category: 'school', boards: ['CBSE'], classes: ['Class 10'], subjects: ['Social Science'] };
       expect(isStrictMatch(student, teacher)).toBe(false);
       expect(calculateSuitabilityScore(student, teacher)).toBe(50); // Class (30) + Board (20) = 50, but 0 subject points
+    });
+  });
+
+  test.describe('Standardized Subject Taxonomy & Matchmaking Tolerances', () => {
+    test('Matches compound slash-separated subjects in both directions', () => {
+      expect(matchesSubjectToken('Computer Science', 'Computer Science / Informatics Practices')).toBe(true);
+      expect(matchesSubjectToken('Informatics Practices', 'Computer Science / Informatics Practices')).toBe(true);
+      expect(matchesSubjectToken('Computer Science / Informatics Practices', 'Computer Science')).toBe(true);
+      expect(matchesSubjectToken('Physical Education', 'Physical Education / Psychology')).toBe(true);
+      expect(matchesSubjectToken('Psychology', 'Physical Education / Psychology')).toBe(true);
+    });
+
+    test('Matches All Subject / All Subjects wildcard when offered by teacher', () => {
+      expect(matchesSubjectToken('English', 'All Subject')).toBe(true);
+      expect(matchesSubjectToken('Math', 'All Subject')).toBe(true);
+      expect(matchesSubjectToken('Science', 'All Subjects')).toBe(true);
+      expect(matchesSubjectToken('Hindi', 'All Subjects')).toBe(true);
+    });
+
+    test('Matches standard academic aliases without false positives', () => {
+      expect(matchesSubjectToken('Math', 'Mathematics')).toBe(true);
+      expect(matchesSubjectToken('Mathematics', 'Math')).toBe(true);
+      expect(matchesSubjectToken('SST', 'Social Science')).toBe(true);
+      expect(matchesSubjectToken('SST', 'Social Studies')).toBe(true);
+      expect(matchesSubjectToken('EVS', 'Environmental Studies')).toBe(true);
+      expect(matchesSubjectToken('GK', 'General Knowledge (GK)')).toBe(true);
+      expect(matchesSubjectToken('English Core', 'English')).toBe(true);
+      expect(matchesSubjectToken('Hindi Core', 'Hindi')).toBe(true);
+
+      // Verify no false positive between Science and Social Science
+      expect(matchesSubjectToken('Science', 'Social Science')).toBe(false);
+      expect(matchesSubjectToken('Science', 'Social Studies')).toBe(false);
+    });
+
+    test('Resolves student subject sets accurately by Board, Class, and Stream', () => {
+      // Early CBSE / State (Nursery to 6th) -> 21 subjects
+      const cbseEarly = getSubjectsForStudent('CBSE', '4th Standard');
+      expect(cbseEarly.length).toBe(21);
+      expect(cbseEarly).toContain('All Subject');
+      expect(cbseEarly).toContain('Math');
+      expect(cbseEarly).not.toContain('Physics');
+
+      // Early ICSE -> 22 subjects
+      const icseEarly = getSubjectsForStudent('ICSE', '4th Standard');
+      expect(icseEarly.length).toBe(22);
+      expect(icseEarly).toContain('All Subjects');
+      expect(icseEarly).toContain('Mathematics');
+      expect(icseEarly).toContain('Moral Science / Value Education');
+
+      // Middle/High CBSE (7th to 10th) -> 27 subjects
+      const cbseHigh = getSubjectsForStudent('CBSE', '9th Standard');
+      expect(cbseHigh.length).toBe(27);
+      expect(cbseHigh).toContain('Physics');
+      expect(cbseHigh).toContain('Chemistry');
+      expect(cbseHigh).toContain('Biology');
+
+      // 11th Science Stream
+      const scienceStream = getSubjectsForStudent('CBSE', '11th Standard', 'Science');
+      expect(scienceStream).toContain('Physics');
+      expect(scienceStream).toContain('Computer Science / Informatics Practices');
+      expect(scienceStream).toContain('JEE');
+
+      // 12th Commerce Stream
+      const commerceStream = getSubjectsForStudent('CBSE', '12th Standard', 'Commerce');
+      expect(commerceStream).toContain('Accountancy');
+      expect(commerceStream).toContain('Business Studies');
+      expect(commerceStream).toContain('Applied Mathematics');
+
+      // 11th Arts Stream
+      const artsStream = getSubjectsForStudent('CBSE', '11th Standard', 'Arts / Humanities');
+      expect(artsStream).toContain('History');
+      expect(artsStream).toContain('Political Science');
+      expect(artsStream).toContain('Sociology');
+      expect(artsStream).toContain('Legal Studies');
+    });
+
+    test('Resolves teacher subject union based on selected boards and classes', () => {
+      const teacherRes = getSubjectsForTeacher(['CBSE'], ['1st - 5th', '1st PU']);
+      expect(teacherRes.hasSenior).toBe(true);
+      expect(teacherRes.allSubjects).toContain('All Subject');
+      expect(teacherRes.allSubjects).toContain('Physics');
+      expect(teacherRes.allSubjects).toContain('Accountancy');
+      expect(teacherRes.allSubjects).toContain('History');
     });
   });
 });
