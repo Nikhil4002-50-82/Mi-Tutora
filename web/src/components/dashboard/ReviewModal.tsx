@@ -46,10 +46,10 @@ export function ReviewModal({ isOpen, onClose, onSubmit, tutorName }: ReviewModa
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="relative bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-5 border-b border-emerald-100 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 sm:px-6 sm:py-5 border-b border-emerald-100 flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Review Teacher</h3>
             <p className="text-sm font-medium text-slate-500 mt-1">How was your experience with {tutorName}?</p>
@@ -64,7 +64,7 @@ export function ReviewModal({ isOpen, onClose, onSubmit, tutorName }: ReviewModa
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="p-5 sm:p-6 space-y-6">
           
           {/* Star Rating System */}
           <div className="flex flex-col items-center space-y-3">
@@ -81,7 +81,7 @@ export function ReviewModal({ isOpen, onClose, onSubmit, tutorName }: ReviewModa
                   className="transition-transform hover:scale-110 active:scale-95 focus:outline-none"
                 >
                   <Star 
-                    className={`w-10 h-10 transition-colors duration-200 ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 transition-colors duration-200 ${
                       star <= (hoverRating || rating) 
                         ? 'fill-amber-400 text-amber-400' 
                         : 'fill-slate-100 text-slate-200'

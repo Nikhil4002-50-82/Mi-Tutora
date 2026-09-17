@@ -1246,7 +1246,7 @@ export default function TeacherDashboard() {
       {/* MAIN CONTENT */}
       {showCategoryPopup && !hasProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-lg w-full text-center">
+          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-lg w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto text-center">
             <h2 className="text-3xl font-black text-slate-900 mb-4">What do you teach?</h2>
             <p className="text-slate-500 mb-8">Select a category to discover students looking for your expertise.</p>
             <div className="space-y-4">
@@ -1260,7 +1260,7 @@ export default function TeacherDashboard() {
       {/* Profile Completion Reminder Modal */}
       {showProfileReminder && !hasProfile && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+          <div className="bg-white rounded-3xl p-5 md:p-10 shadow-2xl max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-32 bg-[#00a992] -z-10"></div>
             <button 
               onClick={() => { setShowProfileReminder(false); setHasDismissedReminder(true); }}
@@ -1305,7 +1305,7 @@ export default function TeacherDashboard() {
 
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
-        <div className="max-w-7xl mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 lg:px-12 lg:pt-8 w-full flex-1">
+        <div className="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-3.5 sm:px-4 md:px-8 lg:px-12 2xl:px-16 pt-4 pb-10 md:pt-6 lg:pt-8 w-full flex-1">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -1350,7 +1350,7 @@ export default function TeacherDashboard() {
                       <p className="text-slate-500 text-lg md:text-xl leading-relaxed">Nice to have you back! Get ready to continue your teaching journey.</p>
                     </div>
 
-                    <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
+                    <div className="lg:col-span-6 xl:col-span-5 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-4 justify-end">
                       {/* Earnings Mini Widget */}
                       <EarningsWidget 
                         netRevenue={data?.earningsData?.netRevenue || 0}
@@ -1650,7 +1650,7 @@ export default function TeacherDashboard() {
 
                       return (
                         <>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                             {displayedStudents.map((group: any) => {
                               const firstStudent = group.students?.[0] || {};
                           const parentName = firstStudent.guardianName || firstStudent.parentName || 'Parent';
@@ -1798,10 +1798,10 @@ export default function TeacherDashboard() {
                                               <ExternalLink className="w-3 h-3 text-emerald-600 opacity-80" />
                                             </button>
                                           )}
-                                          <div className="flex gap-2">
+                                           <div className="flex gap-2">
                                             <button 
                                               onClick={() => setSelectedViewUser(buildStudentViewUser(group, group))}
-                                              className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
+                                              className="flex-1 py-2 sm:py-2.5 text-[#00a992] font-bold text-xs sm:text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95 truncate px-2 sm:px-4"
                                             >
                                               View
                                             </button>
@@ -1820,9 +1820,9 @@ export default function TeacherDashboard() {
                                                   handleSendOffer(group);
                                                 }}
                                                 disabled={(offerLoading && !offerApp) || isLocked}
-                                                className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                                className={`flex-[2] py-2 sm:py-2.5 font-bold text-xs sm:text-sm rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all px-2 sm:px-4 truncate ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                               >
-                                                {isLocked ? 'Locked' : (offerLoading && !offerApp ? 'Sending...' : 'Make Offer')} <ArrowRight className="w-4 h-4" />
+                                                <span className="truncate">{isLocked ? 'Locked' : (offerLoading && !offerApp ? 'Sending...' : 'Make Offer')}</span> <ArrowRight className="w-4 h-4 shrink-0" />
                                               </button>
                                             ) : (
                                               <button
@@ -1839,9 +1839,9 @@ export default function TeacherDashboard() {
                                                   handleDirectRequestDemo(group);
                                                 }}
                                                 disabled={!!offerApp || isLocked}
-                                                className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                                className={`flex-[2] py-2 sm:py-2.5 font-bold text-xs sm:text-sm rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all px-2 sm:px-4 truncate ${!!offerApp || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (tokensUsed >= quotaLimit ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                               >
-                                                {isLocked ? 'Locked' : 'Request Demo'} <ArrowRight className="w-4 h-4" />
+                                                <span className="truncate">{isLocked ? 'Locked' : 'Request Demo'}</span> <ArrowRight className="w-4 h-4 shrink-0" />
                                               </button>
                                             )}
                                           </div>
@@ -1990,7 +1990,7 @@ export default function TeacherDashboard() {
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Requests & Offers</h2>
                 </div>
                 {(displayRequests?.length ?? 0) > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {displayRequests?.map((neg: any) => (
                       <div key={neg.id} className="bg-gradient-to-br from-white to-slate-50 p-6 rounded-3xl border border-gray-100 shadow-lg shadow-slate-200/50 flex flex-col h-full hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300">
                             
@@ -2335,7 +2335,7 @@ export default function TeacherDashboard() {
                 {/* Demo Classes Section */}
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Demo Classes</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {data?.demoClasses?.map((cls: any) => {
                       const phone = cls.studentDetails?.phoneNumber || cls.studentDetails?.whatsappNumber || cls.studentDetails?.parentDetails?.phone || cls.studentDetails?.parentDetails?.whatsapp;
                       const email = cls.studentDetails?.email || cls.studentDetails?.parentDetails?.email;
@@ -2524,7 +2524,7 @@ export default function TeacherDashboard() {
                 {/* Active Students Section */}
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Active Students</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
@@ -2869,9 +2869,9 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch max-w-4xl mx-auto mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-stretch max-w-4xl 2xl:max-w-5xl mx-auto mt-4">
                   {/* Free Plan */}
-                  <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
+                  <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="text-2xl font-black text-gray-900">Basic</h3>
@@ -2918,7 +2918,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Pro Plan */}
-                  <div className="bg-gradient-to-br from-[#00a992] to-[#008270] rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between h-full border border-teal-400/30 text-white">
+                  <div className="bg-gradient-to-br from-[#00a992] to-[#008270] rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between h-full border border-teal-400/30 text-white">
                     <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                       <Star className="w-32 h-32 text-white" />
                     </div>
@@ -3266,7 +3266,7 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Analytics Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:gap-8 gap-4 sm:gap-6">
                   {/* Net Revenue */}
                   <div className="bg-gradient-to-br from-white to-emerald-50/50 border border-emerald-100/60 rounded-3xl p-6 shadow-sm flex flex-col justify-between group hover:-translate-y-1 hover:shadow-md transition-all">
                     <div>
@@ -3328,7 +3328,7 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Ledger & Active Tuitions */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:gap-10 gap-6 lg:gap-8 items-start">
                   {/* Left Column: Transaction Ledger & Referral Rewards Ledger */}
                   <div className="space-y-8">
                     {/* Transaction Ledger */}
@@ -3355,13 +3355,13 @@ export default function TeacherDashboard() {
                             else if (entry.type === 'demo_fee_paid') typeLabel = 'Demo Booking Fee';
 
                             return (
-                              <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                <div className="flex items-center gap-4">
+                              <div key={entry.id} className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                                   <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isOutflow ? 'bg-orange-50 text-orange-600' : isEscrow ? 'bg-teal-50 text-teal-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                     {isOutflow ? <TrendingDown className="w-5 h-5" /> : isEscrow ? <Lock className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
                                   </div>
-                                  <div>
-                                    <p className="font-bold text-gray-900 text-sm">{entry.studentName}</p>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-gray-900 text-sm truncate">{entry.studentName}</p>
                                     <div className="flex items-center gap-2 flex-wrap mt-0.5">
                                       <p className="text-xs text-slate-500 font-medium capitalize">{typeLabel} • {new Date(entry.date).toLocaleDateString()}</p>
                                       {isEscrow && (
@@ -3372,7 +3372,7 @@ export default function TeacherDashboard() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex-shrink-0">
                                   <p className={`font-bold ${isOutflow ? 'text-orange-600' : isEscrow ? 'text-teal-700' : 'text-emerald-600'}`}>
                                     {isOutflow ? '-' : '+'}₹{entry.amount?.toLocaleString()}
                                   </p>
@@ -3413,22 +3413,22 @@ export default function TeacherDashboard() {
                               : 'Pending Day 7 Fee';
 
                             return (
-                              <div key={refItem.id} className="p-5 flex flex-col gap-2.5 hover:bg-slate-50 transition-colors">
+                              <div key={refItem.id} className="p-4 sm:p-5 flex flex-col gap-2.5 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                                       isPaid ? 'bg-emerald-50 text-emerald-600' : isQualified ? 'bg-teal-50 text-teal-600' : 'bg-amber-50 text-amber-600'
                                     }`}>
                                       {isPaid ? <CheckCircle2 className="w-4 h-4" /> : isQualified ? <Lock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                                     </div>
-                                    <div>
-                                      <p className="font-bold text-gray-900 text-sm">{refItem.name}</p>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-bold text-gray-900 text-sm truncate">{refItem.name}</p>
                                       <p className="text-[11px] text-slate-500 font-medium">
                                         {isToken ? 'Teacher Referral' : 'Student Referral'} • Joined {new Date(refItem.createdAt || Date.now()).toLocaleDateString()}
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="text-right">
+                                  <div className="text-right flex-shrink-0">
                                     <p className="font-bold text-sm text-gray-900">
                                       {isToken ? '1 Proposal Token' : `₹${(refItem.reward || 0).toLocaleString()}`}
                                     </p>
@@ -3983,7 +3983,7 @@ export default function TeacherDashboard() {
       {/* View Payment History Modal */}
       {selectedPaymentHistoryApp && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden">
+          <div className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h3 className="font-bold text-gray-900 text-xl">Payment History</h3>
               <button 
@@ -4126,7 +4126,7 @@ export default function TeacherDashboard() {
         
         return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
+          <div className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md p-5 sm:p-8 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#00a992]/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
             <h3 className="text-2xl font-black text-gray-900 mb-2 relative z-10">Complete Payment</h3>
             <p className="text-gray-500 mb-6 font-medium relative z-10">You are about to book a demo with <span className="font-bold text-gray-900">{payingClass.studentName || 'Student'}</span>.</p>
@@ -4191,7 +4191,7 @@ export default function TeacherDashboard() {
         
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden text-center">
+            <div className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md p-5 sm:p-8 shadow-2xl relative overflow-hidden text-center max-h-[90vh] overflow-y-auto">
               <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />

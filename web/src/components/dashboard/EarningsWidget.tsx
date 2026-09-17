@@ -24,7 +24,7 @@ export function EarningsWidget({ netRevenue, activeMRR, onClick }: EarningsWidge
       </div>
       <div className="flex items-end justify-between">
         <div>
-          <h3 className="text-3xl font-black text-gray-900 tracking-tight">₹{netRevenue.toLocaleString()}</h3>
+          <h3 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight truncate">₹{netRevenue.toLocaleString()}</h3>
           <p className="text-xs text-emerald-600 font-bold mt-1">₹{activeMRR.toLocaleString()} Active MRR</p>
         </div>
         <TrendingUp className="w-12 h-12 text-emerald-400 opacity-50" strokeWidth={1.5} />

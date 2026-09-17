@@ -10,7 +10,7 @@ export function ProfileCompletenessCard({ completeness, onClick }: ProfileComple
   return (
     <div 
       onClick={onClick}
-      className="flex-1 max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between ml-auto"
+      className="w-full flex-1 sm:max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between sm:ml-auto"
     >
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">

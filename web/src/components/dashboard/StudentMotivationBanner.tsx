@@ -8,7 +8,7 @@ interface StudentMotivationBannerProps {
 
 export function StudentMotivationBanner({ studentName, onClick }: StudentMotivationBannerProps) {
   return (
-    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100/60 rounded-3xl p-6 flex items-center justify-between shadow-sm">
+    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100/60 rounded-3xl p-4 sm:p-6 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-6">
         <div className="w-16 h-16 relative flex-shrink-0 hidden sm:block">
           <div className="absolute inset-0 bg-emerald-200 rounded-full animate-pulse blur-xl opacity-50"></div>

@@ -267,8 +267,8 @@ export default function GroupSettingsModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-[#00a992] p-6 text-white shrink-0">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-[calc(100%-2rem)] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-[#00a992] p-4 sm:p-6 text-white shrink-0">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h2 className="text-2xl font-black text-white tracking-tight">Group Preferences</h2>
@@ -284,7 +284,7 @@ export default function GroupSettingsModal({
           </div>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-grow">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-grow">
           <form id="group-settings-form" onSubmit={handleSubmit} className="space-y-8">
             
             {category !== 'programming' && (
@@ -420,15 +420,15 @@ export default function GroupSettingsModal({
           </form>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-end gap-3">
-          <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">
+        <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100 shrink-0 flex flex-col sm:flex-row justify-end gap-3">
+          <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors text-center">
             Cancel
           </button>
           <button 
             type="submit" 
             form="group-settings-form"
             disabled={loading}
-            className="bg-[#00a992] text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-md flex items-center gap-2 disabled:opacity-70"
+            className="w-full sm:w-auto bg-[#00a992] text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             Save Preferences

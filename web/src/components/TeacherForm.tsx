@@ -567,46 +567,46 @@ export default function TeacherForm({
 
   return (
 
-    <div className={hasProfile && !isEditing && isDashboard ? "" : "bg-white rounded-3xl p-5 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto"}>
+    <div className={hasProfile && !isEditing && isDashboard ? "" : "bg-white rounded-3xl p-4 sm:p-7 md:p-10 shadow-2xl max-w-6xl mx-auto"}>
 
       {hasProfile && !isEditing ? (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-2xl font-black text-gray-900">Teacher Profile</h2>
+          <div className="flex justify-between items-center gap-3 mb-2">
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900">Teacher Profile</h2>
             <button 
               onClick={() => setIsEditing(true)}
-              className="bg-white border border-emerald-200 text-emerald-700 px-5 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-50 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
+              className="bg-white border border-emerald-200 text-emerald-700 px-3.5 sm:px-5 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-sm hover:bg-emerald-50 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
             >
-              <Edit2 className="w-4 h-4" /> Edit Profile
+              <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span>Edit Profile</span>
             </button>
           </div>
           
-          <div className="relative bg-white/80 backdrop-blur-md rounded-3xl shadow-xl shadow-teal-900/5 border border-white/50 hover:shadow-2xl hover:shadow-teal-900/10 transition-all duration-300 overflow-hidden mb-8 group">
-            <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-6 sm:p-8 flex justify-between items-center relative overflow-hidden">
+          <div className="relative bg-white/80 backdrop-blur-md rounded-2xl sm:rounded-3xl shadow-xl shadow-teal-900/5 border border-white/50 hover:shadow-2xl hover:shadow-teal-900/10 transition-all duration-300 overflow-hidden mb-6 sm:mb-8 group">
+            <div className="bg-gradient-to-br from-[#00a992] to-teal-600 p-4 sm:p-6 md:p-8 flex justify-between items-center relative overflow-hidden">
               <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700" />
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-900/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
               
-              <div className="relative z-10 flex items-center justify-between w-full">
-                <div className="flex items-center gap-5">
-                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30">
+              <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 flex-1 w-full sm:w-auto">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center text-lg sm:text-xl font-bold text-white backdrop-blur-md shadow-inner border border-white/30 shrink-0">
                     {(formData.fullName || 'T').charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white tracking-tight">{formData.fullName || 'Teacher Profile'}</h3>
-                    <p className="text-sm font-medium text-emerald-100/90 mt-0.5">{formData.email || 'No email provided'}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">{formData.fullName || 'Teacher Profile'}</h3>
+                    <p className="text-xs sm:text-sm font-medium text-emerald-100/90 mt-0.5 truncate">{formData.email || 'No email provided'}</p>
                   </div>
                 </div>
                 {initialData?.tutorId && (
-                  <div className="text-right ml-auto">
+                  <div className="flex items-center sm:flex-col items-start sm:items-end justify-between sm:justify-start gap-1 sm:gap-0.5 w-full sm:w-auto pt-2.5 sm:pt-0 border-t border-white/15 sm:border-t-0 shrink-0">
                      <p className="text-[11px] text-emerald-100/80 font-bold uppercase tracking-wider mb-0.5">Tutor ID</p>
-                     <p className="text-lg font-bold text-white font-mono bg-white/10 px-3 py-1 rounded-lg border border-white/20 backdrop-blur-sm shadow-sm">{initialData.tutorId}</p>
+                     <p className="text-sm sm:text-base md:text-lg font-bold text-white font-mono bg-white/10 px-2.5 sm:px-3 py-1 rounded-lg border border-white/20 backdrop-blur-sm shadow-sm tracking-wide">{initialData.tutorId}</p>
                   </div>
                 )}
               </div>
             </div>
             
-            <div className="p-6 md:p-8 bg-slate-50/50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="p-4 sm:p-6 md:p-8 bg-slate-50/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 md:gap-8">
                 <div>
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Gender</p>
                   <p className="text-lg font-bold text-gray-900 capitalize">{formData.gender || '-'}</p>
@@ -646,7 +646,7 @@ export default function TeacherForm({
               </div>
 
               {formData.category ===('school') && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 pt-6 border-t border-gray-200">
                   <div>
                     <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Subjects (School)</p>
                     <p className="text-lg font-bold text-gray-900">{formData.subjects?.length > 0 ? formData.subjects.join(', ') : '-'}</p>
@@ -725,11 +725,11 @@ export default function TeacherForm({
 
                 {existingResume?.url ? (
                   <div className="p-3.5 rounded-2xl border border-slate-200 bg-white flex items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600">
                         <FileText className="w-4 h-4" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-slate-800 truncate">{existingResume.fileName || 'Resume'}</p>
                         <p className="text-[11px] text-slate-400">
                           {existingResume.uploadedAt ? new Date(existingResume.uploadedAt).toLocaleDateString() : 'Active'}
@@ -740,7 +740,7 @@ export default function TeacherForm({
                       href={existingResume.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 text-xs font-bold text-[#00a992] hover:text-[#008f7b] bg-[#00a992]/10 hover:bg-[#00a992]/20 px-3 py-1.5 rounded-xl border border-[#00a992]/30 flex items-center gap-1 transition-colors"
+                      className="shrink-0 text-xs font-bold text-[#00a992] hover:text-[#008f7b] bg-[#00a992]/10 hover:bg-[#00a992]/20 px-3 py-1.5 rounded-xl border border-[#00a992]/30 flex items-center gap-1 transition-colors whitespace-nowrap"
                     >
                       View Resume
                     </a>
@@ -788,11 +788,11 @@ export default function TeacherForm({
                     const docData = existingDocs[req.id];
                     return (
                       <div key={req.id} className="p-3.5 rounded-2xl border border-slate-200 bg-white flex items-center justify-between gap-3 shadow-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${docData?.url ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
                             <FileText className="w-4 h-4" />
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold text-slate-800 truncate">{req.label}</p>
                             <p className="text-[11px] text-slate-400 truncate">{docData ? (docData.fileName || 'Uploaded PDF') : 'Missing document'}</p>
                           </div>
@@ -802,7 +802,7 @@ export default function TeacherForm({
                             href={docData.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1 transition-colors"
+                            className="shrink-0 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1 transition-colors whitespace-nowrap"
                           >
                             View <ExternalLink className="w-3 h-3" />
                           </a>
@@ -821,13 +821,13 @@ export default function TeacherForm({
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex justify-between items-start mb-10">
+          <div className="flex justify-between items-start mb-6 sm:mb-10 gap-4">
             <div>
-              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 flex items-center gap-3">
-                <UserCheck className="w-9 h-9 text-[#00a992] shrink-0" />
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-black mb-2 sm:mb-4 flex items-center gap-2.5 sm:gap-3">
+                <UserCheck className="w-7 h-7 sm:w-9 sm:h-9 text-[#00a992] shrink-0" />
                 <span>{hasProfile ? 'Edit Profile' : (isDashboard ? 'Complete Teacher Profile' : 'Teacher Information Form')}</span>
               </h2>
-              <p className="text-slate-500 text-lg">
+              <p className="text-slate-500 text-sm sm:text-base md:text-lg">
                 {hasProfile 
                   ? 'Update your teaching details and preferences.'
                   : (isDashboard 
@@ -838,7 +838,7 @@ export default function TeacherForm({
             {hasProfile && (
               <button 
                 onClick={() => setIsEditing(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0"
               >
                 Cancel
               </button>

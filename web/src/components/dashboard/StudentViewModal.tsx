@@ -90,8 +90,8 @@ export function StudentViewModal({
   const month2TutorShare = effectiveBudget;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-3 sm:p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-auto sm:my-8 max-h-[92vh] flex flex-col overflow-hidden">
         <button 
           onClick={() => { setSelectedViewUser(null); setSelectedViewApp(null); }}
           className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
@@ -99,13 +99,13 @@ export function StudentViewModal({
           <X className="w-5 h-5" />
         </button>
         
-        <div className="bg-[#00a992] p-8 sm:p-10 text-white flex-shrink-0 relative overflow-hidden">
-          <div className="relative z-10 flex items-start gap-6">
-            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl font-black backdrop-blur-md shadow-inner border border-white/30">
+        <div className="bg-[#00a992] p-5 sm:p-8 md:p-10 text-white flex-shrink-0 relative overflow-hidden">
+          <div className="relative z-10 flex items-start gap-4 sm:gap-6">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-4xl font-black backdrop-blur-md shadow-inner border border-white/30 flex-shrink-0">
               {((selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.guardianName || selectedViewUser.parentName || selectedViewUser.name)?.charAt(0) || 'S')}
             </div>
             <div>
-              <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">{selectedViewUser.students?.[0]?.guardianName || selectedViewUser.students?.[0]?.parentName || selectedViewUser.parentName || selectedViewUser.guardianName || 'Parent'}</h3>
               <div className="flex gap-2 mt-1.5 flex-wrap">
                 {(() => {
                   const parentId = selectedViewUser.parentId || selectedViewApp?.parentId || selectedViewUser.students?.[0]?.parentId || asyncParentId;
@@ -114,12 +114,12 @@ export function StudentViewModal({
                   return (
                     <>
                       {parentId && (
-                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
                           Parent ID: {parentId}
                         </p>
                       )}
                       {groupId && (
-                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                        <p className="text-emerald-100 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
                           Group ID: {groupId}
                         </p>
                       )}
@@ -127,14 +127,14 @@ export function StudentViewModal({
                   );
                 })()}
               </div>
-              <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
+              <p className="text-emerald-100 font-bold capitalize mt-1 text-sm sm:text-lg flex items-center gap-2">
                 <Users className="w-4 h-4" /> {selectedViewUser.students?.length || 1} Student(s)
               </p>
             </div>
           </div>
         </div>
 
-        <div className="p-8 sm:p-10 overflow-y-auto">
+        <div className="p-4 sm:p-8 md:p-10 overflow-y-auto">
           <div className="space-y-8">
             {/* Contact Information Block */}
             {(!selectedViewApp || !['demo_booking_phase', 'demo_scheduled', 'waiting_for_parent_decision', 'demo_booked', 'tuition_started', 'confirmed', 'accepted'].includes(selectedViewApp.status)) ? (
@@ -295,7 +295,7 @@ export function StudentViewModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Month 1 Card */}
                 <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div>

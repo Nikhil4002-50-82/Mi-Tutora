@@ -50,7 +50,7 @@ export function TuitionGroupCard({
               <span className="font-medium text-slate-700 flex items-center gap-2">
                 <User className="w-4 h-4 text-slate-400" /> {s.name}
               </span>
-              <div className="flex gap-1 opacity-0 group-hover/student:opacity-100 transition-opacity">
+              <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover/student:opacity-100 transition-opacity">
                 <button 
                   onClick={() => setEditingStudentId(s.id)}
                   className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"

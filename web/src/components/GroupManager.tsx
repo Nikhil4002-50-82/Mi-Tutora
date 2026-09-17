@@ -207,7 +207,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
   return (
     <div className={`flex flex-col h-full ${!isModal ? 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden' : ''}`}>
       {!isModal && (
-        <div className="bg-[#00a992] p-6 text-white">
+        <div className="bg-[#00a992] p-4 sm:p-6 text-white">
           <h2 className="text-2xl font-black mb-2 flex items-center gap-2">
             <Users className="w-6 h-6" /> {title}
           </h2>
@@ -217,7 +217,7 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
         </div>
       )}
 
-      <div className="p-6 bg-emerald-50/50 border-b border-gray-100 flex items-start gap-3">
+      <div className="p-4 sm:p-6 bg-emerald-50/50 border-b border-gray-100 flex items-start gap-3">
         <div className="mt-0.5 text-emerald-600 bg-emerald-100 p-1.5 rounded-lg">
           <Info className="w-5 h-5" />
         </div>
@@ -227,9 +227,9 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
         </div>
       </div>
 
-      <div className="p-6 flex-grow overflow-y-auto bg-gray-50/30">
+      <div className="p-4 sm:p-6 flex-grow overflow-y-auto bg-gray-50/30">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             
             {/* Unassigned Pool */}
             <Droppable droppableId="unassigned">
@@ -407,24 +407,24 @@ export default function GroupManager({ students, onSave, onCancel, isModal = fal
         </DragDropContext>
       </div>
       
-      <div className="p-6 bg-white border-t border-gray-100 flex justify-end gap-3">
+      <div className="p-4 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
         {onCancel && (
           <button 
             onClick={onCancel}
-            className="px-6 py-3 font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            className="w-full sm:w-auto px-6 py-3 font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-center"
           >
             Cancel
           </button>
         )}
         <button 
           onClick={() => resetGroups(true)}
-          className="px-6 py-3 font-bold text-amber-700 bg-amber-50 rounded-xl hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-2"
+          className="w-full sm:w-auto px-6 py-3 font-bold text-amber-700 bg-amber-50 rounded-xl hover:bg-amber-100 border border-amber-200 transition-colors flex items-center justify-center gap-2"
         >
           <RotateCcw className="w-5 h-5" /> Undo Changes
         </button>
         <button 
           onClick={handleSave}
-          className="px-8 py-3 font-bold text-white bg-[#00a992] rounded-xl shadow-md hover:bg-emerald-600 transition-colors flex items-center gap-2"
+          className="w-full sm:w-auto px-8 py-3 font-bold text-white bg-[#00a992] rounded-xl shadow-md hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
         >
           <Save className="w-5 h-5" /> Save Groups
         </button>

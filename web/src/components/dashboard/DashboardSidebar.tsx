@@ -46,7 +46,7 @@ export function DashboardSidebar({
       )}
 
       {/* SIDEBAR (Desktop & Mobile Drawer) */}
-      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
+      <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out w-64 max-w-[80vw] 2xl:w-72 bg-gradient-to-b from-[#063831] to-[#04241f] text-white flex flex-col border-r border-white/5 shadow-2xl md:shadow-xl z-50`}>
         <div className="h-[76px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
           <div className="flex w-full justify-between items-center">
             <div className="flex items-center gap-2.5">

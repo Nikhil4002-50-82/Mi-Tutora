@@ -33,7 +33,7 @@ export function DeleteAccountModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-8">
+      <div className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md overflow-hidden shadow-2xl p-5 sm:p-8">
         <h3 className="text-2xl font-black text-red-600 mb-2">Delete Account</h3>
         <p className="text-gray-600 font-medium mb-4">
           This will permanently delete your account, profiles, all registered applications, and all history.
@@ -48,17 +48,17 @@ export function DeleteAccountModal({
             placeholder="DELETE"
           />
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
           <button 
             onClick={handleClose}
-            className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="w-full sm:flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
             disabled={isDeleting}
           >
             Cancel
           </button>
           <button 
             onClick={handleConfirm}
-            className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50"
+            className="w-full sm:flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50"
             disabled={isDeleting || deleteConfirmText !== 'DELETE'}
           >
             {isDeleting ? 'Deleting...' : 'Permanently Delete'}

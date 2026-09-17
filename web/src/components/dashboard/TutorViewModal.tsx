@@ -58,8 +58,8 @@ export function TutorViewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-8 overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-3 sm:p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative my-auto sm:my-8 max-h-[92vh] flex flex-col overflow-hidden">
         <button 
           onClick={() => { setSelectedViewUser(null); setSelectedViewApp(null); }}
           className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors z-10"
@@ -67,31 +67,31 @@ export function TutorViewModal({
           <X className="w-5 h-5" />
         </button>
         
-        <div className="bg-[#00a992] p-8 sm:p-10 text-white flex-shrink-0 relative overflow-hidden">
-          <div className="relative z-10 flex items-start gap-6">
-            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl font-black backdrop-blur-md shadow-inner border border-white/30">
+        <div className="bg-[#00a992] p-5 sm:p-8 md:p-10 text-white flex-shrink-0 relative overflow-hidden">
+          <div className="relative z-10 flex items-start gap-4 sm:gap-6">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-4xl font-black backdrop-blur-md shadow-inner border border-white/30 flex-shrink-0">
               {selectedViewUser.name?.charAt(0) || 'T'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">{selectedViewUser.name}</h3>
                 {selectedViewUser.aadharVerified && (
-                  <ShieldCheck className="w-8 h-8 text-white/90 drop-shadow-md flex-shrink-0" />
+                  <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-white/90 drop-shadow-md flex-shrink-0" />
                 )}
               </div>
               {selectedViewUser.tutorId && (
-                <p className="text-emerald-100 font-mono font-bold mt-1.5 uppercase tracking-wider text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
+                <p className="text-emerald-100 font-mono font-bold mt-1.5 uppercase tracking-wider text-xs sm:text-sm bg-black/10 inline-block px-2 py-1 rounded-md border border-white/20 shadow-sm">
                   ID: {selectedViewUser.tutorId}
                 </p>
               )}
-              <p className="text-emerald-100 font-bold capitalize mt-1 text-lg flex items-center gap-2">
+              <p className="text-emerald-100 font-bold capitalize mt-1 text-sm sm:text-lg flex items-center gap-2">
                 <User className="w-4 h-4" /> {selectedViewUser.category || 'Tutor'}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="p-8 sm:p-10 overflow-y-auto">
+        <div className="p-4 sm:p-8 md:p-10 overflow-y-auto">
           <div className="space-y-8">
             
             <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">

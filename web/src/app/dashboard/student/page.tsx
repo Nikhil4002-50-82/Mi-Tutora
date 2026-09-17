@@ -1209,7 +1209,7 @@ export default function StudentDashboard() {
 
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl max-w-lg w-full text-center relative overflow-hidden">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-2xl max-w-lg w-full text-center relative overflow-hidden max-h-[90vh] overflow-y-auto">
               <div className="absolute top-0 left-0 right-0 h-3 bg-amber-400"></div>
               <button 
                 onClick={() => setHasDismissedGraceReminder(true)}
@@ -1272,8 +1272,8 @@ export default function StudentDashboard() {
           const teacherName = lockedApplication.tutorName || lockedApplication.teacher || 'your tutor';
           
           return (
-            <div className="flex-1 flex items-center justify-center p-6 bg-red-50/50 backdrop-blur-sm z-50">
-              <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl border border-red-100 relative overflow-hidden">
+            <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-red-50/50 backdrop-blur-sm z-50">
+              <div className="bg-white rounded-3xl p-5 sm:p-8 max-w-lg w-full text-center shadow-2xl border border-red-100 relative overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 right-0 h-2 bg-red-500"></div>
                 <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Lock className="w-10 h-10 text-red-600" />
@@ -1370,7 +1370,7 @@ export default function StudentDashboard() {
         <ActionModal {...modalConfig} onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} />
         <MessageModal {...messageModalConfig} onClose={() => setMessageModalConfig(prev => ({ ...prev, isOpen: false }))} />
         
-        <div className="max-w-7xl mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 lg:px-12 lg:pt-8 w-full flex-1">
+        <div className="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-3.5 sm:px-4 md:px-8 lg:px-12 2xl:px-16 pt-4 pb-10 md:pt-6 lg:pt-8 w-full flex-1">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -1432,7 +1432,7 @@ export default function StudentDashboard() {
                     </div>
 
                     <div className="lg:col-span-6 xl:col-span-5 flex flex-col sm:flex-row gap-4 justify-end">
-                      <div className="flex-1 max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+                      <div className="w-full flex-1 sm:max-w-sm bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
                         <div className="flex items-center gap-2 mb-4">
                           <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
                             <Activity className="w-4 h-4" />
@@ -1700,7 +1700,7 @@ export default function StudentDashboard() {
 
                   return (
                     <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                         {displayedTutors.map((teacher: any) => {
                       const matchGroup = (app: any) => {
                         return app.groupDocId === activeGroup?.id || app.studentDocId === activeGroup?.id;
@@ -1890,10 +1890,10 @@ export default function StudentDashboard() {
                                           <ExternalLink className="w-3 h-3 text-emerald-600 opacity-80" />
                                         </button>
                                       )}
-                                      <div className="flex gap-2">
+                                       <div className="flex gap-2">
                                         <button 
                                           onClick={() => setSelectedViewUser(teacher)}
-                                          className="flex-1 py-2.5 text-[#00a992] font-bold text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95"
+                                          className="flex-1 py-2 sm:py-2.5 text-[#00a992] font-bold text-xs sm:text-sm bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all active:scale-95 truncate px-2 sm:px-4"
                                         >
                                           View
                                         </button>
@@ -1908,9 +1908,9 @@ export default function StudentDashboard() {
                                               }
                                               handleRequestTutor(teacher);
                                             }}
-                                            className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                            className={`flex-[2] py-2 sm:py-2.5 font-bold text-xs sm:text-sm rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all px-2 sm:px-4 truncate ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                           >
-                                            {isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer'))} <ArrowRight className="w-4 h-4" />
+                                            <span className="truncate">{isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Make Offer'))}</span> <ArrowRight className="w-4 h-4 shrink-0" />
                                           </button>
                                         ) : (
                                           <button
@@ -1923,9 +1923,9 @@ export default function StudentDashboard() {
                                               }
                                               handleDirectRequestDemo(teacher); 
                                             }}
-                                            className={`flex-[2] py-2.5 font-bold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
+                                            className={`flex-[2] py-2 sm:py-2.5 font-bold text-xs sm:text-sm rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all px-2 sm:px-4 truncate ${!!offerApp || hasPendingDues || isLocked ? 'bg-gray-200 text-gray-500 shadow-none cursor-not-allowed' : (dailyRequestsCount >= 5 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#00a992] text-white hover:bg-[#00927d] active:scale-95')}`}
                                           >
-                                            {isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo'))} <ArrowRight className="w-4 h-4" />
+                                            <span className="truncate">{isLocked ? (hiredAppForGroup ? 'Teacher Assigned' : 'Locked') : (hasPendingDues ? 'Clear Dues First' : (dailyRequestsCount >= 5 ? 'Daily Limit' : 'Request Demo'))}</span> <ArrowRight className="w-4 h-4 shrink-0" />
                                           </button>
                                         )}
                                       </div>
@@ -2122,7 +2122,7 @@ export default function StudentDashboard() {
                   <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Requests & Offers</h2>
                 </div>
                 {(displayRequests?.length ?? 0) > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {displayRequests?.map((neg: any) => {
                       const studentForApp = allStudents.find((s:any) => s.id === neg.studentDocId) || { name: neg.studentName || 'Student' };
                       return (
@@ -2456,7 +2456,7 @@ export default function StudentDashboard() {
                 {/* Demo Teachers Section */}
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Demo Teachers</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {data?.demoClasses?.map((cls: any) => {
                       const phone = cls.tutorDetails?.phone || cls.tutorDetails?.whatsapp;
                       const email = cls.tutorDetails?.email;
@@ -2604,7 +2604,7 @@ export default function StudentDashboard() {
                 {/* Active Teachers Section */}
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-8">Active Teachers</h2>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {data?.upcomingClasses?.map((cls: any) => (
                       <li 
                         key={cls.id} 
@@ -3080,7 +3080,7 @@ export default function StudentDashboard() {
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {studentGroups.map((group: any, idx: number) => {
                       const requestDoc = data?.groups?.find((g: any) => g.id === group.id) || data?.tuitionRequests?.find((req: any) => req.groupDocId === group.id) || data?.myRequest; // Fallback
                       
@@ -3469,7 +3469,7 @@ export default function StudentDashboard() {
 
       {viewingGroupDetails && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-4xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 md:p-8 max-w-4xl w-[calc(100%-2rem)] shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <div>
                 {(() => {
