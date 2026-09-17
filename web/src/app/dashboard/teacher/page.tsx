@@ -2619,8 +2619,19 @@ export default function TeacherDashboard() {
                           {(() => {
                             const appData = cls.app || cls;
                             if (appData.status === 'tuition_started' && appData.feePaid === false) {
+                              if (appData.cancellationRequested) {
+                                return (
+                                  <div className="mt-2 bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-xl flex items-start gap-2 shadow-sm">
+                                    <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0 text-amber-600" />
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-sm uppercase tracking-wide text-amber-700 mb-0.5">Cancellation Requested</span>
+                                      <span className="text-xs font-medium">Student requested early cancellation (₹{appData.cancellationProratedFee ? appData.cancellationProratedFee.toLocaleString() : 'prorated'} settlement pending). Please pause classes.</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
                               const daysElapsed = Math.max(1, Math.ceil((Date.now() - (appData.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
-                              if (daysElapsed >= 10) {
+                              if (daysElapsed >= 20) {
                                 return (
                                   <div className="mt-2 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl flex items-start gap-2 shadow-sm">
                                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-600" />
@@ -2634,7 +2645,7 @@ export default function TeacherDashboard() {
                                 return (
                                   <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-xl flex items-start gap-2 shadow-sm">
                                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-yellow-600" />
-                                    <span className="text-xs font-bold leading-tight">The 7-day trial is over. The student has {10 - daysElapsed} days to complete the payment.</span>
+                                    <span className="text-xs font-bold leading-tight">The 7-day trial is over. The student has {Math.max(1, 20 - daysElapsed)} days to complete the payment.</span>
                                   </div>
                                 );
                               }
@@ -3490,8 +3501,8 @@ export default function TeacherDashboard() {
                           const daysElapsed = Math.max(0, Math.floor((nowTime - startMs) / (24 * 60 * 60 * 1000)));
 
                           const isInTrial = !studentPaid && daysElapsed < 7;
-                          const isGracePeriod = !studentPaid && daysElapsed >= 7 && daysElapsed < 10;
-                          const isLockedOverdue = !studentPaid && daysElapsed >= 10;
+                          const isGracePeriod = !studentPaid && daysElapsed >= 7 && daysElapsed < 20;
+                          const isLockedOverdue = !studentPaid && daysElapsed >= 20;
 
                           return (
                             <div key={cls.id} className="p-5 flex flex-col gap-4 hover:bg-slate-50 transition-colors">
@@ -3573,7 +3584,7 @@ export default function TeacherDashboard() {
                                       ) : isGracePeriod ? (
                                         <div>
                                           <p className="text-xs font-bold text-orange-950 mt-0.5">
-                                            Payment Overdue (3-Day Grace Period)
+                                            Payment Due (Grace Period - {Math.max(1, 20 - daysElapsed)}d left)
                                           </p>
                                           <p className="text-[11px] text-orange-800 mt-0.5">
                                             Trial ended on {day7DateStr}. Student in grace period awaiting payment.

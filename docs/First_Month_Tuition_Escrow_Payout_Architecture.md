@@ -206,10 +206,10 @@ In [`web/src/app/dashboard/teacher/page.tsx`](file:///c:/Users/Dell/Desktop/mush
 1. **Trial in Progress (`daysElapsed < 7`, `!feePaid`)**:
    - Stage 1: Amber clock badge `Due on [Day 7 Date] (Trial Day 7)` with days remaining countdown.
    - Stage 2: Slate calendar badge `Expected: ₹Y on [Day 30 Date]` with `Student Fee Required` pill.
-2. **Overdue Grace Period (`7 <= daysElapsed < 10`, `!feePaid`)**:
-   - Stage 1: Orange alert badge `Payment Overdue (3-Day Grace Period)`.
+2. **Overdue Grace Period (`7 <= daysElapsed < 20`, `!feePaid`)**:
+   - Stage 1: Orange alert badge `Payment Due (Grace Period Active)`.
    - Stage 2: Amber lock badge `Payout on Hold (Awaiting Student Fee)`.
-3. **Hard Lock (`daysElapsed >= 10`, `!feePaid`)**:
+3. **Hard Lock (`daysElapsed >= 20`, `!feePaid`)**:
    - Stage 1: Red alert badge `Overdue - Student Account Locked` (instruction to pause classes).
    - Stage 2: Rose lock badge `Payout Blocked (Student Fee Unpaid) - Day 30 Razorpay transfer will NOT execute unless student clears fee`.
 4. **Fee Paid by Student (`feePaid === true`)**:

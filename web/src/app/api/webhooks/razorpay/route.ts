@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
           transaction.update(appRef, {
             status: 'declined',
             feePaid: true,
+            cancellationRequested: false,
             updatedAt: Date.now(),
           });
         } else {

@@ -58,11 +58,11 @@ stateDiagram-v2
     
     state "5. Trial, Grace Period, Settlement & Day 30 Payout" as Phase5 {
         Hired_TuitionStarted --> Day0_6_Trial
-        Day0_6_Trial --> Discontinued_ProratedFee : Days 1-6
-        Day0_6_Trial --> Days7_9_GracePeriod : Days 7-9 (Popup Active)
-        Days7_9_GracePeriod --> Day10_HardLock : Day 10+ (Portal Locked)
-        Days7_9_GracePeriod --> Day30_EscrowPeriod : Fee Paid
-        Day10_HardLock --> Day30_EscrowPeriod : Fee Paid
+        Day0_6_Trial --> Discontinued_ProratedFee : Days 1-6 (Early Cancellation & Persistent Reminders)
+        Day0_6_Trial --> Days7_19_GracePeriod : Days 7-19 (Popup Active, Full Portal Access)
+        Days7_19_GracePeriod --> Day20_HardLock : Day 20+ (Portal Locked)
+        Days7_19_GracePeriod --> Day30_EscrowPeriod : Fee Paid
+        Day20_HardLock --> Day30_EscrowPeriod : Fee Paid
         Day30_EscrowPeriod --> Day30_DualUPIPayout : Day 30
     }
 
@@ -181,24 +181,26 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 
 ---
 
-## 8. The 7-Day Trial, 3-Day Grace Period & Mandatory Fee Settlement
+## 8. The 7-Day Trial, 13-Day Grace Period & Mandatory Fee Settlement
 *Full Specification: [`docs/Student_Fee_Payment_Architecture.md`](./Student_Fee_Payment_Architecture.md), [`docs/Payment_Architecture.md`](./Payment_Architecture.md)*
 
 When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 7-day live trial countdown begins:
-*   **Cancellation on Days 1 to 6 (Prorated Fee):** If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
+*   **Cancellation on Days 1 to 6 (Prorated Fee & Persistent Reminders):** If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
     $$\text{Prorated Fee} = \left(\frac{\text{Monthly Fee}}{30}\right) \times \text{Days Elapsed}$$
-*   **Days 7 to 9: 3-Day Grace Period (Dismissible Pop-Up):**
-    *   On portal load, an automatic **"Monthly Tuition Fee Due"** reminder pop-up prompts the student to settle the monthly fee.
+    The platform records `cancellationRequested: true`. If the parent dismisses the checkout modal, persistent overview banners and pop-up reminders continue prompting settlement of the prorated fee or withdrawal of the cancellation.
+*   **Days 7 to 19: 13-Day Grace Period (Dismissible Pop-Up & Full Portal Access):**
+    *   On portal load, an automatic **"Monthly Tuition Fee Due"** reminder pop-up prompts the student to settle the monthly fee with a dynamic countdown of remaining days (`{20 - daysElapsed} days remaining`).
     *   The student can dismiss the pop-up (`✕` or "Remind Me Later") to continue using and navigating all dashboard tabs without lockout.
     *   Clicking "Pay Monthly Fees" launches the secure Razorpay checkout overlay.
-*   **Day 10+: Hard Account Lock:**
-    *   If 3 grace days pass without payment (`daysElapsed >= 10`), the account enters hard lock.
+*   **Day 20+: Hard Account Lock:**
+    *   If the 13 grace days pass without payment (`daysElapsed >= 20`), the account enters hard lock.
     *   All sidebar navigation tabs and dashboard content are locked (`🔒` lock icons, dimmed styling, and disabled clicks).
     *   The student must click "Pay Monthly Fees Securely" to complete payment via Razorpay and restore full access.
 *   **Teacher Earnings Real-Time Visibility (`teacher/page.tsx`):**
     *   While student is in trial (Days 1–7), the teacher sees Stage 1 *Due on Day 7* and Stage 2 *Expected on Day 30* with *Student Fee Required* status.
-    *   During Grace Period (Days 7–9), displays *Payment Overdue* and *Payout on Hold (Awaiting Student Fee)*.
-    *   In Hard Lock (Day 10+), displays *Account Locked* and *Payout Blocked*, advising tutor to pause classes until dues are cleared.
+    *   If student initiates early cancellation, teacher is alerted with *Cancellation Requested* to pause classes.
+    *   During Grace Period (Days 7–19), displays *Payment Due (Grace Period)* and *Payout on Hold (Awaiting Student Fee)*.
+    *   In Hard Lock (Day 20+), displays *Account Locked* and *Payout Blocked*, advising tutor to pause classes until dues are cleared.
     *   Once student pays, displays *₹X Received by Platform* and *₹Y Held in Platform Escrow* releasing on Day 30.
 *   **Strict Zero-Refund Policy:** Once the tuition fee is paid, **no refunds are permitted**. If the parent disconnects after paying, the full fee is retained to protect teacher earnings.
 

@@ -104,6 +104,7 @@ export const handleRazorpayWebhook = onRequest(async (req, res) => {
             transaction.update(appRef, {
               status: "declined",
               feePaid: true,
+              cancellationRequested: false,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           } else {

@@ -47,3 +47,7 @@ export const APP_STATUS_TEACHER_PENDING = [
   'demo_requested_by_teacher', 
   'demo_pending_payment'
 ];
+
+export const TUITION_TRIAL_DAYS = 7;
+export const TUITION_PAYMENT_LOCK_DAYS = 20;
+

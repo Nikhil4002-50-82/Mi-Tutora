@@ -14,7 +14,7 @@ This master documentation serves as the comprehensive architectural overview of 
 5. [Trust & Safety: Aadhar KYC Verification](#5-trust--safety-aadhar-kyc-verification)
 6. [Real-time 2-Way Negotiation](#6-real-time-2-way-negotiation)
 7. [Demo Class Scheduling & 48-Hour Decision Window](#7-demo-class-scheduling--48-hour-decision-window)
-8. [The 7-Day Trial & Mandatory Fee Settlement](#8-the-7-day-trial--mandatory-fee-settlement)
+8. [The 7-Day Trial, Extended Grace Period (Days 7–19) & Mandatory Fee Settlement](#8-the-7-day-trial-extended-grace-period-days-719--mandatory-fee-settlement)
 9. [First-Month Tuition Escrow & Automated Day 30 Payouts](#9-first-month-tuition-escrow--automated-day-30-payouts)
 10. [Referral & Rewards Engine (Automated UPI Deposition)](#10-referral--rewards-engine-automated-upi-deposition)
 11. [Review & Rating Engine](#11-review--rating-engine)
@@ -58,11 +58,11 @@ stateDiagram-v2
     
     state "5. Trial, Grace Period, Settlement & Day 30 Payout" as Phase5 {
         Hired_TuitionStarted --> Day0_6_Trial
-        Day0_6_Trial --> Discontinued_ProratedFee : Days 1-6
-        Day0_6_Trial --> Days7_9_GracePeriod : Days 7-9 (Popup Active)
-        Days7_9_GracePeriod --> Day10_HardLock : Day 10+ (Portal Locked)
-        Days7_9_GracePeriod --> Day30_EscrowPeriod : Fee Paid
-        Day10_HardLock --> Day30_EscrowPeriod : Fee Paid
+        Day0_6_Trial --> Discontinued_ProratedFee : Days 1-6 (Persistent Reminder if unpaid)
+        Day0_6_Trial --> Days7_19_GracePeriod : Days 7-19 (Popup Active, Full Access)
+        Days7_19_GracePeriod --> Day20_HardLock : Day 20+ (Portal Locked)
+        Days7_19_GracePeriod --> Day30_EscrowPeriod : Fee Paid
+        Day20_HardLock --> Day30_EscrowPeriod : Fee Paid
         Day30_EscrowPeriod --> Day30_DualUPIPayout : Day 30
     }
 
@@ -170,18 +170,21 @@ To prevent lead exhaustion and maintain high application quality, teachers opera
 
 ---
 
-## 8. The 7-Day Trial, 3-Day Grace Period & Mandatory Fee Settlement
+## 8. The 7-Day Trial, Extended Grace Period (Days 7–19) & Mandatory Fee Settlement
 *Full Specification: [`docs/Student_Fee_Payment_Architecture.md`](./docs/Student_Fee_Payment_Architecture.md), [`docs/Payment_Architecture.md`](./docs/Payment_Architecture.md)*
 
 When the parent clicks "Hire", tuition officially starts (`tuition_started`). A 7-day live trial countdown begins:
-*   **Cancellation on Days 1 to 6 (Prorated Fee):** If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
-    $$\text{Prorated Fee} = \left(\frac{\text{Monthly Fee}}{30}\right) \times \text{Days Elapsed}$$
-*   **Days 7 to 9: 3-Day Grace Period (Dismissible Pop-Up):**
-    *   On portal load, an automatic **"Monthly Tuition Fee Due"** reminder pop-up prompts the student to settle the monthly fee.
+*   **Cancellation on Days 1 to 6 (Prorated Fee & Persistent Reminder):**
+    *   If dissatisfied before Day 7, the parent can discontinue by paying only for the exact days utilized:
+        $$\text{Prorated Fee} = \left(\frac{\text{Monthly Fee}}{30}\right) \times \text{Days Elapsed}$$
+    *   **Persistent Cancellation Reminder:** If a student requests early cancellation during Days 1–6 but closes the checkout overlay without paying, the intent is persisted (`cancellationRequested: true`). The student receives persistent reminders (overview amber alert banner, dismissible reminder pop-up, tutor card badge) prompting them to pay the prorated dues or withdraw the cancellation request ("Keep Teacher & Resume"). The teacher is also alerted in their dashboard that cancellation was requested.
+*   **Days 7 to 19: Extended Grace Period (Dismissible Pop-Up, Full Navigation):**
+    *   On portal load, an automatic **"Monthly Tuition Fee Due"** reminder pop-up prompts the student to settle the monthly fee with a live countdown of remaining grace days.
     *   The student can dismiss the pop-up (`✕` or "Remind Me Later") to continue using and navigating all dashboard tabs without lockout.
+    *   Students remain free to book other tutors and explore the platform throughout this 20-day window (`hasPendingDues` only triggers on Day 20+).
     *   Clicking "Pay Monthly Fees" launches the secure Razorpay checkout overlay.
-*   **Day 10+: Hard Account Lock:**
-    *   If 3 grace days pass without payment (`daysElapsed >= 10`), the account enters hard lock.
+*   **Day 20+: Hard Account Lock:**
+    *   If 20 days elapse from tuition start without payment (`daysElapsed >= 20`), the account enters hard lock.
     *   All sidebar navigation tabs and dashboard content are locked (`🔒` lock icons, dimmed styling, and disabled clicks).
     *   The student must click "Pay Monthly Fees Securely" to complete payment via Razorpay and restore full access.
 *   **Strict Zero-Refund Policy:** Once the tuition fee is paid, **no refunds are permitted**. If the parent disconnects after paying, the full fee is retained to protect teacher earnings.
@@ -371,7 +374,7 @@ For detailed deep-dives into specific platform subsystems, refer to the correspo
 The architecture and business rules are protected by an automated end-to-end test suite in [`web/tests/`](./web/tests) and TypeScript compilation in both Next.js and Firebase Cloud Functions:
 
 ```bash
-# Run all 19 test suites (182 unit, integration & ranking pagination tests)
+# Run all 19 test suites (214 unit, integration & ranking pagination tests)
 cd web
 npx playwright test
 
@@ -383,5 +386,5 @@ cd ../functions
 npm run build
 ```
 
-*All 182 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, and anti-fraud protections.*
+*All 214 automated tests pass with 0 errors across 19 test suites, validating the mathematical split, escrow lifecycle, server-side matching & 20-card pagination, 20-day grace period, early cancellation flow, and anti-fraud protections.*
 

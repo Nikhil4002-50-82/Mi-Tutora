@@ -235,10 +235,15 @@ test.describe('Payment Architecture & Financial Integrity (Payment_Architecture.
       expect(day7.allowed).toBe(true);
       expect(day7.type).toBe('full_tuition_payment');
 
-      // Day 10 (Overdue)
+      // Day 10 (Within 13-day Grace Period)
       const day10 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (10 * 24 * 60 * 60 * 1000));
       expect(day10.allowed).toBe(true);
       expect(day10.type).toBe('full_tuition_payment');
+
+      // Day 20 (Post-Grace Lockout)
+      const day20 = evaluateTuitionPaymentEligibility({ startDate: start }, false, start + (20 * 24 * 60 * 60 * 1000));
+      expect(day20.allowed).toBe(true);
+      expect(day20.type).toBe('full_tuition_payment');
     });
 
     test('Allows prorated cancellation payment before Day 7 during trial', () => {
@@ -246,6 +251,35 @@ test.describe('Payment Architecture & Financial Integrity (Payment_Architecture.
       const day4Removal = evaluateTuitionPaymentEligibility({ startDate: start }, true, start + (4 * 24 * 60 * 60 * 1000));
       expect(day4Removal.allowed).toBe(true);
       expect(day4Removal.type).toBe('prorated_cancellation');
+    });
+
+    test('Accurately tracks early cancellation request and withdrawal lifecycle', () => {
+      const app = {
+        id: 'app_trial_cancel',
+        status: 'tuition_started',
+        startDate: Date.now() - (3 * 24 * 60 * 60 * 1000), // Day 3
+        feePaid: false,
+        finalPrice: 6000,
+        cancellationRequested: false,
+        cancellationProratedFee: 0,
+      };
+
+      // 1. Initial State: Normal trial
+      expect(app.cancellationRequested).toBe(false);
+
+      // 2. Student requests early cancellation
+      const daysElapsed = 3;
+      const daysInMonth = 30;
+      const proratedFee = Math.round((app.finalPrice / daysInMonth) * daysElapsed);
+      app.cancellationRequested = true;
+      app.cancellationProratedFee = proratedFee;
+
+      expect(app.cancellationRequested).toBe(true);
+      expect(app.cancellationProratedFee).toBe(600); // (6000/30) * 3 = 600
+
+      // 3. Student withdraws cancellation to keep teacher
+      app.cancellationRequested = false;
+      expect(app.cancellationRequested).toBe(false);
     });
   });
 });

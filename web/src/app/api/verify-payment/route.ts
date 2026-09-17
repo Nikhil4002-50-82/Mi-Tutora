@@ -164,6 +164,7 @@ async function processDatabaseUpdate(adminDb: any, appRef: any, applicationId: s
             batch.update(appRef, {
                 status: 'declined',
                 feePaid: true,
+                cancellationRequested: false,
                 updatedAt: Date.now()
             });
         } else {

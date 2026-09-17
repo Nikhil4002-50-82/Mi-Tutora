@@ -18,10 +18,10 @@ graph TD
     D --> E{Timeline & Action}
     
     E -->|Days 0 to 6: Trial in Progress| E1[Student View Modal: Pay Fee Blurred & Disabled with Countdown]
-    E -->|Clicks 'Remove' < Day 7| F[UI requests Prorated Checkout]
-    E -->|Days 7 to 9: Grace Period| G[Dismissible Pop-Up: 'Pay Monthly Fees']
+    E -->|Clicks 'Remove' < Day 7| F[UI requests Prorated Checkout & records cancellationRequested: true]
+    E -->|Days 7 to 19: Grace Period| G[Dismissible Pop-Up: 'Pay Monthly Fees' with Dynamic Countdown]
     E -->|Day 7+: TutorViewModal Unlocks| G1[Active 'Pay Fee' Button]
-    E -->|Day 10+: Post-Grace Period| G2[Hard Lock Screen: 'Pay Monthly Fees Securely']
+    E -->|Day 20+: Post-Grace Period| G2[Hard Lock Screen: 'Pay Monthly Fees Securely']
     
     F --> H[API: /create-order]
     G -->|Clicks Pay Monthly Fees| I[API: /create-order]
@@ -78,30 +78,32 @@ When Razorpay successfully charges the card, it pings this secure webhook.
 *   **Teacher View (Earnings Transparency):**
     *   **Stage 1 (Student Fee):** Amber clock badge `Due on [Day 7 Date] (Trial Day 7)` with live countdown (*"Student 7-day trial in progress ({7 - daysElapsed} days remaining). Fee will be collected by platform."*).
     *   **Stage 2 (Tutor Payout):** Slate calendar badge `Expected: ₹Y on [Day 30 Date]` with prominent `Student Fee Required` pill (*"Day 30 payout locks into escrow automatically once student pays on Day 7."*).
-*   **Cancellation Policy (Prorated):** 
+*   **Cancellation Policy & Persistent Reminders (Prorated):** 
     *   If the student decides they do not like the teacher and clicks "Remove Teacher" **before** 7 days have passed (`daysElapsed < 7`).
-    *   They must pay a **prorated fee** calculated exactly for the number of days they attended: `(Monthly Fee ÷ Days in Month) × Days Elapsed`.
-    *   Once this prorated exit-fee is paid via Razorpay, the teacher is officially removed.
+    *   The platform records `cancellationRequested: true` and calculates a **prorated fee** for the exact days attended: `(Monthly Fee ÷ Days in Month) × Days Elapsed`.
+    *   If the student closes the checkout modal without paying, a **persistent reminder banner** and **dismissible pop-up** prompt them on every visit to clear the prorated fee or withdraw their cancellation.
+    *   The teacher is notified to pause classes while settlement is pending.
+    *   Once this prorated exit-fee is paid via Razorpay, the teacher is officially removed (`status: 'declined'`).
 
-### Phase 2: The 3-Day Grace Period (Days 7 to 9)
-**Trigger:** 7 full days have elapsed (`daysElapsed >= 7` but `< 10`) and the fee is still unpaid (`feePaid: false`).
+### Phase 2: The 13-Day Grace Period (Days 7 to 19)
+**Trigger:** 7 full days have elapsed (`daysElapsed >= 7` but `< 20`) and the fee is still unpaid (`feePaid: false`).
 
-*   **Status:** The trial period has officially ended, but the student is in an active 3-day grace period.
-*   **Student View (Dismissible Pop-Up):**
-    *   Every time the student opens or refreshes the portal, an amber **"Monthly Tuition Fee Due"** reminder pop-up appears displaying the tutor name, monthly fee, and active grace window.
-    *   The student can click **"Remind Me Later"** or **`✕`** to dismiss the pop-up and freely browse and use all dashboard tabs without lockout.
+*   **Status:** The trial period has officially ended, but the student is in an active 13-day grace period.
+*   **Student View (Dismissible Pop-Up & Full Portal Access):**
+    *   Every time the student opens or refreshes the portal, an amber **"Monthly Tuition Fee Due"** reminder pop-up appears displaying the tutor name, monthly fee, and a dynamic countdown of remaining days (`{20 - daysElapsed} days remaining`).
+    *   The student can click **"Remind Me Later"** or **`✕`** to dismiss the pop-up and freely browse, make offers, and use all dashboard tabs without lockout.
     *   Clicking **"Pay Monthly Fees"** opens the Root-Level Payment Modal to settle fees via Razorpay.
 *   **Teacher View (Earnings Transparency):**
-    *   **Stage 1 (Student Fee):** Orange alert badge `Payment Overdue (3-Day Grace Period)` (*"Trial ended on [Day 7 Date]. Student in grace period awaiting payment."*).
+    *   **Stage 1 (Student Fee):** Orange alert badge `Payment Due (Grace Period - Xd left)` (*"Trial ended on [Day 7 Date]. Student has {20 - daysElapsed} days to complete payment."*).
     *   **Stage 2 (Tutor Payout):** Amber lock badge `Payout on Hold (Awaiting Student Fee)` (*"Day 30 transfer will only lock into escrow once the student settles their dues."*).
 *   **Late Cancellation Penalty:** If the student attempts to click "Remove Teacher" at this stage without having paid, the platform backend denies the prorated discount. They are forced to pay the 100% full monthly fee as a penalty to clear their dues before the teacher is removed.
 
-### Phase 3: The Hard Lock (Day 10+)
-**Trigger:** 10 full days have elapsed (`daysElapsed >= 10`) and the fee is still unpaid (`feePaid: false`).
+### Phase 3: The Hard Lock (Day 20+)
+**Trigger:** 20 full days have elapsed (`daysElapsed >= 20`) and the fee is still unpaid (`feePaid: false`).
 
-*   **Status:** The 3-day grace period has expired without payment.
+*   **Status:** The 13-day grace period has expired without payment (20 days from tuition start).
 *   **Student View (Full Account Lockout):**
-    *   The entire main dashboard area is replaced with a dedicated red **"Account Locked"** screen.
+    *   The entire main dashboard area is replaced with a dedicated red **"Account Locked"** screen (*"Your payment grace period has expired (Day 20). Please clear your pending tuition fees to unlock your dashboard and continue using MiTutora."*).
     *   **Sidebar Navigation Locked:** All sidebar tabs (Dashboard, New Tuition, Requests & Offers, Notifications, My Teachers, Referrals) display a lock icon (`🔒`), are dimmed with `opacity-50 cursor-not-allowed`, and disabled. Clicking any tab shows a toast warning: *"Account locked. Please clear pending tuition fees to unlock your dashboard."*
     *   The student must click **"Pay Monthly Fees Securely"** on the lock card, which mounts the root-level payment modal and opens the Razorpay checkout overlay.
 *   **Teacher View (Earnings Transparency):**

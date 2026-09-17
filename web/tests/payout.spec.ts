@@ -249,7 +249,7 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
 
       if (app.feePaid) {
         stage1State = 'paid';
-      } else if (daysElapsed >= 10) {
+      } else if (daysElapsed >= 20) {
         stage1State = 'locked_overdue';
       } else if (daysElapsed >= 7) {
         stage1State = 'grace_period';
@@ -261,7 +261,7 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
         stage2State = 'disbursed';
       } else if (app.feePaid) {
         stage2State = 'in_escrow';
-      } else if (daysElapsed >= 10) {
+      } else if (daysElapsed >= 20) {
         stage2State = 'locked_overdue';
       } else if (daysElapsed >= 7) {
         stage2State = 'locked_grace';
@@ -309,7 +309,7 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
       expect(day3.stage1State).toBe('trial');
       expect(day3.stage2State).toBe('locked_trial');
 
-      // Day 8 (3-day Grace Period)
+      // Day 8 (Grace Period Active)
       const day8 = evaluateTeacherEarningsMilestone({
         startDate: now - (8 * ONE_DAY),
         feePaid: false,
@@ -319,15 +319,25 @@ test.describe('First-Month Tuition Escrow & Payout Workflow (First_Month_Tuition
       expect(day8.stage1State).toBe('grace_period');
       expect(day8.stage2State).toBe('locked_grace');
 
-      // Day 12 (Hard Lock / Overdue)
+      // Day 12 (Grace Period Still Active in 20-day window)
       const day12 = evaluateTeacherEarningsMilestone({
         startDate: now - (12 * ONE_DAY),
         feePaid: false,
         now,
       });
       expect(day12.daysElapsed).toBe(12);
-      expect(day12.stage1State).toBe('locked_overdue');
-      expect(day12.stage2State).toBe('locked_overdue');
+      expect(day12.stage1State).toBe('grace_period');
+      expect(day12.stage2State).toBe('locked_grace');
+
+      // Day 22 (Hard Lock / Overdue after 20 days)
+      const day22 = evaluateTeacherEarningsMilestone({
+        startDate: now - (22 * ONE_DAY),
+        feePaid: false,
+        now,
+      });
+      expect(day22.daysElapsed).toBe(22);
+      expect(day22.stage1State).toBe('locked_overdue');
+      expect(day22.stage2State).toBe('locked_overdue');
 
       // Student Paid (Escrow Held)
       const paidEscrow = evaluateTeacherEarningsMilestone({

@@ -37,6 +37,7 @@ import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { auth, functions } from '@/utils/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { getStudentDemoFee } from '@/utils/pricing';
+import { TUITION_TRIAL_DAYS, TUITION_PAYMENT_LOCK_DAYS } from '@/utils/constants';
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTabState] = useState('dashboard');
@@ -116,12 +117,71 @@ export default function StudentDashboard() {
   const [actionLoadingAppId, setActionLoadingAppId] = useState<string | null>(null);
   const [actionConfirmModal, setActionConfirmModal] = useState<{isOpen: boolean, type: 'hire'|'reject'|'remove', appId: string, teacherName: string} | null>(null);
   const [retrievingGmeetAppId, setRetrievingGmeetAppId] = useState<string | null>(null);
+  const [hasDismissedCancellationReminder, setHasDismissedCancellationReminder] = useState(false);
+  const [isWithdrawingCancellation, setIsWithdrawingCancellation] = useState<string | null>(null);
   const [nowTime, setNowTime] = useState(Date.now());
   
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleRequestCancellation = async (cls: any) => {
+    try {
+      const vToken = await auth.currentUser?.getIdToken();
+      if (!vToken) return null;
+      
+      const res = await fetch('/api/transactions/cancel-tuition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${vToken}`
+        },
+        body: JSON.stringify({
+          applicationId: cls.id,
+          action: 'request'
+        })
+      });
+      const dataRes = await res.json();
+      if (res.ok && dataRes.success) {
+        mutate();
+      }
+      return dataRes;
+    } catch (err) {
+      console.error("Cancellation record error:", err);
+      return null;
+    }
+  };
+
+  const handleWithdrawCancellation = async (appId: string) => {
+    try {
+      setIsWithdrawingCancellation(appId);
+      const vToken = await auth.currentUser?.getIdToken();
+      if (!vToken) throw new Error("Authentication required");
+
+      const res = await fetch('/api/transactions/cancel-tuition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${vToken}`
+        },
+        body: JSON.stringify({
+          applicationId: appId,
+          action: 'withdraw'
+        })
+      });
+      const dataRes = await res.json();
+      if (!res.ok || !dataRes.success) {
+        throw new Error(dataRes.error || "Failed to withdraw cancellation");
+      }
+      toast.success("Cancellation request withdrawn. Your tuition continues as normal.");
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to withdraw cancellation");
+    } finally {
+      setIsWithdrawingCancellation(null);
+    }
+  };
 
   useEffect(() => {
     setVisibleTutorsCount(20);
@@ -242,9 +302,15 @@ export default function StudentDashboard() {
       if (cls.status !== 'tuition_started') return false;
       if (cls.feePaid === true) return false;
       const daysElapsed = Math.max(1, Math.ceil((Date.now() - (cls.startDate || Date.now())) / (1000 * 60 * 60 * 24)));
-      return daysElapsed >= 7;
+      return daysElapsed >= TUITION_PAYMENT_LOCK_DAYS;
     });
   }, [data?.upcomingClasses]);
+
+  const pendingCancellationApp = useMemo(() => {
+    return data?.applications?.find((app: any) => {
+      return app.status === 'tuition_started' && app.cancellationRequested === true && !app.feePaid;
+    });
+  }, [data?.applications]);
   
   const studentGroups = useMemo(() => {
     const acc: any = {};
@@ -1129,7 +1195,7 @@ export default function StudentDashboard() {
       if (app.status === 'tuition_started' && !app.feePaid) {
         const appStart = app.startDate || Date.now();
         const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
-        return daysElapsed >= 10;
+        return daysElapsed >= TUITION_PAYMENT_LOCK_DAYS;
       }
       return false;
     });
@@ -1190,19 +1256,21 @@ export default function StudentDashboard() {
         userName={data?.profile?.name || data?.user?.displayName || ''}
       />
 
-      {/* Days 7-9 Grace Period Reminder Modal (Dismissible, allows navigation) */}
+      {/* Days 7-19 Grace Period Reminder Modal (Dismissible, allows navigation) */}
       {(() => {
         const graceApp = data?.applications?.find((app: any) => {
-          if (app.status === 'tuition_started' && !app.feePaid) {
+          if (app.status === 'tuition_started' && !app.feePaid && !app.cancellationRequested) {
             const appStart = app.startDate || Date.now();
             const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
-            return daysElapsed >= 7 && daysElapsed < 10;
+            return daysElapsed >= TUITION_TRIAL_DAYS && daysElapsed < TUITION_PAYMENT_LOCK_DAYS;
           }
           return false;
         });
 
         if (!graceApp || hasDismissedGraceReminder) return null;
 
+        const appStart = graceApp.startDate || Date.now();
+        const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
         const monthlyFee = graceApp.finalPrice || graceApp.currentOffer || 0;
         const displayNames = graceApp.studentName || (graceApp.studentDocIds?.length > 1 ? 'Group' : 'Student');
         const teacherName = graceApp.tutorName || graceApp.teacher || 'your tutor';
@@ -1223,7 +1291,7 @@ export default function StudentDashboard() {
               </div>
               <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Monthly Tuition Fee Due</h2>
               <p className="text-slate-600 font-medium text-sm mb-6 leading-relaxed">
-                Your 7-day free trial with <strong className="text-slate-900">{teacherName}</strong> has completed. You have an active 3-day grace period to pay your monthly fees and continue classes without interruption.
+                Your 7-day free trial with <strong className="text-slate-900">{teacherName}</strong> has completed. You have an active grace period ({Math.max(1, TUITION_PAYMENT_LOCK_DAYS - daysElapsed)} {TUITION_PAYMENT_LOCK_DAYS - daysElapsed === 1 ? 'day' : 'days'} remaining) to pay your monthly fees and continue classes without interruption.
               </p>
               
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 text-left">
@@ -1264,6 +1332,87 @@ export default function StudentDashboard() {
         );
       })()}
 
+      {/* Early Cancellation Reminder Modal (Dismissible) */}
+      {(() => {
+        if (!pendingCancellationApp || hasDismissedCancellationReminder) return null;
+
+        const monthlyFee = pendingCancellationApp.finalPrice || pendingCancellationApp.currentOffer || pendingCancellationApp.budget || 4000;
+        const appStart = pendingCancellationApp.startDate || Date.now();
+        const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
+        const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+        const proratedFee = pendingCancellationApp.cancellationProratedFee || Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
+        const teacherName = pendingCancellationApp.tutorName || pendingCancellationApp.teacher || 'your tutor';
+        const displayNames = pendingCancellationApp.studentName || (pendingCancellationApp.studentDocIds?.length > 1 ? 'Group' : 'Student');
+
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-2xl max-w-lg w-full text-center relative overflow-hidden max-h-[90vh] overflow-y-auto">
+              <div className="absolute top-0 left-0 right-0 h-3 bg-amber-500"></div>
+              <button 
+                onClick={() => setHasDismissedCancellationReminder(true)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors z-10"
+                title="Dismiss reminder"
+              >
+                ✕
+              </button>
+              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-200/80 text-amber-600">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Complete Teacher Removal</h2>
+              <p className="text-slate-600 font-medium text-sm mb-6 leading-relaxed">
+                You initiated cancellation for <strong className="text-slate-900">{teacherName}</strong>. Please pay your prorated fee of <strong className="text-slate-900">₹{proratedFee.toLocaleString()}</strong> for the {daysElapsed} trial {daysElapsed === 1 ? 'day' : 'days'} attended to finalize removal.
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 text-left">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 font-bold">Prorated Cancellation Fee</span>
+                  <span className="text-lg font-black text-slate-900">₹{proratedFee.toLocaleString()}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">Attended {daysElapsed} of 7 trial days for {displayNames}</p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => {
+                    setHasDismissedCancellationReminder(true);
+                    setPayingClass({ 
+                      id: pendingCancellationApp.id, 
+                      studentName: displayNames, 
+                      finalPrice: proratedFee, 
+                      isProrated: true, 
+                      isRemoval: true, 
+                      studentsList: pendingCancellationApp.studentsList || (pendingCancellationApp.studentDetails ? [pendingCancellationApp.studentDetails] : []), 
+                      tutorName: teacherName 
+                    });
+                  }}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3.5 px-4 rounded-xl font-bold text-sm shadow-md shadow-amber-600/25 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Pay Prorated Fee (₹{proratedFee.toLocaleString()})
+                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => setHasDismissedCancellationReminder(true)}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors text-xs"
+                  >
+                    Remind Me Later
+                  </button>
+                  <button
+                    onClick={() => {
+                      setHasDismissedCancellationReminder(true);
+                      handleWithdrawCancellation(pendingCancellationApp.id);
+                    }}
+                    disabled={isWithdrawingCancellation === pendingCancellationApp.id}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors text-xs disabled:opacity-50"
+                  >
+                    {isWithdrawingCancellation === pendingCancellationApp.id ? 'Resuming...' : 'Keep Teacher & Resume'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* MAIN CONTENT */}
       {(() => {
         if (lockedApplication) {
@@ -1280,7 +1429,7 @@ export default function StudentDashboard() {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Account Locked</h2>
                 <p className="text-slate-600 font-medium mb-8 text-lg leading-relaxed">
-                  Your 3-day payment grace period has expired. Please clear your pending tuition fees to unlock your dashboard and continue using MiTutora.
+                  Your payment grace period has expired (Day 20). Please clear your pending tuition fees to unlock your dashboard and continue using MiTutora.
                 </p>
                 <button 
                   onClick={() => {
@@ -1403,6 +1552,54 @@ export default function StudentDashboard() {
 
               return (
                 <div className="flex flex-col gap-8 h-full pb-10">
+                  {pendingCancellationApp && (() => {
+                    const monthlyFee = pendingCancellationApp.finalPrice || pendingCancellationApp.currentOffer || pendingCancellationApp.budget || 4000;
+                    const appStart = pendingCancellationApp.startDate || Date.now();
+                    const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStart) / (1000 * 60 * 60 * 24)));
+                    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                    const proratedFee = pendingCancellationApp.cancellationProratedFee || Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
+                    const teacherName = pendingCancellationApp.tutorName || pendingCancellationApp.teacher || 'your tutor';
+                    const displayNames = pendingCancellationApp.studentName || (pendingCancellationApp.studentDocIds?.length > 1 ? 'Group' : 'Student');
+
+                    return (
+                      <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 text-amber-600">
+                            <AlertTriangle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-amber-900 text-sm">Action Required: Prorated Cancellation Fee Due</h3>
+                            <p className="text-amber-800 text-xs font-medium mt-0.5">
+                              You requested to remove <strong className="text-slate-900">{teacherName}</strong>. Please pay ₹{proratedFee.toLocaleString()} ({daysElapsed} trial {daysElapsed === 1 ? 'day' : 'days'} attended) to complete teacher removal.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button
+                            onClick={() => handleWithdrawCancellation(pendingCancellationApp.id)}
+                            disabled={isWithdrawingCancellation === pendingCancellationApp.id}
+                            className="flex-1 sm:flex-initial bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap disabled:opacity-50"
+                          >
+                            {isWithdrawingCancellation === pendingCancellationApp.id ? 'Resuming...' : 'Keep Teacher'}
+                          </button>
+                          <button
+                            onClick={() => setPayingClass({
+                              id: pendingCancellationApp.id,
+                              studentName: displayNames,
+                              finalPrice: proratedFee,
+                              isProrated: true,
+                              isRemoval: true,
+                              studentsList: pendingCancellationApp.studentsList || (pendingCancellationApp.studentDetails ? [pendingCancellationApp.studentDetails] : []),
+                              tutorName: teacherName
+                            })}
+                            className="flex-1 sm:flex-initial bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-colors shadow-sm whitespace-nowrap"
+                          >
+                            Pay ₹{proratedFee.toLocaleString()} Now
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {hasPendingDues && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm gap-4">
                       <div className="flex items-center gap-3">
@@ -2754,18 +2951,49 @@ export default function StudentDashboard() {
                             const daysElapsed = Math.max(1, Math.ceil((Date.now() - appStartDate) / (1000 * 60 * 60 * 24)));
                             const monthlyFee = cls.finalPrice || cls.currentOffer || 0;
                             const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-                            const proratedFee = Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
+                            const proratedFee = cls.cancellationProratedFee || cls.app?.cancellationProratedFee || Math.max(1, Math.round((monthlyFee / daysInMonth) * daysElapsed));
                             const isPaid = (cls.feePaid === true) || (cls.app?.feePaid === true);
+                            const isCancellationRequested = Boolean(cls.cancellationRequested || cls.app?.cancellationRequested);
                             const displayNames = cls.studentName || (cls.studentDocIds?.length > 1 ? 'Group' : 'Student');
+
+                            if (isCancellationRequested && !isPaid) {
+                              return (
+                                <div className="mt-2 flex flex-col gap-2">
+                                  <div className="bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm p-3 rounded-xl font-bold flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                                    <span>Cancellation Initiated: Please pay ₹{proratedFee.toLocaleString()} ({daysElapsed} trial {daysElapsed === 1 ? 'day' : 'days'} attended) to finalize removal.</span>
+                                  </div>
+                                  <button 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: proratedFee, isProrated: true, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
+                                    }} 
+                                    className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3.5 rounded-xl font-bold shadow-md hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" /> Pay Prorated Fee (₹{proratedFee.toLocaleString()})
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      handleWithdrawCancellation(cls.id);
+                                    }}
+                                    disabled={isWithdrawingCancellation === cls.id}
+                                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                                  >
+                                    {isWithdrawingCancellation === cls.id ? 'Resuming...' : 'Undo Cancellation & Keep Teacher'}
+                                  </button>
+                                </div>
+                              );
+                            }
 
                             return (
                               <div className="mt-2 flex flex-col gap-2">
                                 {!isPaid && daysElapsed >= 7 && (
                                   <div className="flex flex-col gap-2">
-                                    {daysElapsed < 10 && (
+                                    {daysElapsed < TUITION_PAYMENT_LOCK_DAYS && (
                                       <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs sm:text-sm p-3 rounded-xl font-bold flex items-start gap-2">
                                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                                        <span>Your 7-day trial has ended. You have a 3-day grace period to pay your monthly fees to continue classes.</span>
+                                        <span>Your 7-day trial has ended. You have an active grace period ({Math.max(1, TUITION_PAYMENT_LOCK_DAYS - daysElapsed)} {TUITION_PAYMENT_LOCK_DAYS - daysElapsed === 1 ? 'day' : 'days'} remaining) to pay your monthly fees to continue classes.</span>
                                       </div>
                                     )}
                                     <button 
@@ -2786,6 +3014,7 @@ export default function StudentDashboard() {
                                       setActionConfirmModal({ isOpen: true, type: 'remove', appId: cls.id, teacherName: cls.tutorName || cls.teacher });
                                     } else {
                                       if (daysElapsed < 7) {
+                                        handleRequestCancellation(cls);
                                         setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: proratedFee, isProrated: true, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });
                                       } else {
                                         setPayingClass({ id: cls.id, studentName: displayNames, finalPrice: monthlyFee, isProrated: false, isRemoval: true, studentsList: cls.studentsList || (cls.studentDetails ? [cls.studentDetails] : []), tutorName: cls.tutorName || cls.teacher });

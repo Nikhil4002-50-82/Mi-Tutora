@@ -272,8 +272,8 @@ export function TutorViewModal({
               const day30DateStr = new Date(day30Date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
               const isInTrial = !isFeePaid && daysElapsed < 7;
-              const isGracePeriod = !isFeePaid && daysElapsed >= 7 && daysElapsed < 10;
-              const isLockedOverdue = !isFeePaid && daysElapsed >= 10;
+              const isGracePeriod = !isFeePaid && daysElapsed >= 7 && daysElapsed < 20;
+              const isLockedOverdue = !isFeePaid && daysElapsed >= 20;
 
               const subsequentPayments: any[] = Array.isArray(selectedViewApp.subsequentPayments) ? selectedViewApp.subsequentPayments : [];
               const totalPaymentsMade = (isFeePaid ? 1 : 0) + subsequentPayments.length;
@@ -359,16 +359,16 @@ export function TutorViewModal({
                             {isLockedOverdue ? (
                               'Payment Overdue — Account Locked'
                             ) : isGracePeriod ? (
-                              `Payment Overdue (3-Day Grace Period ends ${new Date(startMs + 10 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`
+                              `Payment Due (Grace Period ends ${new Date(startMs + 20 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`
                             ) : (
                               `Due on ${day7DateStr} (Trial Day 7)`
                             )}
                           </p>
                           <p className="text-xs opacity-90 mt-1">
                             {isLockedOverdue 
-                              ? 'Your 7-day trial has ended. Classes are paused until tuition dues are cleared.' 
+                              ? 'Your payment grace period has expired. Classes are paused until tuition dues are cleared.' 
                               : isGracePeriod 
-                                ? `Trial ended on ${day7DateStr}. Please clear dues to prevent class suspension.` 
+                                ? `Trial ended on ${day7DateStr}. You have ${Math.max(1, 20 - daysElapsed)} days remaining to clear dues before account lockout.` 
                                 : `7-day trial in progress (${Math.max(0, 7 - daysElapsed)} days remaining). Your fee is held in platform escrow until Day 30.`}
                           </p>
                         </div>
