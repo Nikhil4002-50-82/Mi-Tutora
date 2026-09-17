@@ -37,6 +37,7 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const subtitle = role === 'student' ? 'Student' : 'Teacher';
   const defaultInitial = role === 'student' ? 'S' : 'T';
+  const dashboardPath = role === 'student' ? '/dashboard/student' : '/dashboard/teacher';
 
   return (
     <>
@@ -50,7 +51,15 @@ export function DashboardSidebar({
         <div className="h-[76px] px-6 border-b border-white/10 flex flex-col justify-center items-start">
           <div className="flex w-full justify-between items-center">
             <div className="flex items-center gap-2.5">
-              <Link href="/" className="hover:opacity-90 transition-opacity">
+              <Link 
+                href={dashboardPath} 
+                onClick={() => {
+                  setActiveTab('dashboard');
+                  setActiveRequestViewId(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="hover:opacity-90 transition-opacity"
+              >
                 <Image
                   src="/logo.png"
                   alt="MiTutora"
